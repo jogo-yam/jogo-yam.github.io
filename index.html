@@ -239,6 +239,18 @@
   <button type="button" class="acao-legenda" hidden></button>
 </div>
 
+<!-- Avisos e perguntas do app (no lugar das caixinhas do navegador) -->
+<div id="janela-pergunta" class="janela" hidden>
+  <div class="janela-caixa" role="alertdialog" aria-modal="true" aria-labelledby="pergunta-titulo">
+    <h2 id="pergunta-titulo"></h2>
+    <p id="pergunta-texto" class="pergunta-texto"></p>
+    <div class="fim-acoes">
+      <button id="pergunta-sim" class="principal" onclick="responder(true)">OK</button>
+      <button id="pergunta-nao" onclick="responder(false)">Cancelar</button>
+    </div>
+  </div>
+</div>
+
 <script src="app.js"></script>
 <script type="module" src="familia.js"></script>
 

@@ -524,10 +524,46 @@ function avisarSala() {
   if (window.familia) familia.sincronizar();
 }
 
+// ---------- avisos e perguntas (janelas do app) ----------
+// Substituem alert/confirm do navegador. Devolvem uma Promise:
+// avisar() resolve quando a pessoa toca em OK; confirmar() resolve true/false.
+
+let respostaPendente = null;
+
+function perguntar({ titulo = "", texto = "", sim = "OK", nao = null, perigo = false }) {
+  if (respostaPendente) respostaPendente(false); // só uma pergunta por vez
+  document.getElementById("pergunta-titulo").textContent = titulo;
+  document.getElementById("pergunta-titulo").hidden = !titulo;
+  document.getElementById("pergunta-texto").textContent = texto;
+  const botaoSim = document.getElementById("pergunta-sim");
+  botaoSim.textContent = sim;
+  botaoSim.className = perigo ? "perigo" : "principal";
+  const botaoNao = document.getElementById("pergunta-nao");
+  botaoNao.textContent = nao || "";
+  botaoNao.hidden = !nao;
+  document.getElementById("janela-pergunta").hidden = false;
+  botaoSim.focus();
+  return new Promise(resolve => {
+    respostaPendente = valor => {
+      respostaPendente = null;
+      document.getElementById("janela-pergunta").hidden = true;
+      resolve(valor);
+    };
+  });
+}
+
+function responder(valor) {
+  if (respostaPendente) respostaPendente(valor);
+}
+
+const avisar = (texto, titulo = "") => perguntar({ titulo, texto });
+const confirmar = (titulo, texto, sim = "Sim", perigo = false) =>
+  perguntar({ titulo, texto, sim, nao: "Cancelar", perigo });
+
 // Botão "Jogar em família" (funciona só com internet).
 function abrirFamilia(modo) {
   if (window.familia) familia.abrir(modo);
-  else alert("A sala precisa de internet. Verifique a conexão e tente de novo.");
+  else avisar("Verifique a conexão e tente de novo.", "A sala precisa de internet");
 }
 
 function update(key, value) {
@@ -800,7 +836,7 @@ async function convidarJogadores() {
     ultimoAviso = Date.now();
     mostrarLegenda(["Link copiado", "Agora é só colar no WhatsApp."]);
   } catch {
-    prompt("Copie o link do app:", ENDERECO_APP);
+    avisar(ENDERECO_APP, "Copie o link do app");
   }
 }
 
@@ -833,19 +869,21 @@ function soltarConfete() {
   setTimeout(() => { area.innerHTML = ""; }, 3800);
 }
 
-function novoJogo() {
-  if (window.familia && familia.ativa() && !familia.revelada()) {
-    if (!confirm("Você está numa sala. Sair dela e começar um novo jogo?")) return;
-    familia.sair();
-  }
-
+async function novoJogo() {
   const jaSalva = entradaDaPartidaAtual() !== null;
   const temValores = partidaTemValores(state);
-  const mensagem = jaSalva || !temValores
-    ? "Começar um novo jogo?"
-    : "Salvar esta partida no histórico e começar um novo jogo?";
 
-  if (!confirm(mensagem)) return;
+  if (window.familia && familia.ativa() && !familia.revelada()) {
+    if (!await confirmar("Sair da sala?",
+      "Você está numa sala. Para começar um novo jogo, você sai dela." +
+      (temValores && !jaSalva ? " Esta partida vai para o histórico." : ""), "Sair e começar")) return;
+    familia.sair();
+  } else if (!await confirmar("Novo jogo",
+    jaSalva || !temValores
+      ? "Começar um novo jogo?"
+      : "Esta partida vai para o histórico e a tabela fica zerada.", "Começar")) {
+    return;
+  }
 
   if (temValores) salvarPartidaAtual();
   comecarNovaPartida();
@@ -962,9 +1000,9 @@ function abrirPartida(id) {
   mostrarTela("tela-partida");
 }
 
-function excluirPartida() {
+async function excluirPartida() {
   if (!partidaAberta) return;
-  if (!confirm("Excluir esta partida do histórico? Não dá para desfazer.")) return;
+  if (!await confirmar("Excluir partida?", "Ela sai do histórico e não dá para desfazer.", "Excluir", true)) return;
 
   historico = historico.filter(p => p.id !== partidaAberta.id);
   salvarHistorico();
@@ -1257,7 +1295,7 @@ function mostrarNome() {
 // Abre a janelinha para digitar o nome.
 function editarNome() {
   if (window.familia && familia.ativa()) {
-    alert("Para trocar o nome, saia da sala primeiro.");
+    avisar("Para trocar o nome, saia da sala primeiro.", "Você está numa sala");
     return;
   }
   const campo = document.getElementById("campo-nome");
@@ -1369,7 +1407,7 @@ async function exportarHistorico() {
     }
   } catch (erro) {
     if (erro && erro.name === "AbortError") return; // a pessoa cancelou o compartilhamento
-    alert("Não foi possível exportar o backup.");
+    avisar("Não foi possível exportar o backup. Tente de novo.");
     return;
   }
 
@@ -1393,13 +1431,13 @@ async function importarHistorico(campo) {
   try {
     dados = JSON.parse(await arquivo.text());
   } catch {
-    alert("Esse arquivo não é um backup do YAM.");
+    avisar("Escolha o arquivo .json exportado pelo botão Exportar.", "Esse arquivo não é um backup do YAM");
     return;
   }
 
   const lista = Array.isArray(dados) ? dados : dados && dados.historico;
   if (!Array.isArray(lista) || !lista.every(partidaValida)) {
-    alert("Esse arquivo não é um backup do YAM.");
+    avisar("Escolha o arquivo .json exportado pelo botão Exportar.", "Esse arquivo não é um backup do YAM");
     return;
   }
 
@@ -1408,16 +1446,18 @@ async function importarHistorico(campo) {
   const quando = dados.exportadoEm ? ` de ${formatarData(dados.exportadoEm)}` : "";
 
   if (novas.length === 0) {
-    alert(`Todas as ${lista.length} partidas desse backup${quando} já estão neste celular.`);
+    avisar(`Todas as ${lista.length} partidas desse backup${quando} já estão neste celular.`, "Nada novo para importar");
     return;
   }
-  if (!confirm(`Importar ${novas.length} partida(s) do backup${quando}? As partidas que já estão aqui continuam.`)) return;
+  if (!await confirmar("Importar backup?",
+    `${novas.length} partida${novas.length === 1 ? "" : "s"} do backup${quando} entra${novas.length === 1 ? "" : "m"} no histórico. As que já estão aqui continuam.`,
+    "Importar")) return;
 
   historico = [...historico, ...novas].sort((a, b) => b.data.localeCompare(a.data));
   recalcularTotaisHistorico();
   salvarHistorico();
   abrirHistorico();
-  alert(`${novas.length} partida(s) importada(s).`);
+  avisar(`${novas.length} partida${novas.length === 1 ? "" : "s"} importada${novas.length === 1 ? "" : "s"}.`, "Pronto!");
 }
 
 // Pede ao navegador para não apagar os dados do app por falta de espaço ou de uso.

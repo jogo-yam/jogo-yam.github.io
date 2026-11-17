@@ -1122,6 +1122,15 @@ button.podio-nome {
   cursor: pointer;
 }
 
+.pergunta-texto {
+  margin: 0 0 16px;
+  line-height: 1.45;
+  color: var(--texto-suave);
+  user-select: text;
+  -webkit-user-select: text;
+  overflow-wrap: anywhere;
+}
+
 .podio-revanche-info {
   margin: 12px 0 0;
   font-weight: 600;
@@ -1188,7 +1197,8 @@ button.podio-nome {
 
 /* título da tela da partida ("Tabela de ...") não passa por baixo do Voltar */
 #titulo-partida {
-  padding: 0 92px;
+  padding: 0 90px;
+  font-size: 18px; /* a data cabe mesmo em celular estreito */
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;

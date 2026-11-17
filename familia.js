@@ -251,18 +251,19 @@ async function compartilharCodigo() {
   try {
     if (navigator.share) { await navigator.share({ text: `${texto}: ${ENDERECO_APP}` }); return; }
   } catch (e) { if (e && e.name === "AbortError") return; }
-  alert(`Código da partida: ${sessao.codigo}`);
+  avisar(`Passe este código para os outros jogadores: ${sessao.codigo}`, "Código da sala");
 }
 
 async function encerrarPartida() {
   const faltam = jogadoresDe(partida).filter(j => !j.terminou).map(j => j.nome);
-  if (!confirm(`Encerrar agora e mostrar o resultado? Quem ainda não terminou (${faltam.join(", ")}) fica fora do pódio.`)) return;
+  if (!await confirmar("Encerrar a partida?",
+    `O resultado aparece agora. Quem ainda não terminou (${faltam.join(", ")}) fica fora do pódio.`, "Encerrar")) return;
   try { await update(ref(db, `partidas/${sessao.codigo}`), { encerrada: true }); }
-  catch (e) { alert(mensagemDeErro(e)); }
+  catch (e) { avisar(mensagemDeErro(e), "Não deu para encerrar"); }
 }
 
 async function confirmarSair() {
-  if (!confirm("Sair da sala? Sua tabela continua aqui, mas você sai do resultado da sala.")) return;
+  if (!await confirmar("Sair da sala?", "Sua tabela continua aqui, mas você sai do resultado da sala.", "Sair")) return;
   await sair();
 }
 
@@ -292,9 +293,10 @@ function fecharJanela() {
 }
 
 // A partida em família começa com a tabela zerada.
-function prepararTabela() {
+async function prepararTabela() {
   if (!partidaTemValores(state)) return true;
-  if (!confirm("Para jogar em sala, sua tabela começa zerada. A partida atual vai para o histórico. Continuar?")) return false;
+  if (!await confirmar("Começar com a tabela zerada?",
+    "Para jogar em sala, sua tabela começa zerada. A partida atual vai para o histórico.", "Continuar")) return false;
   salvarPartidaAtual();
   comecarNovaPartida();
   return true;
@@ -306,7 +308,7 @@ async function acaoJanela(tipo = modoJanela) {
   const codigo = $("familia-codigo").value.replace(/\D/g, "");
   if (!nome) { erro.textContent = "Digite seu nome para entrar na sala."; $("familia-nome").focus(); return; }
   if (tipo === "entrar" && codigo.length !== 5) { erro.textContent = "O código tem 5 números."; $("familia-codigo").focus(); return; }
-  if (!prepararTabela()) return;
+  if (!await prepararTabela()) return;
 
   erro.textContent = tipo === "criar" ? "Criando a sala…" : "Entrando na sala…";
   document.querySelectorAll("#janela-familia button").forEach(b => { b.disabled = true; });
