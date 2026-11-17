@@ -38,8 +38,8 @@ const LEGENDA_LINHAS = [
   ["F – Full", "Uma trinca e um par (ex.: 3-3-3-5-5). Vale 30 + a soma dos dados."],
   ["S- – Sequência menor", "1-2-3-4-5. Vale 35 + 15 = 50."],
   ["S+ – Sequência maior", "2-3-4-5-6. Vale 40 + 20 = 60."],
-  ["X MIN – Mínimo", "Soma dos cinco dados, tentando fazer o menor valor. Precisa ser menor que o X MAX da coluna."],
-  ["X MAX – Máximo", "Soma dos cinco dados, tentando fazer o maior valor. Precisa ser maior que o X MIN da coluna."],
+  ["MIN – Mínimo", "Soma dos cinco dados, tentando fazer o menor valor. Precisa ser menor que o MAX da coluna."],
+  ["MAX – Máximo", "Soma dos cinco dados, tentando fazer o maior valor. Precisa ser maior que o MIN da coluna."],
   ["YAM", "Os cinco dados iguais. Vale 50 + a soma dos dados (ex.: cinco 6 = 80)."],
   ["3º total", "Soma das linhas de Quadra até YAM."],
   ["2º + 3º total", "Total da coluna."]
@@ -255,7 +255,7 @@ function validar(key, texto) {
       const min = linha === 13 ? valor : outro;
       const max = linha === 14 ? valor : outro;
       if (max <= min) {
-        return [`${valor} não vale em ${nome}`, `Nesta coluna o X MAX precisa ser maior que o X MIN (MIN = ${min}, MAX = ${max}).`];
+        return [`${valor} não vale em ${nome}`, `Nesta coluna o MAX precisa ser maior que o MIN (MIN = ${min}, MAX = ${max}).`];
       }
     }
   }
@@ -1244,10 +1244,11 @@ async function excluirPartida() {
 // ---------- estatísticas ----------
 
 // Nome da casa em textos (mensagens e estatísticas): a sigla da tabela sem o
-// número de pontos na frente ("50 YAM" -> "YAM", "40 S+" -> "S+", "X MIN" fica
-// igual). O primeiro bloco fica como na tabela ("2 / 1", "4 / 2"...).
+// número de pontos na frente ("50 YAM" -> "YAM", "40 S+" -> "S+") e sem o X
+// ("X MIN" -> "MIN"; o X só aparece na tabela). O primeiro bloco fica como na
+// tabela ("2 / 1", "4 / 2"...).
 function siglaDaCasa(linha) {
-  return linha <= 5 ? rows[linha] : rows[linha].replace(/^\d+\s*/, "");
+  return linha <= 5 ? rows[linha] : rows[linha].replace(/^(\d+|X)\s+/, "");
 }
 
 const partidaEstaCompleta = valores =>
@@ -1758,24 +1759,86 @@ function rolarDados() {
   }, 60);
 }
 
-// O que a jogada atual vale nas linhas da tabela (mesmas regras de valoresPossiveis).
+// O que a jogada atual vale (mesmas regras de valoresPossiveis):
+// 1) as combinações que dá para marcar agora na sua tabela; se não der nenhuma,
+//    o número com menor risco de perder o bônus e onde marcar;
+// 2) a soma (para o MIN e o MAX).
 function oQueValem(v) {
   const soma = v.reduce((a, b) => a + b, 0);
   const qtd = [0, 0, 0, 0, 0, 0, 0];
   v.forEach(f => qtd[f]++);
-  const itens = [];
+  const combinacoes = []; // [nome, linha, valor]
   const face = n => qtd.findIndex((q, f) => f > 0 && q >= n);
-  if (face(5) > 0) itens.push(`YAM ${50 + 5 * face(5)}`);
-  // Quadra são exatamente 4 iguais: com os 5 iguais vale YAM, número ou X (não Quadra)
+  if (face(5) > 0) combinacoes.push(["YAM", 15, 50 + 5 * face(5)]);
+  // Quadra são exatamente 4 iguais: com os 5 iguais vale YAM, número ou MIN/MAX (não Quadra)
   const quadra = qtd.findIndex((q, f) => f > 0 && q === 4);
-  if (quadra > 0) itens.push(`Q ${20 + 4 * quadra}`);
-  if (qtd.includes(3) && qtd.includes(2)) itens.push(`F ${30 + soma}`);
+  if (quadra > 0) combinacoes.push(["Q", 9, 20 + 4 * quadra]);
+  if (qtd.includes(3) && qtd.includes(2)) combinacoes.push(["F", 10, 30 + soma]);
   const ordenados = [...v].sort().join("");
-  if (ordenados === "12345") itens.push("S- 50");
-  if (ordenados === "23456") itens.push("S+ 60");
-  itens.push(`X ${soma}`);
-  const numeros = [1, 2, 3, 4, 5, 6].filter(f => qtd[f] > 0).map(f => `${f} → ${f * qtd[f]}`);
-  return `${itens.join(" · ")}\nNúmeros: ${numeros.join(" · ")}`;
+  if (ordenados === "12345") combinacoes.push(["S-", 11, 50]);
+  if (ordenados === "23456") combinacoes.push(["S+", 12, 60]);
+
+  const linhas = [];
+  const marcaveis = combinacoes.filter(([, linha, valor]) => colunasLivres(linha, valor).length > 0);
+  if (marcaveis.length) {
+    linhas.push(marcaveis.map(([nome, , valor]) => `${nome} ${valor}`).join(" · "));
+  } else {
+    const s = sugestaoDeNumero(qtd);
+    if (s) {
+      linhas.push(`${["", "Um", "Dois", "Três", "Quatro", "Cinco"][qtd[s.face]]} ${s.face} → ${s.valor}, na ${NOMES_COLUNAS[s.col]}` +
+        (s.garante ? " (garante o bônus)" : ""));
+    }
+  }
+  linhas.push(`Soma dos dados: ${soma}`);
+  return linhas.join("\n");
+}
+
+// Colunas onde dá para marcar `valor` na linha agora: casa vazia, na ordem da
+// descida/subida, MIN < MAX, e a Seca (S) só na 1ª jogada.
+function colunasLivres(linha, valor) {
+  return [0, 1, 2, 3].filter(col =>
+    !preenchida(linha, col) &&
+    (col !== 3 || mesa.jogada === 1) &&
+    validar(`${linha}-${col}`, String(valor)) === null);
+}
+
+// Referência de cada número (soma 60): com ela em todas as linhas, o bônus sai certinho.
+const REFERENCIA_BONUS = [2, 4, 9, 12, 15, 18];
+
+// Quanto marcar `valor` na linha (1 a 6) da coluna arrisca o bônus de +30.
+// nivel: -1 garante o bônus, 0 nada a perder (já garantido ou já perdido),
+// 1 continua em dia com a referência, 2 fica atrás dela, 3 perde o bônus.
+// folga: quanto fica acima (+) ou abaixo (-) da referência.
+function riscoParaOBonus(linha, col, valor) {
+  const total1 = somaColuna(state, col, 0, 5);
+  const outras = [0, 1, 2, 3, 4, 5].filter(l => l !== linha && !preenchida(l, col));
+  const maximo = outras.reduce((s, l) => s + 5 * (l + 1), 0);
+  if (total1 >= META_BONUS || total1 + maximo + 5 * (linha + 1) < META_BONUS) return { nivel: 0, folga: 0 };
+  const depois = total1 + valor;
+  if (depois >= META_BONUS) return { nivel: -1, folga: 0 };
+  if (depois + maximo < META_BONUS) return { nivel: 3, folga: depois + maximo - META_BONUS };
+  const folga = depois + outras.reduce((s, l) => s + REFERENCIA_BONUS[l], 0) - META_BONUS;
+  return { nivel: folga >= 0 ? 1 : 2, folga };
+}
+
+// Melhor lugar para os números desta jogada: menor risco para o bônus; no
+// empate, o que fica mais perto da referência da linha, e depois mais pontos.
+function sugestaoDeNumero(qtd) {
+  let melhor = null;
+  for (let face = 1; face <= 6; face++) {
+    if (!qtd[face]) continue;
+    const linha = face - 1;
+    const valor = face * qtd[face];
+    for (const col of colunasLivres(linha, valor)) {
+      const { nivel, folga } = riscoParaOBonus(linha, col, valor);
+      const nota = [nivel, -folga, REFERENCIA_BONUS[linha] - valor, -valor]; // menor é melhor
+      const menor = melhor && nota.findIndex((n, i) => n !== melhor.nota[i]);
+      if (!melhor || (menor >= 0 && nota[menor] < melhor.nota[menor])) {
+        melhor = { face, valor, col, nota, garante: nivel === -1 };
+      }
+    }
+  }
+  return melhor;
 }
 
 function desenharDados(rolando = []) {

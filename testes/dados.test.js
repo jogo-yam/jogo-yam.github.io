@@ -1,51 +1,103 @@
-// Dados virtuais: o que cada jogada vale e as regras de rolar/segurar.
+// Dados virtuais: o que cada jogada vale, a sugestão de número e as regras de rolar/segurar.
 const { test } = require("node:test");
 const assert = require("node:assert/strict");
-const { carregarApp } = require("./carregar-app.js");
+const { carregarApp, igual } = require("./carregar-app.js");
 
 const { app, rodar } = carregarApp();
-const itens = dados => app.oQueValem(dados).split("\n")[0].split(" · ");
+// mesa na jogada pedida (1ª por padrão) e tabela (state) do jeito pedido
+const naTabela = (valores = {}, jogada = 1) => rodar(`mesa.jogada = ${jogada}; state = ${JSON.stringify(valores)}`);
+// combinações da 1ª linha (a última linha é sempre a soma)
+const itens = dados => app.oQueValem(dados).split("\n").slice(0, -1).join(" · ").split(" · ").filter(Boolean);
 
-test("cinco 6: YAM 80, número e X (não é Quadra nem Full)", () => {
-  const texto = app.oQueValem([6, 6, 6, 6, 6]);
-  assert.ok(texto.includes("YAM 80"));
-  assert.ok(texto.includes("6 → 30"));
-  assert.ok(texto.includes("X 30"));
-  assert.ok(!itens([6, 6, 6, 6, 6]).some(i => i.startsWith("Q ") || i.startsWith("F ")));
+test("cinco 6: YAM 80 e a soma (não é Quadra nem Full)", () => {
+  naTabela();
+  igual(app.oQueValem([6, 6, 6, 6, 6]), "YAM 80\nSoma dos dados: 30");
 });
 
 test("quatro iguais: Quadra", () => {
+  naTabela();
   assert.ok(itens([5, 5, 2, 5, 5]).includes("Q 40"));
   assert.ok(!itens([5, 5, 2, 5, 5]).some(i => i.startsWith("YAM")));
 });
 
 test("trinca + par: Full", () => {
+  naTabela();
   assert.ok(itens([3, 5, 3, 5, 3]).includes("F 49"));
 });
 
 test("sequências, em qualquer ordem", () => {
+  naTabela();
   assert.ok(itens([3, 1, 5, 2, 4]).includes("S- 50"));
   assert.ok(itens([6, 2, 4, 3, 5]).includes("S+ 60"));
   assert.ok(!itens([1, 2, 3, 4, 6]).some(i => i.startsWith("S")));
 });
 
-// Para TODAS as 7.776 jogadas possíveis: tudo o que a janela dos dados sugere
-// precisa ser aceito pela tabela naquela linha.
-test("o que os dados sugerem sempre é aceito pela tabela", () => {
-  const linhaDa = { YAM: [15], Q: [9], F: [10], "S-": [11], "S+": [12], X: [13, 14] };
-  const aceitos = {};
-  for (let l = 0; l <= 15; l++) aceitos[l] = new Set(app.valoresPossiveis(l) || []);
+// ---------- sem combinação para marcar: sugestão de número ----------
 
-  for (let n = 0; n < 6 ** 5; n++) {
-    const dados = [0, 1, 2, 3, 4].map(i => 1 + Math.floor(n / 6 ** i) % 6);
-    const [combinacoes, numeros] = app.oQueValem(dados).split("\n");
-    for (const item of combinacoes.split(" · ")) {
-      const [nome, valor] = item.split(" ");
-      for (const l of linhaDa[nome]) assert.ok(aceitos[l].has(Number(valor)), `${dados}: ${item}`);
-    }
-    for (const item of numeros.replace("Números: ", "").split(" · ")) {
-      const [face, valor] = item.split(" → ").map(Number);
-      assert.ok(aceitos[face - 1].has(valor), `${dados}: ${item}`);
+test("sem combinação: sugere o número com menor risco para o bônus", () => {
+  naTabela();
+  // um 1 fica só 1 abaixo da referência (2); os outros ficam bem mais
+  igual(app.oQueValem([1, 2, 3, 4, 6]), "Um 1 → 1, na descida (↓)\nSoma dos dados: 16");
+  // três 6 = a referência (18); a descida está no 1, então vai na D
+  igual(app.oQueValem([6, 6, 6, 2, 4]), "Três 6 → 18, na coluna D\nSoma dos dados: 24");
+});
+
+test("sugestão que garante o bônus avisa", () => {
+  naTabela({ "0-2": "3", "1-2": "6", "2-2": "9", "3-2": "12", "4-2": "20" }); // D: 50, falta o 6
+  igual(app.oQueValem([6, 6, 6, 1, 3]), "Três 6 → 18, na coluna D (garante o bônus)\nSoma dos dados: 22");
+});
+
+test("coluna com bônus garantido recebe o número ruim (nada a perder)", () => {
+  // D: 75, bônus garantido, só o 6 livre. Um 1 na descida deixaria a descida
+  // 1 abaixo da referência; um 6 na D não arrisca nada.
+  naTabela({ "0-2": "5", "1-2": "10", "2-2": "15", "3-2": "20", "4-2": "25" });
+  igual(app.oQueValem([6, 1, 2, 3, 4]), "Um 6 → 6, na coluna D\nSoma dos dados: 16");
+});
+
+test("combinação sem casa livre não aparece; vira sugestão de número", () => {
+  naTabela({ "10-0": "49", "10-1": "49", "10-2": "49", "10-3": "49" }); // Full todo preenchido
+  igual(app.oQueValem([3, 3, 3, 5, 5]), "Três 3 → 9, na coluna D\nSoma dos dados: 19");
+});
+
+test("a coluna S (Seca) só vale na 1ª jogada", () => {
+  const soSobraS = {};
+  for (const col of [0, 1, 2]) for (let l = 0; l <= 5; l++) soSobraS[`${l}-${col}`] = "0";
+  naTabela(soSobraS, 1);
+  igual(app.oQueValem([6, 6, 6, 2, 4]), "Três 6 → 18, na coluna S\nSoma dos dados: 24");
+  naTabela(soSobraS, 2);
+  igual(app.oQueValem([6, 6, 6, 2, 4]), "Soma dos dados: 24");
+});
+
+// Para TODAS as 7.776 jogadas possíveis, com a tabela vazia e no meio de um
+// jogo: tudo o que a janela dos dados mostra pode mesmo ser marcado.
+test("o que os dados mostram sempre pode ser marcado na tabela", () => {
+  const linhaDa = { YAM: 15, Q: 9, F: 10, "S-": 11, "S+": 12 };
+  const QUANTOS = { Um: 1, Dois: 2, "Três": 3 };
+  const meioDoJogo = { "0-0": "2", "1-0": "4", "2-0": "6", "0-2": "3", "5-2": "12", "10-2": "49", "15-3": "0", "4-3": "20" };
+  const sugestaoRe = /^(Um|Dois|Três) (\d) → (\d+), na (.+?)( \(garante o bônus\))?$/;
+  for (const tabela of [{}, meioDoJogo]) {
+    naTabela(tabela);
+    const livres = (linha, valor) => JSON.parse(JSON.stringify(app.colunasLivres(linha, valor)));
+    for (let n = 0; n < 6 ** 5; n++) {
+      const dados = [0, 1, 2, 3, 4].map(i => 1 + Math.floor(n / 6 ** i) % 6);
+      const linhas = app.oQueValem(dados).split("\n");
+      const soma = Number(linhas.pop().replace("Soma dos dados: ", ""));
+      assert.equal(soma, dados.reduce((a, b) => a + b, 0));
+      if (!linhas.length) continue;
+      const sugestao = linhas[0].match(sugestaoRe);
+      if (sugestao) {
+        const face = Number(sugestao[2]);
+        const valor = Number(sugestao[3]);
+        assert.equal(dados.filter(d => d === face).length, QUANTOS[sugestao[1]], `${dados}: ${linhas[0]}`);
+        assert.equal(valor, face * QUANTOS[sugestao[1]]);
+        const col = app.NOMES_COLUNAS.indexOf(sugestao[4]);
+        assert.ok(livres(face - 1, valor).includes(col), `${dados}: ${linhas[0]}`);
+      } else {
+        for (const item of linhas[0].split(" · ")) {
+          const [nome, valor] = item.split(" ");
+          assert.ok(livres(linhaDa[nome], Number(valor)).length > 0, `${dados}: ${item}`);
+        }
+      }
     }
   }
 });
@@ -58,6 +110,7 @@ test("sorteio: só sai de 1 a 6, e sai de tudo", () => {
 });
 
 test("rolar e segurar: até 3 jogadas por vez", async () => {
+  naTabela();
   const esperarRolagem = () => new Promise(r => setTimeout(r, 700));
   const mesa = () => JSON.parse(rodar("JSON.stringify(mesa)"));
 

@@ -106,7 +106,7 @@ test("colunas D e S: qualquer ordem", () => {
   assert.ok(aceita("3-2", 12));
 });
 
-test("X MAX tem que ser maior que o X MIN na mesma coluna", () => {
+test("MAX tem que ser maior que o MIN na mesma coluna", () => {
   comTabela({ "13-2": "10" });
   assert.ok(!aceita("14-2", 10), "igual não vale");
   assert.ok(!aceita("14-2", 9));
@@ -136,6 +136,8 @@ test("nomes das casas nas mensagens", () => {
   assert.equal(app.siglaDaCasa(0), "2 / 1");
   assert.equal(app.siglaDaCasa(9), "Q");
   assert.equal(app.siglaDaCasa(12), "S+");
-  assert.equal(app.siglaDaCasa(13), "X MIN");
+  assert.equal(app.siglaDaCasa(13), "MIN", "fora da tabela, sem o X");
+  assert.equal(app.siglaDaCasa(14), "MAX");
+  assert.equal(app.rows[13], "X MIN", "na tabela continua X MIN");
   assert.equal(app.siglaDaCasa(15), "YAM");
 });
