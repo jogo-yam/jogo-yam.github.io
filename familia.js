@@ -259,7 +259,7 @@ function atualizarBarra(erro) {
   barra.appendChild(info);
 
   const codigo = document.createElement("button");
-  codigo.textContent = "📲 Código";
+  rotular(codigo, "enviar", "Código");
   codigo.onclick = compartilharCodigo;
   barra.appendChild(codigo);
 
@@ -352,7 +352,7 @@ async function acaoJanela(tipo = modoJanela) {
     atualizarBarra();
     if (tipo === "criar") {
       ultimoAviso = Date.now();
-      mostrarLegenda(["Sala criada!", `Passe o código ${sessao.codigo} para os outros jogadores (botão 📲 Código).`]);
+      mostrarLegenda(["Sala criada!", `Passe o código ${sessao.codigo} para os outros jogadores (botão Código).`]);
     }
   } catch (e) {
     erro.textContent = mensagemDeErro(e);
@@ -449,7 +449,7 @@ function revancheDeOutro() {
 function atualizarRevanche() {
   const convite = partida ? revancheDeOutro() : null;
   const botao = $("podio-revanche");
-  if (!botao.disabled) botao.textContent = convite ? "🔁 Entrar na revanche" : "🔁 Jogar de novo";
+  if (!botao.disabled) rotular(botao, "repetir", convite ? "Entrar na revanche" : "Jogar de novo");
   const info = $("podio-revanche-info");
   info.textContent = convite ? `${convite.nome} chamou para uma revanche!` : "";
   info.hidden = !convite;
@@ -485,7 +485,7 @@ async function jogarDeNovo() {
       // avisa quem ainda está no pódio da sala antiga
       if (antigo && uid) update(ref(db, `partidas/${antigo}/jogadores/${uid}`), { revanche: codigo }).catch(() => {});
       ultimoAviso = Date.now();
-      mostrarLegenda(["Revanche criada!", `Quem ainda está no pódio vê o botão para entrar. Para os outros, passe o código ${codigo} (botão 📲 Código).`]);
+      mostrarLegenda(["Revanche criada!", `Quem ainda está no pódio vê o botão para entrar. Para os outros, passe o código ${codigo} (botão Código).`]);
     }
   } catch (e) {
     ultimoAviso = Date.now();

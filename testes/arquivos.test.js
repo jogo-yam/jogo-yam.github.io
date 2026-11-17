@@ -73,5 +73,31 @@ test("o cache offline tem todos os arquivos, e eles existem", () => {
 test("manifest.json é válido", () => {
   const manifest = JSON.parse(lerArquivo("manifest.json"));
   assert.ok(manifest.name);
-  for (const icone of manifest.icons) assert.ok(fs.existsSync(path.join(RAIZ, icone.src)), icone.src);
+  const imagens = [
+    ...manifest.icons,
+    ...(manifest.screenshots || []),
+    ...(manifest.shortcuts || []).flatMap(atalho => atalho.icons || [])
+  ];
+  for (const imagem of imagens) assert.ok(fs.existsSync(path.join(RAIZ, imagem.src)), imagem.src);
+  // atalhos abrem algo que o app entende (?abrir=...)
+  for (const atalho of manifest.shortcuts || []) {
+    assert.match(appJs, new RegExp(`atalho === "${new URL(atalho.url, "https://x/").searchParams.get("abrir")}"`), atalho.url);
+  }
+});
+
+test("a versão do app é a mesma do cache offline", () => {
+  const sw = lerArquivo("service-worker.js");
+  const doCache = Number(sw.match(/yam-cache-v(\d+)/)[1]);
+  assert.equal(rodar("VERSAO"), doCache, "mude o VERSAO do app.js junto com o CACHE_NAME");
+});
+
+test("todo ícone usado existe na página", () => {
+  const simbolos = new Set([...html.matchAll(/<symbol id="i-([\w-]+)"/g)].map(m => m[1]));
+  const usados = [
+    ...[...html.matchAll(/href="#i-([\w-]+)"/g)].map(m => m[1]),
+    ...[appJs, familiaJs].flatMap(codigo => [...codigo.matchAll(/rotular\([^,]+,\s*(?:[^"]*?\?\s*)?"([\w-]+)"(?:\s*:\s*"([\w-]+)")?/g)])
+      .flatMap(m => [m[1], m[2]]).filter(Boolean)
+  ];
+  assert.ok(usados.length > 20);
+  for (const nome of usados) assert.ok(simbolos.has(nome), `ícone i-${nome}`);
 });

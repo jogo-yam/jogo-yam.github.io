@@ -1,8 +1,14 @@
 {
+  "id": "./",
   "name": "YAM - Tabela de Pontuação",
   "short_name": "YAM",
+  "description": "Marque os pontos do YAM no celular: dados virtuais, regras, partidas em sala com a família e histórico.",
+  "lang": "pt-BR",
+  "dir": "ltr",
+  "categories": ["games", "entertainment"],
   "start_url": ".",
   "display": "standalone",
+  "orientation": "portrait",
   "background_color": "#1f3a5f",
   "theme_color": "#1f3a5f",
   "icons": [
@@ -23,6 +29,36 @@
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "maskable"
+    }
+  ],
+  "screenshots": [
+    {
+      "src": "tela-tabela.jpg",
+      "sizes": "375x812",
+      "type": "image/jpeg",
+      "form_factor": "narrow",
+      "label": "Tabela de pontuação do YAM"
+    },
+    {
+      "src": "tela-dados.jpg",
+      "sizes": "375x812",
+      "type": "image/jpeg",
+      "form_factor": "narrow",
+      "label": "Dados virtuais com o que cada jogada vale"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Rolar os dados",
+      "short_name": "Dados",
+      "url": "./?abrir=dados",
+      "icons": [{ "src": "icon-192.png", "sizes": "192x192", "type": "image/png" }]
+    },
+    {
+      "name": "Histórico de partidas",
+      "short_name": "Histórico",
+      "url": "./?abrir=historico",
+      "icons": [{ "src": "icon-192.png", "sizes": "192x192", "type": "image/png" }]
     }
   ]
 }

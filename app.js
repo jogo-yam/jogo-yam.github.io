@@ -7,6 +7,20 @@ const rows = [
 ];
 const COLUNAS = 4;
 
+// Versão do app: igual ao número do CACHE_NAME do service-worker.js (um teste confere).
+const VERSAO = 39;
+
+// Ícone desenhado (o mesmo em todo celular, ao contrário dos emojis).
+function icone(nome) {
+  return `<svg class="icone" aria-hidden="true"><use href="#i-${nome}"/></svg>`;
+}
+
+// Põe ícone + texto num botão (o texto entra como texto, nunca como HTML).
+function rotular(botao, nome, texto) {
+  botao.innerHTML = icone(nome);
+  if (texto) botao.append(texto);
+}
+
 // Classes de cada linha (cor da seção e linha grossa no fim de cada bloco).
 const CLASSES_LINHA = {
   5: "numeros fim-secao",
@@ -1606,7 +1620,7 @@ let nomeJogador = ler(CHAVE_NOME, "");
 
 function mostrarNome() {
   const botao = document.getElementById("botao-nome");
-  botao.textContent = nomeJogador ? `👤 ${nomeJogador}` : "👤 Seu nome";
+  rotular(botao, "pessoa", nomeJogador || "Seu nome");
   botao.classList.toggle("sem-nome", !nomeJogador);
 }
 
@@ -1658,7 +1672,7 @@ function atualizarBotaoTema() {
   const escuro = temaAtual() === "dark";
   document.getElementById("botao-tema").setAttribute("aria-checked", escuro);
   document.querySelectorAll('meta[name="theme-color"]').forEach(meta => {
-    meta.content = escuro ? "#121212" : "#1f3a5f";
+    meta.content = escuro ? "#121212" : "#f3f3f0";
   });
 }
 
@@ -1964,7 +1978,7 @@ function marcarPelosDados(riscar = false) {
     mesa.valores.map(f => "⚀⚁⚂⚃⚄⚅"[f - 1]).join("");
   document.getElementById("marcar-texto").textContent = riscar ? "Riscar qual?" : "Escolha a casa";
   const trocar = document.getElementById("marcar-trocar");
-  trocar.textContent = riscar ? "✏️ Valores" : "— Riscar";
+  rotular(trocar, riscar ? "lapis" : "riscar", riscar ? "Valores" : "Riscar");
   trocar.hidden = riscar && !temValores; // nada para marcar: só dá para riscar
   const barra = document.getElementById("barra-marcar");
   barra.classList.toggle("riscando", riscar);
@@ -2098,7 +2112,7 @@ function desenharDados(rolando = [], assentaram = []) {
   const valem = document.getElementById("dados-valem");
   if (mesa.jogada === 0) {
     status.textContent = "Toque em Rolar para começar a sua vez.";
-    botao.textContent = "🎲 Rolar";
+    rotular(botao, "dado", "Rolar");
     valem.textContent = "";
   } else {
     status.textContent = mesa.jogada === 1
@@ -2106,7 +2120,8 @@ function desenharDados(rolando = [], assentaram = []) {
       : mesa.jogada < 3
         ? `${mesa.jogada}ª jogada de 3. Toque nos dados que quer segurar.`
         : "3ª jogada: agora é anotar na tabela.";
-    botao.textContent = mesa.jogada < 3 ? `🎲 Rolar (${mesa.jogada + 1}ª)` : "Fim da vez";
+    if (mesa.jogada < 3) rotular(botao, "dado", `Rolar (${mesa.jogada + 1}ª)`);
+    else botao.textContent = "Fim da vez";
     valem.textContent = rolando.length ? "" : oQueValem(mesa.valores);
   }
   botao.disabled = mesa.jogada >= 3 || rolandoDados || mesa.segurados.every(Boolean);
@@ -2117,7 +2132,8 @@ function desenharDados(rolando = [], assentaram = []) {
   const marcar = document.getElementById("dados-marcar");
   marcar.hidden = mesa.jogada === 0 || rolando.length > 0 || !Object.keys(casasParaRiscar()).length;
   if (!marcar.hidden) {
-    marcar.textContent = Object.keys(casasParaMarcar(mesa.valores)).length ? "✏️ Marcar" : "— Riscar";
+    if (Object.keys(casasParaMarcar(mesa.valores)).length) rotular(marcar, "lapis", "Marcar");
+    else rotular(marcar, "riscar", "Riscar");
   }
   const fim = mesa.jogada >= 3;
   marcar.className = fim ? "principal" : "";
@@ -2158,3 +2174,86 @@ if (navigator.storage && navigator.storage.persist) {
 }
 
 buildTable();
+
+// ---------- versão nova ----------
+// Com o app aberto (ou deixado em segundo plano), confere se saiu versão nova
+// ao voltar para ele e a cada 30 min; se saiu, oferece atualizar com um toque.
+async function conferirVersaoNova() {
+  if (navigator.onLine === false) return;
+  try {
+    const resposta = await fetch(`service-worker.js?v=${Date.now()}`, { cache: "no-store" });
+    const nova = Number((String(await resposta.text()).match(/yam-cache-v(\d+)/) || [])[1]);
+    if (nova > VERSAO) document.getElementById("aviso-versao").hidden = false;
+  } catch {}
+}
+
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "visible") conferirVersaoNova();
+});
+const timerVersao = setInterval(conferirVersaoNova, 30 * 60 * 1000);
+if (timerVersao && timerVersao.unref) timerVersao.unref();
+document.getElementById("versao-app").textContent = VERSAO;
+
+// ---------- instalar o app ----------
+// Android/Chrome: o navegador avisa que dá para instalar e o botão chama a
+// instalação. iPhone: não tem esse aviso, então o botão explica o caminho.
+
+let pedidoDeInstalar = null;
+
+function appInstalado() {
+  try {
+    return matchMedia("(display-mode: standalone)").matches === true || navigator.standalone === true;
+  } catch { return false; }
+}
+
+function ehIphone() {
+  try {
+    const ua = String(navigator.userAgent || "");
+    return /iphone|ipad|ipod/i.test(ua) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+  } catch { return false; }
+}
+
+function mostrarBotaoInstalar() {
+  document.getElementById("botao-instalar").hidden = appInstalado() || !(pedidoDeInstalar || ehIphone());
+}
+
+window.addEventListener("beforeinstallprompt", evento => {
+  evento.preventDefault();
+  pedidoDeInstalar = evento;
+  mostrarBotaoInstalar();
+  // sugere uma vez só (depois fica no Mais)
+  try {
+    if (localStorage.getItem("yam-sugeriu-instalar")) return;
+    localStorage.setItem("yam-sugeriu-instalar", "1");
+  } catch { return; }
+  mostrarLegenda(["Instale o YAM", "Fica com ícone na tela inicial e abre como app, até sem internet."], "",
+    { texto: "Instalar", fazer: instalarApp });
+});
+
+window.addEventListener("appinstalled", () => {
+  pedidoDeInstalar = null;
+  mostrarBotaoInstalar();
+});
+
+async function instalarApp() {
+  if (pedidoDeInstalar) {
+    const pedido = pedidoDeInstalar;
+    pedidoDeInstalar = null;
+    pedido.prompt();
+    try { await pedido.userChoice; } catch {}
+    mostrarBotaoInstalar();
+    return;
+  }
+  avisar("No Safari, toque em Compartilhar (o quadrado com a seta para cima) e depois em " +
+    "\"Adicionar à Tela de Início\".", "Instalar no iPhone");
+}
+
+mostrarBotaoInstalar();
+
+// Atalhos do ícone (segurar o ícone do app): ?abrir=dados ou ?abrir=historico
+try {
+  const atalho = new URLSearchParams(location.search).get("abrir");
+  if (atalho === "dados") abrirDados();
+  else if (atalho === "historico") abrirHistorico();
+  if (atalho) history.replaceState(null, "", location.pathname);
+} catch {}
