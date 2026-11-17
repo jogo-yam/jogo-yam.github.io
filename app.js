@@ -1880,6 +1880,33 @@ function desenharDados(rolando = []) {
   document.getElementById("dados-nova-vez").hidden = mesa.jogada === 0;
 }
 
+// ---------- sem zoom no toque duplo ----------
+// O CSS (touch-action) não basta em todo lugar, principalmente no iPhone: um
+// 2º toque rápido no mesmo ponto ainda dava zoom. Aqui esse 2º toque vira um
+// clique normal, sem zoom. Campos de digitar ficam de fora (não dão zoom: letra
+// de 16px ou mais), e arrastar ou usar dois dedos (rolar, ampliar) não muda nada.
+let ultimoToque = 0;
+let inicioDoToque = null;
+
+document.addEventListener("touchstart", evento => {
+  const t = evento.touches;
+  inicioDoToque = t.length === 1 ? { x: t[0].clientX, y: t[0].clientY } : null;
+}, { passive: true });
+
+document.addEventListener("touchend", evento => {
+  const t = evento.changedTouches[0];
+  const parado = inicioDoToque && t && evento.touches.length === 0 &&
+    Math.hypot(t.clientX - inicioDoToque.x, t.clientY - inicioDoToque.y) < 10;
+  const agora = Date.now();
+  const segundoToque = parado && agora - ultimoToque < 350;
+  ultimoToque = parado ? agora : 0;
+  const alvo = evento.target;
+  if (!segundoToque || !(alvo instanceof Element) || alvo.closest("input, textarea, select")) return;
+  evento.preventDefault(); // sem zoom...
+  if (typeof alvo.click === "function") alvo.click(); // ...mas o toque conta
+  else alvo.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true }));
+}, { passive: false });
+
 // Pede ao navegador para não apagar os dados do app por falta de espaço ou de uso.
 if (navigator.storage && navigator.storage.persist) {
   navigator.storage.persist().catch(() => {});
