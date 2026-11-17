@@ -24,6 +24,7 @@
   <link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png">
   <link rel="apple-touch-icon" href="apple-touch-icon.png">
 
+  <link rel="preload" href="fontes/nunito.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="stylesheet" href="style.css">
 
   <!-- Aplica o tema escolhido antes de desenhar a página, para não piscar. -->
@@ -63,6 +64,9 @@
   <symbol id="i-ampulheta" viewBox="0 0 24 24"><path d="M6 2.5h12M6 21.5h12"/><path d="M7.5 2.5V6a4.5 4.5 0 0 0 2.2 3.9L12 12l2.3 2.1A4.5 4.5 0 0 1 16.5 18v3.5"/><path d="M16.5 2.5V6a4.5 4.5 0 0 1-2.2 3.9L12 12l-2.3 2.1A4.5 4.5 0 0 0 7.5 18v3.5"/></symbol>
   <symbol id="i-celular" viewBox="0 0 24 24"><rect x="6" y="2.5" width="12" height="19" rx="2.5"/><path d="M11 18.5h2"/></symbol>
   <symbol id="i-festa" viewBox="0 0 24 24"><path d="M11 3l1.8 4.7 4.7 1.8-4.7 1.8L11 16l-1.8-4.7L4.5 9.5l4.7-1.8z"/><path d="M18.5 14.5l.8 2.2 2.2.8-2.2.8-.8 2.2-.8-2.2-2.2-.8 2.2-.8z"/></symbol>
+  <symbol id="i-som" viewBox="0 0 24 24"><path d="M3.5 9.5H7l4.5-4v13L7 14.5H3.5z"/><path d="M15.5 9a4 4 0 0 1 0 6M18.5 6.5a7.5 7.5 0 0 1 0 11"/></symbol>
+  <symbol id="i-mudo" viewBox="0 0 24 24"><path d="M3.5 9.5H7l4.5-4v13L7 14.5H3.5z"/><path d="m16 9.5 5 5M21 9.5l-5 5"/></symbol>
+  <symbol id="i-cadeado" viewBox="0 0 24 24"><rect x="4.5" y="10.5" width="15" height="11" rx="2.5"/><path d="M8 10.5V7.5a4 4 0 0 1 8 0v3"/></symbol>
   <symbol id="i-atualizar" viewBox="0 0 24 24"><path d="M20.5 12a8.5 8.5 0 1 1-2.5-6"/><path d="M20.5 3.5V9H15"/></symbol>
 </svg>
 
@@ -225,6 +229,15 @@
           <svg class="icone" aria-hidden="true"><use href="#i-lua"/></svg>
         </button>
       </div>
+      <div class="linha-tema">
+        <span>Sons</span>
+        <button id="botao-som" class="tema" role="switch" aria-checked="true"
+                aria-label="Sons" onclick="alternarSom()">
+          <svg class="icone" aria-hidden="true"><use href="#i-mudo"/></svg>
+          <span class="trilho"><span class="bolinha"></span></span>
+          <svg class="icone" aria-hidden="true"><use href="#i-som"/></svg>
+        </button>
+      </div>
     </div>
 
     <div class="bloco">
@@ -245,6 +258,16 @@
       <p id="ultimo-backup" class="dica"></p>
       <input type="file" id="arquivo-backup" accept=".json,application/json" hidden
              onchange="importarHistorico(this)">
+    </div>
+
+    <div class="bloco">
+      <h2><svg class="icone" aria-hidden="true"><use href="#i-cadeado"/></svg>Sobre e privacidade</h2>
+      <ul class="privacidade">
+        <li>Suas partidas, seu nome e o histórico ficam guardados só neste celular.</li>
+        <li>Nas salas, o nome e os pontos de cada jogador passam por um servidor (Firebase, do Google)
+          para todos verem o pódio. Salas com mais de alguns dias são apagadas.</li>
+        <li>Sem cadastro, sem e-mail, sem anúncios. O app não coleta dados de uso.</li>
+      </ul>
     </div>
 
     <p class="versao">YAM · versão <span id="versao-app"></span></p>
@@ -409,6 +432,39 @@
     <button class="largo escolha-sala" onclick="escolherSala('entrar')"><svg class="icone" aria-hidden="true"><use href="#i-entrar"/></svg>Entrar em sala
       <small>Alguém já criou e te passou o código</small></button>
     <button class="link" onclick="fecharEscolhaSala()">Cancelar</button>
+  </div>
+</div>
+
+<!-- Boas-vindas: só no primeiro uso -->
+<div id="boas-vindas" class="boas-vindas" hidden>
+  <div class="bv-caixa" role="dialog" aria-modal="true" aria-label="Boas-vindas">
+    <button id="bv-pular" class="link bv-pular" onclick="fecharBoasVindas()">Pular</button>
+    <div id="bv-slides" class="bv-slides">
+      <div class="bv-slide">
+        <div class="bv-figura"><svg class="logo-dado" viewBox="0 0 32 32" aria-hidden="true"><rect x="1" y="1" width="30" height="30" rx="8"/><circle cx="9.5" cy="9.5" r="3"/><circle cx="22.5" cy="9.5" r="3"/><circle cx="16" cy="16" r="3"/><circle cx="9.5" cy="22.5" r="3"/><circle cx="22.5" cy="22.5" r="3"/></svg></div>
+        <h2>Bem-vindo ao YAM</h2>
+        <p>A tabela de pontos do jogo de dados, no seu celular. Ela soma tudo e avisa quando uma jogada não vale.</p>
+      </div>
+      <div class="bv-slide">
+        <div class="bv-figura"><svg class="icone" aria-hidden="true"><use href="#i-dado"/></svg></div>
+        <h2>Dados na mão</h2>
+        <p>Toque no dado lá embaixo para rolar. O app mostra quanto a jogada vale e destaca onde marcar.</p>
+      </div>
+      <div class="bv-slide">
+        <div class="bv-figura"><svg class="icone" aria-hidden="true"><use href="#i-sala"/></svg></div>
+        <h2>Jogue em sala</h2>
+        <p>Cada um no seu celular: crie uma sala, passe o código e, no fim, vejam juntos o pódio.</p>
+      </div>
+      <div class="bv-slide">
+        <div class="bv-figura"><svg class="icone" aria-hidden="true"><use href="#i-pessoa"/></svg></div>
+        <h2>Como você se chama?</h2>
+        <input id="bv-nome" type="text" maxlength="20" autocomplete="given-name" enterkeyhint="done"
+               placeholder="Ex.: Maria" aria-label="Seu nome">
+        <p class="bv-dica">Aparece no pódio e nos resultados. Dá para mudar depois em Mais opções.</p>
+      </div>
+    </div>
+    <div id="bv-pontos" class="bv-pontos" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
+    <button id="bv-proximo" class="principal largo" onclick="proximaBoasVindas()">Próximo</button>
   </div>
 </div>
 

@@ -1,5 +1,5 @@
 // Ao publicar mudanças, aumente a versão para limpar o cache antigo.
-const CACHE_NAME = "yam-cache-v40";
+const CACHE_NAME = "yam-cache-v41";
 const FILES_TO_CACHE = [
   "./",
   "./index.html",
@@ -11,7 +11,8 @@ const FILES_TO_CACHE = [
   "./icon-512.png",
   "./icon-maskable-512.png",
   "./apple-touch-icon.png",
-  "./favicon-32.png"
+  "./favicon-32.png",
+  "./fontes/nunito.woff2"
 ];
 
 self.addEventListener("install", event => {

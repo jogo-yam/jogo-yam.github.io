@@ -505,6 +505,7 @@ function registrarResultado() {
 function confetePodio() {
   soltarConfete(80);
   vibrar([40, 60, 40, 60, 120]);
+  tocar("podio");
 }
 
 // Fechar o pódio encerra a partida em família neste celular.

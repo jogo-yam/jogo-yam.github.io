@@ -8,7 +8,7 @@ const rows = [
 const COLUNAS = 4;
 
 // Versão do app: igual ao número do CACHE_NAME do service-worker.js (um teste confere).
-const VERSAO = 40;
+const VERSAO = 41;
 
 // Ícone desenhado (o mesmo em todo celular, ao contrário dos emojis).
 function icone(nome, classe = "") {
@@ -466,6 +466,7 @@ function montarTabela(tbody, valores, editavel) {
           update(key, numero);
           if (numero !== antes) {
             vibrar(15);
+            tocar("marcar");
             comemorarJogada(key, antes, numero);
           }
           avisarSala();
@@ -828,13 +829,14 @@ function caber(ctx, texto, largura) {
 }
 
 // Imagem do pódio (1080 x 1350), no mesmo estilo do cartão de resultado.
-function gerarImagemPodio(p, dataIso) {
+async function gerarImagemPodio(p, dataIso) {
+  await fonteCarregada();
   const W = 1080, H = 1350;
   const canvas = document.createElement("canvas");
   canvas.width = W;
   canvas.height = H;
   const ctx = canvas.getContext("2d");
-  const fonte = (peso, tam) => `${peso} ${tam}px system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif`;
+  const fonte = (peso, tam) => `${peso} ${tam}px "Nunito", system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif`;
   const NAVY = "#1f3a5f", FUNDO = "#f3f3f0", TEXTO = "#1d1d1f", SUAVE = "#66666a", OURO = "#c98a00";
   const data = new Date(dataIso).toLocaleDateString("pt-BR");
 
@@ -986,7 +988,10 @@ function mostrarFimDeJogo(recordeAnterior) {
   caixa.classList.toggle("recorde", novoRecorde);
   caixa.hidden = false;
   document.getElementById("legenda").hidden = true;
-  if (novoRecorde) soltarConfete();
+  if (novoRecorde) {
+    soltarConfete();
+    tocar("podio");
+  }
 }
 
 // ---------- compartilhar resultado (imagem) ----------
@@ -1005,7 +1010,8 @@ function retanguloArredondado(ctx, x, y, w, h, r) {
 }
 
 // Desenha o cartão do resultado (1080 x 1350, bom para WhatsApp) e devolve um PNG.
-function gerarImagemResultado(valores, total, dataIso, selo, nome = "") {
+async function gerarImagemResultado(valores, total, dataIso, selo, nome = "") {
+  await fonteCarregada();
   const { calculados } = calcularTotais(valores);
   const bonus = [0, 1, 2, 3].filter(col => calculados[`7-${col}`] > 0).length;
   const yams = [0, 1, 2, 3].filter(col => Number(valores[`15-${col}`]) > 0).length;
@@ -1016,7 +1022,7 @@ function gerarImagemResultado(valores, total, dataIso, selo, nome = "") {
   canvas.width = W;
   canvas.height = H;
   const ctx = canvas.getContext("2d");
-  const fonte = (peso, tam) => `${peso} ${tam}px system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif`;
+  const fonte = (peso, tam) => `${peso} ${tam}px "Nunito", system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif`;
   const NAVY = "#1f3a5f", FUNDO = "#f3f3f0", TEXTO = "#1d1d1f", SUAVE = "#66666a", AMBAR = "#f2b134";
 
   ctx.fillStyle = FUNDO;
@@ -1166,6 +1172,16 @@ function comecarNovaPartida() {
 }
 
 // Confete simples de comemoração do recorde.
+// As imagens compartilhadas usam a fonte do app (espera ela carregar, no máximo 1,5 s).
+async function fonteCarregada() {
+  try {
+    await Promise.race([
+      Promise.all([document.fonts.load("800 64px Nunito"), document.fonts.load("400 40px Nunito")]),
+      new Promise(r => setTimeout(r, 1500))
+    ]);
+  } catch {}
+}
+
 // Confete caindo pela tela toda (recorde, pódio, YAM, bônus).
 let timerConfete = null;
 function soltarConfete(quantos = 60) {
@@ -1208,6 +1224,7 @@ function festa(titulo, texto) {
   mostrarLegenda([titulo, texto], "festa");
   soltarConfete(45);
   vibrar([40, 60, 40, 60, 80]);
+  tocar("festa");
 }
 
 async function novoJogo() {
@@ -1278,9 +1295,9 @@ function abrirHistorico() {
 
   if (historico.length === 0) {
     resumo.hidden = true;
-    const vazio = document.createElement("li");
-    vazio.className = "vazio";
-    vazio.textContent = "Nenhuma partida salva ainda. Ao tocar em \"Novo Jogo\", a partida atual é guardada aqui.";
+    const vazio = elemento("li", "item-vazio");
+    vazio.appendChild(estadoVazio("Nenhuma partida ainda",
+      "Quando uma partida termina, ou você toca em Novo Jogo, ela fica guardada aqui."));
     lista.appendChild(vazio);
   } else {
     const totais = historico.map(p => p.total);
@@ -1396,6 +1413,18 @@ function elemento(tag, classe, texto) {
   return el;
 }
 
+// Tela vazia (Histórico, Estatísticas): dado apagado, título, texto e um atalho para jogar.
+function estadoVazio(titulo, texto) {
+  const caixa = elemento("div", "estado-vazio");
+  caixa.innerHTML = document.querySelector(".logo-dado").outerHTML;
+  caixa.appendChild(elemento("h3", "", titulo));
+  caixa.appendChild(elemento("p", "", texto));
+  const botao = elemento("button", "principal", "Começar a jogar");
+  botao.onclick = () => mostrarTela("tela-jogo");
+  caixa.appendChild(botao);
+  return caixa;
+}
+
 function bloco(titulo, subtitulo) {
   const b = elemento("div", "bloco");
   b.appendChild(elemento("h2", "", titulo));
@@ -1408,7 +1437,7 @@ function abrirEstatisticas() {
   area.innerHTML = "";
 
   if (historico.length === 0) {
-    area.appendChild(elemento("p", "vazio", "Ainda não há partidas salvas. Termine uma partida para ver suas estatísticas aqui."));
+    area.appendChild(estadoVazio("Sem estatísticas ainda", "Termine uma partida para ver médias, recordes e destaques."));
     mostrarTela("tela-estatisticas");
     return;
   }
@@ -1421,7 +1450,8 @@ function abrirEstatisticas() {
     `Considerando as ${completas.length} partidas completas (${fora} incompleta${fora === 1 ? "" : "s"} não entra${fora === 1 ? "" : "m"}).`;
 
   if (completas.length === 0) {
-    area.appendChild(elemento("p", "vazio", "As estatísticas aparecem quando houver uma partida completa salva."));
+    area.appendChild(estadoVazio("Falta uma partida completa",
+      "As estatísticas usam só partidas terminadas. Termine uma para ver médias, recordes e destaques."));
     mostrarTela("tela-estatisticas");
     return;
   }
@@ -1887,6 +1917,7 @@ function rolarDados() {
   soltos.forEach(i => { mesa.valores[i] = sortearFace(); });
   desenharDados(soltos); // começa a animação (giro e pulo de cada dado)
   vibrar([12, 50, 12, 50, 12]);
+  tocar("rolar");
   let passos = 0;
   const animar = setInterval(() => {
     soltos.forEach(i => { mesa.valores[i] = sortearFace(); });
@@ -2061,6 +2092,7 @@ function marcarCasa(key, valor) {
   if (input) input.value = exibir(numero);
   piscarCasa(key);
   vibrar(15);
+  tocar("marcar");
   comemorarJogada(key, antes, numero);
   avisarSala();
   verificarFimDeJogo();
@@ -2288,6 +2320,189 @@ async function instalarApp() {
 }
 
 mostrarBotaoInstalar();
+
+// ---------- sons ----------
+// Feitos na hora (sem arquivos de áudio). No iPhone respeitam a chave do
+// silencioso e não param a música que estiver tocando.
+
+const CHAVE_SOM = "yam-som";
+let somLigado = true;
+try { somLigado = localStorage.getItem(CHAVE_SOM) !== "0"; } catch {}
+let audio = null;
+
+function contextoDeAudio() {
+  if (!somLigado) return null;
+  try {
+    if (!audio) {
+      const Contexto = window.AudioContext || window.webkitAudioContext;
+      if (typeof Contexto !== "function") return null;
+      if (navigator.audioSession) navigator.audioSession.type = "ambient";
+      audio = new Contexto();
+    }
+    if (audio.state === "suspended") audio.resume();
+    return audio;
+  } catch { return null; }
+}
+
+function nota(ctx, freq, inicio, duracao, { tipo = "triangle", volume = 0.16 } = {}) {
+  const osc = ctx.createOscillator();
+  const ganho = ctx.createGain();
+  const t = ctx.currentTime + inicio;
+  osc.type = tipo;
+  osc.frequency.value = freq;
+  ganho.gain.setValueAtTime(0.0001, t);
+  ganho.gain.exponentialRampToValueAtTime(volume, t + 0.012);
+  ganho.gain.exponentialRampToValueAtTime(0.0001, t + duracao);
+  osc.connect(ganho).connect(ctx.destination);
+  osc.start(t);
+  osc.stop(t + duracao + 0.03);
+}
+
+// batidinha de dado: um estalo curto de ruído, em tom aleatório
+function estalo(ctx, inicio, volume) {
+  const n = Math.floor(ctx.sampleRate * 0.035);
+  const buffer = ctx.createBuffer(1, n, ctx.sampleRate);
+  const dados = buffer.getChannelData(0);
+  for (let i = 0; i < n; i++) dados[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / n, 3);
+  const fonte = ctx.createBufferSource();
+  fonte.buffer = buffer;
+  const filtro = ctx.createBiquadFilter();
+  filtro.type = "bandpass";
+  filtro.frequency.value = 1400 + Math.random() * 1800;
+  filtro.Q.value = 1.3;
+  const ganho = ctx.createGain();
+  ganho.gain.value = volume;
+  fonte.connect(filtro).connect(ganho).connect(ctx.destination);
+  fonte.start(ctx.currentTime + inicio);
+}
+
+const SONS = {
+  rolar(ctx) {
+    for (let i = 0; i < 9; i++) estalo(ctx, i * 0.045 + Math.random() * 0.02, 0.35 + Math.random() * 0.3);
+  },
+  marcar(ctx) {
+    nota(ctx, 660, 0, 0.09, { tipo: "sine", volume: 0.14 });
+    nota(ctx, 990, 0.06, 0.13, { tipo: "sine", volume: 0.11 });
+  },
+  festa(ctx) {
+    [523.25, 659.25, 783.99, 1046.5].forEach((f, i) => nota(ctx, f, i * 0.09, 0.3));
+  },
+  podio(ctx) {
+    [392, 523.25, 659.25, 783.99, 1046.5].forEach((f, i) => nota(ctx, f, i * 0.1, 0.35, { volume: 0.14 }));
+    nota(ctx, 1046.5, 0.55, 0.7, { volume: 0.12 });
+    nota(ctx, 1318.5, 0.55, 0.7, { volume: 0.09 });
+  }
+};
+
+function tocar(nome) {
+  const ctx = contextoDeAudio();
+  if (!ctx || !SONS[nome]) return;
+  try { SONS[nome](ctx); } catch {}
+}
+
+function atualizarBotaoSom() {
+  document.getElementById("botao-som").setAttribute("aria-checked", somLigado);
+}
+
+function alternarSom() {
+  somLigado = !somLigado;
+  try { localStorage.setItem(CHAVE_SOM, somLigado ? "1" : "0"); } catch {}
+  atualizarBotaoSom();
+  tocar("marcar"); // amostra ao ligar
+}
+
+atualizarBotaoSom();
+
+// ---------- a tabela cabe na tela ----------
+// As linhas têm 30px no mínimo. Se faltarem só alguns pixels para a tabela
+// caber (iPhone no navegador, celular baixinho), elas encolhem até 25px em vez
+// de a tabela dar uma roladinha à toa. Se nem assim couber, rola normalmente.
+
+const LINHA_NORMAL = 30, LINHA_APERTADA = 25;
+
+function caberNaTela(moldura) {
+  if (!moldura || !moldura.clientHeight) return;
+  let linha = LINHA_NORMAL;
+  moldura.style.setProperty("--linha", `${linha}px`);
+  for (let i = 0; i < 4; i++) {
+    const sobra = moldura.scrollHeight - moldura.clientHeight;
+    if (sobra <= 0) return;
+    linha -= Math.max(1, Math.ceil(sobra / 19));
+    if (linha < LINHA_APERTADA) break;
+    moldura.style.setProperty("--linha", `${linha}px`);
+  }
+  if (moldura.scrollHeight > moldura.clientHeight) moldura.style.setProperty("--linha", `${LINHA_NORMAL}px`);
+}
+
+if (typeof ResizeObserver === "function") {
+  const observador = new ResizeObserver(mudancas => {
+    new Set(mudancas.map(m => m.target.closest(".tabela"))).forEach(caberNaTela);
+  });
+  document.querySelectorAll(".tabela").forEach(moldura => {
+    observador.observe(moldura);
+    observador.observe(moldura.querySelector("table"));
+  });
+}
+
+// ---------- boas-vindas (primeiro uso) ----------
+
+const CHAVE_BOAS_VINDAS = "yam-boas-vindas";
+let slideAtual = 0;
+
+// Só para quem nunca usou: sem partidas, sem nome e sem jogo em andamento.
+function deveMostrarBoasVindas() {
+  try { if (localStorage.getItem(CHAVE_BOAS_VINDAS)) return false; } catch { return false; }
+  return historico.length === 0 && !nomeJogador && !partidaTemValores(state);
+}
+
+function mostrarSlide(n) {
+  const slides = [...document.querySelectorAll(".bv-slide")];
+  slideAtual = Math.max(0, Math.min(n, slides.length - 1));
+  slides.forEach((s, i) => s.classList.toggle("atual", i === slideAtual));
+  document.querySelectorAll("#bv-pontos i").forEach((p, i) => p.classList.toggle("atual", i === slideAtual));
+  const ultimo = slideAtual === slides.length - 1;
+  document.getElementById("bv-proximo").textContent = ultimo ? "Começar" : "Próximo";
+  document.getElementById("bv-pular").hidden = ultimo;
+}
+
+function abrirBoasVindas() {
+  mostrarSlide(0);
+  document.getElementById("boas-vindas").hidden = false;
+}
+
+function proximaBoasVindas() {
+  if (slideAtual < document.querySelectorAll(".bv-slide").length - 1) {
+    mostrarSlide(slideAtual + 1);
+    return;
+  }
+  const nome = document.getElementById("bv-nome").value.trim().replace(/\s+/g, " ").slice(0, TAMANHO_MAX_NOME);
+  if (nome) definirNome(nome);
+  fecharBoasVindas();
+}
+
+function fecharBoasVindas() {
+  try { localStorage.setItem(CHAVE_BOAS_VINDAS, "1"); } catch {}
+  document.getElementById("bv-nome").blur();
+  document.getElementById("boas-vindas").hidden = true;
+}
+
+// arrastar para o lado troca de tela; Enter no nome começa
+(() => {
+  let inicioX = null;
+  const area = document.getElementById("bv-slides");
+  area.addEventListener("touchstart", e => { inicioX = e.touches[0].clientX; }, { passive: true });
+  area.addEventListener("touchend", e => {
+    if (inicioX === null) return;
+    const dx = e.changedTouches[0].clientX - inicioX;
+    inicioX = null;
+    if (Math.abs(dx) > 50) mostrarSlide(slideAtual + (dx < 0 ? 1 : -1));
+  }, { passive: true });
+  document.getElementById("bv-nome").addEventListener("keydown", e => {
+    if (e.key === "Enter") proximaBoasVindas();
+  });
+})();
+
+try { if (deveMostrarBoasVindas()) abrirBoasVindas(); } catch {}
 
 // Atalhos do ícone (segurar o ícone do app): ?abrir=dados ou ?abrir=historico
 try {

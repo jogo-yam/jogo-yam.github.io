@@ -119,6 +119,18 @@
   transform: none;
 }
 
+/* ---------- fonte do app ---------- */
+/* Nunito (licença OFL, em fontes/): a mesma letra em todo celular, até sem internet */
+@font-face {
+  font-family: "Nunito";
+  font-style: normal;
+  font-weight: 400 900;
+  font-display: swap;
+  src: url("fontes/nunito.woff2") format("woff2");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308,
+                 U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
 /* ---------- base ---------- */
 
 * {
@@ -216,6 +228,188 @@ body {
 .aviso-versao button { padding: 7px 12px; font-size: 14px; white-space: nowrap; }
 .aviso-versao .aviso-fechar { padding: 7px 8px; border: none; background: none; }
 
+/* ---------- sobre e privacidade ---------- */
+
+.bloco h2 .icone { color: var(--destaque); }
+
+.privacidade {
+  margin: 8px 0 0;
+  padding-left: 18px;
+  font-size: 14px;
+  line-height: 1.45;
+  color: var(--texto-suave);
+}
+
+.privacidade li + li { margin-top: 6px; }
+
+/* ---------- telas vazias ---------- */
+
+.item-vazio { list-style: none; }
+
+.estado-vazio {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 32px 16px;
+  text-align: center;
+}
+
+.estado-vazio .logo-dado {
+  width: 64px;
+  height: 64px;
+  opacity: 0.35;
+  transform: rotate(-10deg);
+  margin-bottom: 4px;
+}
+
+.estado-vazio h3 { margin: 0; font-size: 19px; }
+
+.estado-vazio p {
+  max-width: 300px;
+  margin: 0 0 8px;
+  font-size: 15px;
+  line-height: 1.45;
+  color: var(--texto-suave);
+}
+
+/* ---------- boas-vindas ---------- */
+
+.boas-vindas {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: flex;
+  justify-content: center;
+  padding: calc(16px + env(safe-area-inset-top)) 20px calc(20px + env(safe-area-inset-bottom));
+  background: var(--fundo);
+}
+
+.bv-caixa {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+  max-width: 420px;
+  height: 100%;
+  max-height: 720px;
+  margin: auto 0;
+  text-align: center;
+}
+
+.bv-pular {
+  position: absolute;
+  top: 0;
+  right: 0;
+  padding: 8px 4px;
+  font-size: 15px;
+}
+
+.bv-slides {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-height: 0;
+}
+
+.bv-slide {
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+}
+
+.bv-slide.atual { display: flex; }
+
+@media (prefers-reduced-motion: no-preference) {
+  .bv-slide.atual { animation: subir 0.3s cubic-bezier(0.2, 0.8, 0.2, 1); }
+}
+
+.bv-figura {
+  display: grid;
+  place-items: center;
+  width: 116px;
+  height: 116px;
+  margin-bottom: 10px;
+  border-radius: 30px;
+  background: color-mix(in srgb, var(--destaque) 14%, var(--superficie));
+  color: var(--destaque);
+}
+
+.bv-figura .icone {
+  width: 58px;
+  height: 58px;
+  margin: 0;
+  stroke-width: 1.8;
+}
+
+.bv-figura .logo-dado {
+  width: 70px;
+  height: 70px;
+}
+
+.bv-slide h2 {
+  margin: 0;
+  font-size: 27px;
+  font-weight: 800;
+}
+
+.bv-slide p {
+  max-width: 320px;
+  margin: 0;
+  font-size: 17px;
+  line-height: 1.45;
+  color: var(--texto-suave);
+}
+
+.bv-slide p.bv-dica { font-size: 14px; }
+
+.bv-slide input {
+  width: 100%;
+  max-width: 300px;
+  height: 52px;
+  margin-top: 6px;
+  border: 2px solid var(--borda);
+  border-radius: 12px;
+  background: var(--superficie);
+  font-size: 20px;
+}
+
+.bv-slide input:focus {
+  border-color: var(--destaque);
+  box-shadow: none;
+  background: var(--superficie);
+}
+
+.bv-pontos {
+  display: flex;
+  gap: 8px;
+  margin: 18px 0;
+}
+
+.bv-pontos i {
+  width: 8px;
+  height: 8px;
+  border-radius: 4px;
+  background: var(--borda);
+  transition: width 0.2s, background 0.2s;
+}
+
+.bv-pontos i.atual {
+  width: 24px;
+  background: var(--destaque);
+}
+
+#bv-proximo {
+  max-width: 320px;
+  padding: 14px;
+  font-size: 18px;
+}
+
 .versao {
   margin: 4px 0 8px;
   text-align: center;
@@ -246,7 +440,7 @@ body {
   overflow: hidden;
   padding: calc(12px + env(safe-area-inset-top)) max(10px, env(safe-area-inset-right))
            calc(8px + env(safe-area-inset-bottom)) max(10px, env(safe-area-inset-left));
-  font-family: system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+  font-family: "Nunito", system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
   background: var(--fundo);
   color: var(--texto);
   -webkit-tap-highlight-color: transparent;
@@ -310,7 +504,7 @@ th, td {
   border-bottom: 1px solid var(--borda);
   padding: 0;
   text-align: center;
-  height: 30px;
+  height: var(--linha, 30px);
   font-size: 17px;
 }
 
@@ -329,7 +523,7 @@ th:last-child, td:last-child {
 
 /* cabeçalho fixo ao rolar (dentro da moldura) */
 thead th {
-  height: 36px;
+  height: calc(var(--linha, 30px) + 6px);
   position: sticky;
   top: 0;
   z-index: 1;
@@ -421,7 +615,7 @@ tr.fim-secao td {
 }
 
 .total-geral td {
-  height: 44px;
+  height: calc(var(--linha, 30px) + 14px);
   background: var(--destaque);
   color: var(--destaque-texto);
   border-bottom: none;
@@ -482,7 +676,8 @@ button.perigo {
   left: 0;
   top: 22px; /* meio da linha do título */
   transform: translateY(-50%);
-  padding: 6px 12px;
+  padding: 6px 10px;
+  font-size: 15px;
 }
 
 .topo h1 {
