@@ -1242,6 +1242,16 @@ button.podio-nome {
   overflow-wrap: anywhere;
 }
 
+/* tela da partida: Pódio, Compartilhar e Excluir numa linha só */
+#acoes-partida { gap: 8px; }
+#acoes-partida button { white-space: nowrap; padding-left: 14px; padding-right: 14px; }
+
+.podio-data {
+  margin: -6px 0 6px;
+  color: var(--texto-suave);
+  font-size: 14px;
+}
+
 .podio-revanche-info {
   margin: 12px 0 0;
   font-weight: 600;

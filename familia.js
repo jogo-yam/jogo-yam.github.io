@@ -30,7 +30,6 @@ let partida = null;                    // último estado recebido do banco
 let pararEscuta = null;
 let ultimoEnvio = "";
 let podioMostrado = false;
-let ultimoPodio = null;                // dados do último pódio (para compartilhar)
 let resultadoSala = null;              // colocação deste jogador no último pódio
 
 // ---------- utilidades ----------
@@ -97,6 +96,43 @@ async function entrar(codigo, nome) {
   escutar();
 }
 
+// Salas com mais de 3 dias são apagadas pelo celular que as criou: cada celular
+// guarda os códigos das salas que criou e, ao abrir o app ou criar outra sala,
+// apaga as que já passaram de 3 dias. As regras do Firebase só deixam apagar
+// uma sala inteira quando ela tem mais de 3 dias (aqui: 3,5 dias, de folga
+// caso o relógio do celular esteja adiantado).
+const DIA = 24 * 60 * 60 * 1000;
+const CHAVE_CRIADAS = "yam-salas-criadas"; // [{ codigo, em }]
+
+function salasCriadas() {
+  try { return JSON.parse(localStorage.getItem(CHAVE_CRIADAS)) || []; } catch { return []; }
+}
+
+function guardarSalaCriada(codigo) {
+  localStorage.setItem(CHAVE_CRIADAS, JSON.stringify([...salasCriadas(), { codigo, em: Date.now() }]));
+}
+
+async function limparSalasAntigas() {
+  const limite = Date.now() - 3.5 * DIA;
+  const antigas = salasCriadas().filter(s => s.em < limite);
+  if (!antigas.length) return [];
+  try { await usuario(); } catch { return []; }
+  const apagadas = [];
+  for (const sala of antigas) {
+    if (sessao && sessao.codigo === sala.codigo) continue; // ainda estou nela
+    try {
+      const existe = (await get(ref(db, `partidas/${sala.codigo}/criadaEm`))).exists();
+      if (existe) await remove(ref(db, `partidas/${sala.codigo}`));
+      apagadas.push(sala.codigo); // apagada agora ou já não existia
+    } catch {
+      // sem conexão ou ainda não pode: tenta de novo outra vez (desiste depois de 30 dias)
+      if (sala.em < Date.now() - 30 * DIA) apagadas.push(sala.codigo);
+    }
+  }
+  localStorage.setItem(CHAVE_CRIADAS, JSON.stringify(salasCriadas().filter(s => !apagadas.includes(s.codigo))));
+  return apagadas;
+}
+
 async function criar(nome) {
   const user = await usuario();
   for (let tentativa = 0; tentativa < 6; tentativa++) {
@@ -106,6 +142,8 @@ async function criar(nome) {
     if (r.committed) {
       await update(ref(db, `partidas/${codigo}`), { criadaEm: serverTimestamp() });
       await entrar(codigo, nome);
+      guardarSalaCriada(codigo);
+      limparSalasAntigas(); // em segundo plano
       return codigo;
     }
   }
@@ -333,6 +371,7 @@ async function acaoJanela(tipo = modoJanela) {
 
 function aoTerminar() {
   sincronizar();
+  if (podioMostrado) return; // o envio já revelou o pódio (era o último a terminar)
   $("familia-espera").hidden = false;
   atualizarEspera();
 }
@@ -368,107 +407,33 @@ function mostrarPodio() {
 
   // empate fica na mesma posição (1º, 1º, 3º...)
   const posicao = j => 1 + terminaram.filter(o => o.total > j.total).length;
-  const nomeCom = j => j.uid === uid ? `${j.nome} (você)` : j.nome;
-
   const vencedores = terminaram.filter(j => posicao(j) === 1);
+  const euSou = j => (j.uid === uid ? { eu: true } : {});
 
-  // tocar no nome abre a tabela daquela pessoa (quem tem a versão nova do app envia a tabela)
-  const podeVer = j => j.valores && typeof j.valores === "object";
-  const verTabela = j => () => {
+  // o pódio inteiro (com as tabelas de quem enviou) fica guardado na partida do histórico
+  const podio = {
+    titulo: tituloDoPodio(vencedores.map(v => v.nome)),
+    terminaram: terminaram.map(j => ({
+      nome: j.nome, total: j.total, posicao: posicao(j), ...euSou(j),
+      ...(j.valores && typeof j.valores === "object" ? { valores: j.valores } : {})
+    })),
+    naoTerminaram: naoTerminaram.map(j => ({ nome: j.nome, ...euSou(j) }))
+  };
+
+  // tocar no nome abre a tabela daquela pessoa
+  desenharPodio(podio, j => () => {
     $("podio").hidden = true;
     abrirTabelaJogador(j.nome, j.valores, j.total, () => {
       mostrarTela("tela-jogo");
       $("podio").hidden = false;
     });
-  };
-  $("podio-titulo").textContent = vencedores.length === 0 ? "Partida encerrada"
-    : vencedores.length === 1 ? `🏆 ${vencedores[0].nome} venceu!`
-    : `🏆 Empate: ${vencedores.map(v => v.nome).join(" e ")}!`;
-
-  // degraus: 2º à esquerda, 1º no meio, 3º à direita
-  const degraus = $("podio-degraus");
-  degraus.innerHTML = "";
-  const medalhas = { 1: "🥇", 2: "🥈", 3: "🥉" };
-  [1, 0, 2].forEach(i => {
-    const j = terminaram[i];
-    const coluna = document.createElement("div");
-    coluna.className = `degrau degrau-${i + 1}`;
-    if (j) {
-      const p = posicao(j);
-      const medalha = document.createElement("div");
-      medalha.className = "medalha";
-      medalha.textContent = medalhas[p] || `${p}º`;
-      const nome = document.createElement(podeVer(j) ? "button" : "div");
-      nome.className = "podio-nome";
-      nome.textContent = nomeCom(j);
-      if (podeVer(j)) nome.onclick = verTabela(j);
-      const pontos = document.createElement("div");
-      pontos.className = "podio-pontos";
-      pontos.textContent = `${j.total} pts`;
-      const bloco = document.createElement("div");
-      bloco.className = "bloco-degrau";
-      bloco.textContent = `${p}º`;
-      coluna.append(medalha, nome, pontos, bloco);
-      coluna.classList.add(`pos-${Math.min(p, 3)}`); // altura do degrau segue a colocação (empate = mesma altura)
-      if (j.uid === uid) coluna.classList.add("eu");
-    } else {
-      coluna.classList.add("vazio");
-    }
-    degraus.appendChild(coluna);
   });
-
-  // do 4º em diante, e quem não terminou
-  const lista = $("podio-lista");
-  lista.innerHTML = "";
-  terminaram.slice(3).forEach(j => {
-    const li = document.createElement("li");
-    if (j.uid === uid) li.classList.add("eu");
-    if (podeVer(j)) {
-      li.classList.add("clicavel");
-      li.onclick = verTabela(j);
-    }
-    const pos = document.createElement("span");
-    pos.className = "pos";
-    pos.textContent = `${posicao(j)}º`;
-    const nome = document.createElement("span");
-    nome.className = "nome";
-    nome.textContent = nomeCom(j);
-    const pontos = document.createElement("span");
-    pontos.className = "pts";
-    pontos.textContent = `${j.total} pts`;
-    li.append(pos, nome, pontos);
-    lista.appendChild(li);
-  });
-  naoTerminaram.forEach(j => {
-    const li = document.createElement("li");
-    li.className = "nao-terminou";
-    const pos = document.createElement("span");
-    pos.className = "pos";
-    pos.textContent = "–";
-    const nome = document.createElement("span");
-    nome.className = "nome";
-    nome.textContent = nomeCom(j);
-    const pontos = document.createElement("span");
-    pontos.className = "pts";
-    pontos.textContent = "não terminou";
-    li.append(pos, nome, pontos);
-    lista.appendChild(li);
-  });
-  lista.hidden = lista.children.length === 0;
-  $("podio-dica").hidden = !terminaram.some(podeVer);
-
-  ultimoPodio = {
-    codigo: sessao.codigo,
-    titulo: $("podio-titulo").textContent,
-    terminaram: terminaram.map(j => ({ nome: j.nome, total: j.total, posicao: posicao(j) })),
-    naoTerminaram: naoTerminaram.map(j => j.nome)
-  };
 
   // guarda na partida do histórico deste jogador como foi a sala
   const eu = terminaram.find(j => j.uid === uid);
   resultadoSala = eu ? {
     codigo: sessao.codigo, total: eu.total, posicao: posicao(eu), meuNome: eu.nome,
-    jogadores: jogadores.length, vencedores: vencedores.map(v => v.nome)
+    jogadores: jogadores.length, vencedores: vencedores.map(v => v.nome), podio
   } : null;
   registrarResultado();
 
@@ -543,115 +508,6 @@ function registrarResultado() {
   if (resultadoSala) registrarResultadoSala({ ...resultadoSala });
 }
 
-// Corta o texto com "…" para caber na largura.
-function caber(ctx, texto, largura) {
-  if (ctx.measureText(texto).width <= largura) return texto;
-  while (texto.length > 1 && ctx.measureText(texto + "…").width > largura) texto = texto.slice(0, -1);
-  return texto + "…";
-}
-
-// Imagem do pódio (1080 x 1350), no mesmo estilo do cartão de resultado.
-function gerarImagemPodio(p) {
-  const W = 1080, H = 1350;
-  const canvas = document.createElement("canvas");
-  canvas.width = W;
-  canvas.height = H;
-  const ctx = canvas.getContext("2d");
-  const fonte = (peso, tam) => `${peso} ${tam}px system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif`;
-  const NAVY = "#1f3a5f", FUNDO = "#f3f3f0", TEXTO = "#1d1d1f", SUAVE = "#66666a", OURO = "#c98a00";
-  const data = new Date().toLocaleDateString("pt-BR");
-
-  ctx.fillStyle = FUNDO;
-  ctx.fillRect(0, 0, W, H);
-  ctx.textAlign = "center";
-  ctx.textBaseline = "middle";
-
-  // faixa do topo
-  ctx.fillStyle = NAVY;
-  ctx.fillRect(0, 0, W, 230);
-  ctx.fillStyle = "#ffffff";
-  ctx.font = fonte(800, 100);
-  ctx.fillText("YAM", W / 2, 100);
-  ctx.font = fonte(500, 40);
-  ctx.fillStyle = "rgba(255,255,255,0.8)";
-  ctx.fillText(data, W / 2, 185);
-
-  // lista de quem ficou do 4º em diante e de quem não terminou
-  const linhas = [
-    ...p.terminaram.slice(3).map(j => [`${j.posicao}º`, j.nome, `${j.total} pts`]),
-    ...p.naoTerminaram.map(n => ["–", n, "não terminou"])
-  ];
-  const cabem = linhas.length > 5 ? 4 : 5;
-  const alturaLista = (Math.min(linhas.length, cabem) + (linhas.length > cabem ? 1 : 0)) * 54;
-  // com lista curta (ou nenhuma), desce título e pódio para não sobrar espaço embaixo
-  const desce = Math.round((5 * 54 - alturaLista) / 2);
-
-  // quem venceu
-  ctx.fillStyle = TEXTO;
-  ctx.font = fonte(800, 64);
-  ctx.fillText(caber(ctx, p.titulo, W - 100), W / 2, 330 + desce);
-
-  // degraus: 2º à esquerda, 1º no meio, 3º à direita
-  const alturas = { 1: 360, 2: 260, 3: 190 };
-  const medalhas = { 1: "🥇", 2: "🥈", 3: "🥉" };
-  const larg = 300, gap = 30, x0 = (W - (3 * larg + 2 * gap)) / 2, base = 1010 + desce;
-  [1, 0, 2].forEach((i, coluna) => {
-    const j = p.terminaram[i];
-    if (!j) return;
-    const h = alturas[Math.min(j.posicao, 3)];
-    const x = x0 + coluna * (larg + gap), topo = base - h;
-    ctx.fillStyle = j.posicao === 1 ? OURO : NAVY;
-    retanguloArredondado(ctx, x, topo, larg, h + 20, 22);
-    ctx.fill();
-    ctx.fillStyle = "#ffffff";
-    ctx.font = fonte(800, 84);
-    ctx.fillText(`${j.posicao}º`, x + larg / 2, topo + 75);
-    ctx.font = fonte(400, 84);
-    ctx.fillText(medalhas[j.posicao] || "", x + larg / 2, topo - 190);
-    ctx.fillStyle = TEXTO;
-    ctx.font = fonte(700, 46);
-    ctx.fillText(caber(ctx, j.nome, larg - 10), x + larg / 2, topo - 100);
-    ctx.fillStyle = SUAVE;
-    ctx.font = fonte(500, 40);
-    ctx.fillText(`${j.total} pts`, x + larg / 2, topo - 45);
-  });
-  // chão do pódio
-  ctx.fillStyle = FUNDO;
-  ctx.fillRect(0, base, W, H - base);
-  ctx.fillStyle = "#c8c8c4";
-  ctx.fillRect(x0 - 20, base, 3 * larg + 2 * gap + 40, 6);
-
-  // do 4º em diante e quem não terminou
-  linhas.slice(0, cabem).forEach(([pos, nome, pts], k) => {
-    const y = base + 55 + k * 54;
-    ctx.textAlign = "left";
-    ctx.fillStyle = SUAVE;
-    ctx.font = fonte(700, 38);
-    ctx.fillText(pos, 140, y);
-    ctx.fillStyle = TEXTO;
-    ctx.font = fonte(600, 38);
-    ctx.fillText(caber(ctx, nome, 520), 230, y);
-    ctx.textAlign = "right";
-    ctx.fillStyle = pts === "não terminou" ? SUAVE : TEXTO;
-    ctx.font = fonte(pts === "não terminou" ? 500 : 700, 38);
-    ctx.fillText(pts, W - 140, y);
-  });
-  if (linhas.length > cabem) {
-    ctx.textAlign = "center";
-    ctx.fillStyle = SUAVE;
-    ctx.font = fonte(500, 36);
-    ctx.fillText(`e mais ${linhas.length - cabem}`, W / 2, base + 55 + cabem * 54);
-  }
-
-  return new Promise(resolve => canvas.toBlob(resolve, "image/png"));
-}
-
-async function compartilharPodio() {
-  if (!ultimoPodio) return;
-  const blob = await gerarImagemPodio(ultimoPodio);
-  await compartilharImagem(blob, new Date().toISOString());
-}
-
 function confetePodio() {
   const cores = ["#f2b134", "#3d6ea8", "#ffffff", "#e8604c", "#5cb85c"];
   const area = $("confete-podio");
@@ -681,10 +537,11 @@ function fecharPodio() {
 
 window.familia = {
   abrir, fecharJanela, acaoJanela, sair, confirmarSair, compartilharCodigo,
-  aoTerminar, fecharEspera, fecharPodio, compartilharPodio, jogarDeNovo, sincronizar, registrarResultado,
+  aoTerminar, fecharEspera, fecharPodio, jogarDeNovo, limparSalasAntigas, sincronizar, registrarResultado,
   ativa: () => !!sessao,
   revelada: () => !!(partida && (partida.revelada || partida.encerrada))
 };
 
 atualizarBarra();
+setTimeout(limparSalasAntigas, 3000); // depois que o app abriu, sem atrapalhar
 if (sessao) usuario().then(escutar).catch(e => atualizarBarra(mensagemDeErro(e)));

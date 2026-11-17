@@ -210,8 +210,9 @@
   </div>
 
   <div id="acoes-partida" class="acoes">
+    <button id="ver-podio-partida" class="principal" onclick="abrirPodioDaPartida()" hidden>🏆 Pódio</button>
     <button onclick="compartilharPartidaAberta()">📤 Compartilhar</button>
-    <button class="perigo" onclick="excluirPartida()">Excluir partida</button>
+    <button class="perigo" onclick="excluirPartida()">Excluir</button>
   </div>
 </section>
 
@@ -267,15 +268,16 @@
 <div id="podio" class="fim-de-jogo" hidden>
   <div class="fim-caixa podio-caixa">
     <h2 id="podio-titulo">🏆</h2>
+    <p id="podio-data" class="podio-data" hidden></p>
     <div id="podio-degraus" class="podio"></div>
     <ol id="podio-lista" class="podio-lista"></ol>
     <p id="podio-dica" class="podio-dica" hidden>Toque num nome para ver a tabela da pessoa.</p>
     <p id="podio-revanche-info" class="podio-revanche-info" hidden></p>
     <div class="fim-acoes">
       <button id="podio-revanche" class="principal" onclick="familia.jogarDeNovo()">🔁 Jogar de novo</button>
-      <button onclick="familia.fecharPodio()">Fechar</button>
+      <button id="podio-fechar" onclick="fecharPodioDaTela()">Fechar</button>
     </div>
-    <button class="compartilhar" onclick="familia.compartilharPodio()">📤 Compartilhar pódio</button>
+    <button class="compartilhar" onclick="compartilharPodioDaTela()">📤 Compartilhar pódio</button>
   </div>
   <div id="confete-podio" class="confete" aria-hidden="true"></div>
 </div>

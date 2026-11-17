@@ -635,6 +635,228 @@ function aposPodio() {
   mostrarFimDeJogo(recordeSemAPartidaAtual());
 }
 
+// ---------- pódio ----------
+// O mesmo pódio serve para a sala ao vivo (familia.js) e para uma partida em
+// sala aberta no histórico (fica guardado na partida e funciona sem internet).
+
+let podioNaTela = null;       // { titulo, terminaram, naoTerminaram } do pódio aberto
+let podioDoHistorico = null;  // partida do histórico cujo pódio está aberto (null = sala ao vivo)
+
+function tituloDoPodio(vencedores) {
+  return vencedores.length === 0 ? "Partida encerrada"
+    : vencedores.length === 1 ? `🏆 ${vencedores[0]} venceu!`
+    : `🏆 Empate: ${vencedores.join(" e ")}!`;
+}
+
+// p.terminaram: [{ nome, total, posicao, eu?, valores? }] do 1º ao último;
+// p.naoTerminaram: [{ nome, eu? }]. verTabela(j) diz o que fazer ao tocar num nome.
+function desenharPodio(p, verTabela, partidaDoHistorico = null) {
+  const el = id => document.getElementById(id);
+  podioNaTela = p;
+  podioDoHistorico = partidaDoHistorico;
+  const nomeCom = j => j.eu ? `${j.nome} (você)` : j.nome;
+  const podeVer = j => j.valores && typeof j.valores === "object";
+
+  el("podio-titulo").textContent = p.titulo;
+  el("podio-data").textContent = partidaDoHistorico ? formatarData(partidaDoHistorico.data) : "";
+  el("podio-data").hidden = !partidaDoHistorico;
+
+  // degraus: 2º à esquerda, 1º no meio, 3º à direita
+  const degraus = el("podio-degraus");
+  degraus.innerHTML = "";
+  const medalhas = { 1: "🥇", 2: "🥈", 3: "🥉" };
+  [1, 0, 2].forEach(i => {
+    const j = p.terminaram[i];
+    const coluna = document.createElement("div");
+    coluna.className = `degrau degrau-${i + 1}`;
+    if (j) {
+      const medalha = document.createElement("div");
+      medalha.className = "medalha";
+      medalha.textContent = medalhas[j.posicao] || `${j.posicao}º`;
+      const nome = document.createElement(podeVer(j) ? "button" : "div");
+      nome.className = "podio-nome";
+      nome.textContent = nomeCom(j);
+      if (podeVer(j)) nome.onclick = verTabela(j);
+      const pontos = document.createElement("div");
+      pontos.className = "podio-pontos";
+      pontos.textContent = `${j.total} pts`;
+      const bloco = document.createElement("div");
+      bloco.className = "bloco-degrau";
+      bloco.textContent = `${j.posicao}º`;
+      coluna.append(medalha, nome, pontos, bloco);
+      coluna.classList.add(`pos-${Math.min(j.posicao, 3)}`); // altura do degrau segue a colocação (empate = mesma altura)
+      if (j.eu) coluna.classList.add("eu");
+    } else {
+      coluna.classList.add("vazio");
+    }
+    degraus.appendChild(coluna);
+  });
+
+  // do 4º em diante, e quem não terminou
+  const lista = el("podio-lista");
+  lista.innerHTML = "";
+  const linha = (j, pos, pts, classe) => {
+    const li = document.createElement("li");
+    if (classe) li.className = classe;
+    if (j.eu) li.classList.add("eu");
+    [["pos", pos], ["nome", nomeCom(j)], ["pts", pts]].forEach(([c, texto]) => {
+      const span = document.createElement("span");
+      span.className = c;
+      span.textContent = texto;
+      li.appendChild(span);
+    });
+    lista.appendChild(li);
+    return li;
+  };
+  p.terminaram.slice(3).forEach(j => {
+    const li = linha(j, `${j.posicao}º`, `${j.total} pts`);
+    if (podeVer(j)) {
+      li.classList.add("clicavel");
+      li.onclick = verTabela(j);
+    }
+  });
+  p.naoTerminaram.forEach(j => linha(j, "–", "não terminou", "nao-terminou"));
+  lista.hidden = lista.children.length === 0;
+  el("podio-dica").hidden = !p.terminaram.some(podeVer);
+
+  // revanche só na sala ao vivo
+  el("podio-revanche").hidden = !!partidaDoHistorico;
+  if (partidaDoHistorico) el("podio-revanche-info").hidden = true;
+  el("podio-fechar").className = partidaDoHistorico ? "principal" : "";
+}
+
+// Pódio de uma partida em sala, aberto no histórico.
+function abrirPodioDaPartida() {
+  const partida = partidaAberta;
+  if (!partida || !partida.sala || !partida.sala.podio) return;
+  desenharPodio(partida.sala.podio, j => () => {
+    document.getElementById("podio").hidden = true;
+    abrirTabelaJogador(j.nome, j.valores, j.total, () => {
+      abrirPartida(partida.id);
+      abrirPodioDaPartida();
+    });
+  }, partida);
+  document.getElementById("podio").hidden = false;
+}
+
+function fecharPodioDaTela() {
+  if (podioDoHistorico) {
+    podioDoHistorico = null;
+    document.getElementById("podio").hidden = true;
+  } else if (window.familia) {
+    familia.fecharPodio();
+  }
+}
+
+async function compartilharPodioDaTela() {
+  if (!podioNaTela) return;
+  const dataIso = podioDoHistorico ? podioDoHistorico.data : new Date().toISOString();
+  await compartilharImagem(await gerarImagemPodio(podioNaTela, dataIso), dataIso);
+}
+
+// Corta o texto com "…" para caber na largura.
+function caber(ctx, texto, largura) {
+  if (ctx.measureText(texto).width <= largura) return texto;
+  while (texto.length > 1 && ctx.measureText(texto + "…").width > largura) texto = texto.slice(0, -1);
+  return texto + "…";
+}
+
+// Imagem do pódio (1080 x 1350), no mesmo estilo do cartão de resultado.
+function gerarImagemPodio(p, dataIso) {
+  const W = 1080, H = 1350;
+  const canvas = document.createElement("canvas");
+  canvas.width = W;
+  canvas.height = H;
+  const ctx = canvas.getContext("2d");
+  const fonte = (peso, tam) => `${peso} ${tam}px system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif`;
+  const NAVY = "#1f3a5f", FUNDO = "#f3f3f0", TEXTO = "#1d1d1f", SUAVE = "#66666a", OURO = "#c98a00";
+  const data = new Date(dataIso).toLocaleDateString("pt-BR");
+
+  ctx.fillStyle = FUNDO;
+  ctx.fillRect(0, 0, W, H);
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+
+  // faixa do topo
+  ctx.fillStyle = NAVY;
+  ctx.fillRect(0, 0, W, 230);
+  ctx.fillStyle = "#ffffff";
+  ctx.font = fonte(800, 100);
+  ctx.fillText("YAM", W / 2, 100);
+  ctx.font = fonte(500, 40);
+  ctx.fillStyle = "rgba(255,255,255,0.8)";
+  ctx.fillText(data, W / 2, 185);
+
+  // lista de quem ficou do 4º em diante e de quem não terminou
+  const linhas = [
+    ...p.terminaram.slice(3).map(j => [`${j.posicao}º`, j.nome, `${j.total} pts`]),
+    ...p.naoTerminaram.map(j => ["–", j.nome, "não terminou"])
+  ];
+  const cabem = linhas.length > 5 ? 4 : 5;
+  const alturaLista = (Math.min(linhas.length, cabem) + (linhas.length > cabem ? 1 : 0)) * 54;
+  // com lista curta (ou nenhuma), desce título e pódio para não sobrar espaço embaixo
+  const desce = Math.round((5 * 54 - alturaLista) / 2);
+
+  // quem venceu
+  ctx.fillStyle = TEXTO;
+  ctx.font = fonte(800, 64);
+  ctx.fillText(caber(ctx, p.titulo, W - 100), W / 2, 330 + desce);
+
+  // degraus: 2º à esquerda, 1º no meio, 3º à direita
+  const alturas = { 1: 360, 2: 260, 3: 190 };
+  const medalhas = { 1: "🥇", 2: "🥈", 3: "🥉" };
+  const larg = 300, gap = 30, x0 = (W - (3 * larg + 2 * gap)) / 2, base = 1010 + desce;
+  [1, 0, 2].forEach((i, coluna) => {
+    const j = p.terminaram[i];
+    if (!j) return;
+    const h = alturas[Math.min(j.posicao, 3)];
+    const x = x0 + coluna * (larg + gap), topo = base - h;
+    ctx.fillStyle = j.posicao === 1 ? OURO : NAVY;
+    retanguloArredondado(ctx, x, topo, larg, h + 20, 22);
+    ctx.fill();
+    ctx.fillStyle = "#ffffff";
+    ctx.font = fonte(800, 84);
+    ctx.fillText(`${j.posicao}º`, x + larg / 2, topo + 75);
+    ctx.font = fonte(400, 84);
+    ctx.fillText(medalhas[j.posicao] || "", x + larg / 2, topo - 190);
+    ctx.fillStyle = TEXTO;
+    ctx.font = fonte(700, 46);
+    ctx.fillText(caber(ctx, j.nome, larg - 10), x + larg / 2, topo - 100);
+    ctx.fillStyle = SUAVE;
+    ctx.font = fonte(500, 40);
+    ctx.fillText(`${j.total} pts`, x + larg / 2, topo - 45);
+  });
+  // chão do pódio
+  ctx.fillStyle = FUNDO;
+  ctx.fillRect(0, base, W, H - base);
+  ctx.fillStyle = "#c8c8c4";
+  ctx.fillRect(x0 - 20, base, 3 * larg + 2 * gap + 40, 6);
+
+  // do 4º em diante e quem não terminou
+  linhas.slice(0, cabem).forEach(([pos, nome, pts], k) => {
+    const y = base + 55 + k * 54;
+    ctx.textAlign = "left";
+    ctx.fillStyle = SUAVE;
+    ctx.font = fonte(700, 38);
+    ctx.fillText(pos, 140, y);
+    ctx.fillStyle = TEXTO;
+    ctx.font = fonte(600, 38);
+    ctx.fillText(caber(ctx, nome, 520), 230, y);
+    ctx.textAlign = "right";
+    ctx.fillStyle = pts === "não terminou" ? SUAVE : TEXTO;
+    ctx.font = fonte(pts === "não terminou" ? 500 : 700, 38);
+    ctx.fillText(pts, W - 140, y);
+  });
+  if (linhas.length > cabem) {
+    ctx.textAlign = "center";
+    ctx.fillStyle = SUAVE;
+    ctx.font = fonte(500, 36);
+    ctx.fillText(`e mais ${linhas.length - cabem}`, W / 2, base + 55 + cabem * 54);
+  }
+
+  return new Promise(resolve => canvas.toBlob(resolve, "image/png"));
+}
+
 // Guarda na partida do histórico como foi o resultado da sala.
 function registrarResultadoSala(sala) {
   const entrada = entradaDaPartidaAtual();
@@ -1001,6 +1223,7 @@ function abrirPartida(id) {
   const infoSala = document.getElementById("sala-partida");
   infoSala.textContent = textoDaSala(partidaAberta.sala);
   infoSala.hidden = !partidaAberta.sala;
+  document.getElementById("ver-podio-partida").hidden = !(partidaAberta.sala && partidaAberta.sala.podio);
   const tbody = document.getElementById("tableBody-partida");
   montarTabela(tbody, partidaAberta.valores, false);
   atualizarTotais(tbody, document.getElementById("total-geral-partida"), partidaAberta.valores);
