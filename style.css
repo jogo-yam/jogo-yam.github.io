@@ -1122,6 +1122,11 @@ button.podio-nome {
   cursor: pointer;
 }
 
+.podio-revanche-info {
+  margin: 12px 0 0;
+  font-weight: 600;
+}
+
 .podio-dica {
   margin: 10px 0 0;
   font-size: 13px;

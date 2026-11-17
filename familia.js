@@ -154,6 +154,7 @@ function escutar() {
     atualizarBarra();
     atualizarEspera();
     verificarRevelacao();
+    if (podioMostrado) atualizarRevanche();
   }, erro => {
     console.warn("familia:", erro);
     atualizarBarra(mensagemDeErro(erro));
@@ -469,8 +470,69 @@ function mostrarPodio() {
   } : null;
   registrarResultado();
 
+  atualizarRevanche();
   $("podio").hidden = false;
   confetePodio();
+}
+
+// ---------- revanche ----------
+// Quem toca em "Jogar de novo" cria uma sala nova e marca o código dela no
+// próprio jogador da sala antiga. Quem ainda está no pódio vê "Entrar na revanche".
+
+function revancheDeOutro() {
+  const uid = auth.currentUser && auth.currentUser.uid;
+  const j = jogadoresDe(partida).find(j => j.revanche && j.uid !== uid);
+  return j ? { codigo: j.revanche, nome: j.nome } : null;
+}
+
+function atualizarRevanche() {
+  const convite = partida ? revancheDeOutro() : null;
+  const botao = $("podio-revanche");
+  if (!botao.disabled) botao.textContent = convite ? "🔁 Entrar na revanche" : "🔁 Jogar de novo";
+  const info = $("podio-revanche-info");
+  info.textContent = convite ? `${convite.nome} chamou para uma revanche!` : "";
+  info.hidden = !convite;
+}
+
+// Sai da sala antiga sem mostrar o resultado pessoal (ele já está no histórico).
+function sairDoPodio() {
+  $("podio").hidden = true;
+  pararDeEscutar();
+  guardarSessao(null);
+  partida = null;
+}
+
+async function jogarDeNovo() {
+  const botao = $("podio-revanche");
+  if (botao.disabled) return;
+  const convite = revancheDeOutro();
+  const antigo = sessao && sessao.codigo;
+  const uid = auth.currentUser && auth.currentUser.uid;
+  botao.disabled = true;
+  botao.textContent = convite ? "Entrando…" : "Criando sala…";
+  try {
+    // a partida que acabou já está no histórico: começa uma tabela nova
+    if (partidaTemValores(state) && !entradaDaPartidaAtual()) salvarPartidaAtual();
+    comecarNovaPartida();
+    sairDoPodio();
+    if (convite) {
+      await entrar(convite.codigo, nomeJogador);
+      ultimoAviso = Date.now();
+      mostrarLegenda(["Revanche!", `Você entrou na sala ${convite.codigo}. Boa sorte!`]);
+    } else {
+      const codigo = await criar(nomeJogador);
+      // avisa quem ainda está no pódio da sala antiga
+      if (antigo && uid) update(ref(db, `partidas/${antigo}/jogadores/${uid}`), { revanche: codigo }).catch(() => {});
+      ultimoAviso = Date.now();
+      mostrarLegenda(["Revanche criada!", `Quem ainda está no pódio vê o botão para entrar. Para os outros, passe o código ${codigo} (botão 📲 Código).`]);
+    }
+  } catch (e) {
+    ultimoAviso = Date.now();
+    mostrarLegenda(["Não deu para começar a revanche", mensagemDeErro(e)], "erro");
+  } finally {
+    botao.disabled = false;
+    atualizarBarra();
+  }
 }
 
 // O pódio pode abrir antes de a partida ir para o histórico (último a terminar):
@@ -617,7 +679,7 @@ function fecharPodio() {
 
 window.familia = {
   abrir, fecharJanela, acaoJanela, sair, confirmarSair, compartilharCodigo,
-  aoTerminar, fecharEspera, fecharPodio, compartilharPodio, sincronizar, registrarResultado,
+  aoTerminar, fecharEspera, fecharPodio, compartilharPodio, jogarDeNovo, sincronizar, registrarResultado,
   ativa: () => !!sessao,
   revelada: () => !!(partida && (partida.revelada || partida.encerrada))
 };

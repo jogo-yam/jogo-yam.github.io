@@ -204,8 +204,10 @@
     <div id="podio-degraus" class="podio"></div>
     <ol id="podio-lista" class="podio-lista"></ol>
     <p id="podio-dica" class="podio-dica" hidden>Toque num nome para ver a tabela da pessoa.</p>
+    <p id="podio-revanche-info" class="podio-revanche-info" hidden></p>
     <div class="fim-acoes">
-      <button class="principal" onclick="familia.fecharPodio()">Fechar</button>
+      <button id="podio-revanche" class="principal" onclick="familia.jogarDeNovo()">🔁 Jogar de novo</button>
+      <button onclick="familia.fecharPodio()">Fechar</button>
     </div>
     <button class="compartilhar" onclick="familia.compartilharPodio()">📤 Compartilhar pódio</button>
   </div>
