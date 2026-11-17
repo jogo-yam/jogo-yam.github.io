@@ -8,12 +8,22 @@ const rows = [
 const COLUNAS = 4;
 
 // Versão do app: igual ao número do CACHE_NAME do service-worker.js (um teste confere).
-const VERSAO = 39;
+const VERSAO = 40;
 
 // Ícone desenhado (o mesmo em todo celular, ao contrário dos emojis).
-function icone(nome) {
-  return `<svg class="icone" aria-hidden="true"><use href="#i-${nome}"/></svg>`;
+function icone(nome, classe = "") {
+  return `<svg class="icone${classe ? " " + classe : ""}" aria-hidden="true"><use href="#i-${nome}"/></svg>`;
 }
+
+// Dadinho desenhado com os pontos da face (barra de marcar).
+function dadoMini(face) {
+  const pontos = PONTOS_DO_DADO[face].map(p =>
+    `<circle cx="${5.5 + (p % 3) * 6.5}" cy="${5.5 + Math.floor(p / 3) * 6.5}" r="2"/>`).join("");
+  return `<svg class="dado-mini" viewBox="0 0 24 24" aria-hidden="true"><rect x="1" y="1" width="22" height="22" rx="5"/>${pontos}</svg>`;
+}
+
+// Partidas antigas guardaram o título do pódio com o emoji 🏆 na frente.
+const semTrofeu = texto => String(texto).replace(/^🏆\s*/u, "");
 
 // Põe ícone + texto num botão (o texto entra como texto, nunca como HTML).
 function rotular(botao, nome, texto) {
@@ -74,7 +84,8 @@ let ultimoAviso = 0;
 // acao (opcional): { texto, fazer } mostra um botão dentro da caixa.
 function mostrarLegenda([titulo, texto], tipo = "", acao = null) {
   const caixa = document.getElementById("legenda");
-  caixa.querySelector("strong").textContent = titulo;
+  if (tipo === "festa") rotular(caixa.querySelector("strong"), "festa", titulo);
+  else caixa.querySelector("strong").textContent = titulo;
   caixa.querySelector("span").textContent = texto;
   const botao = caixa.querySelector("button");
   botao.hidden = !acao;
@@ -697,8 +708,8 @@ let podioDoHistorico = null;  // partida do histórico cujo pódio está aberto 
 
 function tituloDoPodio(vencedores) {
   return vencedores.length === 0 ? "Partida encerrada"
-    : vencedores.length === 1 ? `🏆 ${vencedores[0]} venceu!`
-    : `🏆 Empate: ${vencedores.join(" e ")}!`;
+    : vencedores.length === 1 ? `${vencedores[0]} venceu!`
+    : `Empate: ${vencedores.join(" e ")}!`;
 }
 
 // p.terminaram: [{ nome, total, posicao, eu?, valores? }] do 1º ao último;
@@ -710,22 +721,24 @@ function desenharPodio(p, verTabela, partidaDoHistorico = null) {
   const nomeCom = j => j.eu ? `${j.nome} (você)` : j.nome;
   const podeVer = j => j.valores && typeof j.valores === "object";
 
-  el("podio-titulo").textContent = p.titulo;
+  const titulo = semTrofeu(p.titulo);
+  if (titulo === "Partida encerrada") el("podio-titulo").textContent = titulo;
+  else rotular(el("podio-titulo"), "trofeu", titulo);
   el("podio-data").textContent = partidaDoHistorico ? formatarData(partidaDoHistorico.data) : "";
   el("podio-data").hidden = !partidaDoHistorico;
 
   // degraus: 2º à esquerda, 1º no meio, 3º à direita
   const degraus = el("podio-degraus");
   degraus.innerHTML = "";
-  const medalhas = { 1: "🥇", 2: "🥈", 3: "🥉" };
+  const medalhas = { 1: "ouro", 2: "prata", 3: "bronze" };
   [1, 0, 2].forEach(i => {
     const j = p.terminaram[i];
     const coluna = document.createElement("div");
     coluna.className = `degrau degrau-${i + 1}`;
     if (j) {
       const medalha = document.createElement("div");
-      medalha.className = "medalha";
-      medalha.textContent = medalhas[j.posicao] || `${j.posicao}º`;
+      medalha.className = `medalha ${medalhas[j.posicao] || ""}`;
+      medalha.textContent = j.posicao;
       const nome = document.createElement(podeVer(j) ? "button" : "div");
       nome.className = "podio-nome";
       nome.textContent = nomeCom(j);
@@ -853,11 +866,11 @@ function gerarImagemPodio(p, dataIso) {
   // quem venceu
   ctx.fillStyle = TEXTO;
   ctx.font = fonte(800, 64);
-  ctx.fillText(caber(ctx, p.titulo, W - 100), W / 2, 330 + desce);
+  ctx.fillText(caber(ctx, semTrofeu(p.titulo), W - 100), W / 2, 330 + desce);
 
   // degraus: 2º à esquerda, 1º no meio, 3º à direita
   const alturas = { 1: 360, 2: 260, 3: 190 };
-  const medalhas = { 1: "🥇", 2: "🥈", 3: "🥉" };
+  const CORES_MEDALHA = { 1: "#e0a800", 2: "#9aa4ad", 3: "#c27a3a" };
   const larg = 300, gap = 30, x0 = (W - (3 * larg + 2 * gap)) / 2, base = 1010 + desce;
   [1, 0, 2].forEach((i, coluna) => {
     const j = p.terminaram[i];
@@ -870,8 +883,20 @@ function gerarImagemPodio(p, dataIso) {
     ctx.fillStyle = "#ffffff";
     ctx.font = fonte(800, 84);
     ctx.fillText(`${j.posicao}º`, x + larg / 2, topo + 75);
-    ctx.font = fonte(400, 84);
-    ctx.fillText(medalhas[j.posicao] || "", x + larg / 2, topo - 190);
+    if (CORES_MEDALHA[j.posicao]) {
+      ctx.fillStyle = CORES_MEDALHA[j.posicao];
+      ctx.beginPath();
+      ctx.arc(x + larg / 2, topo - 190, 44, 0, 2 * Math.PI);
+      ctx.fill();
+      ctx.lineWidth = 6;
+      ctx.strokeStyle = "rgba(255, 255, 255, 0.55)";
+      ctx.beginPath();
+      ctx.arc(x + larg / 2, topo - 190, 34, 0, 2 * Math.PI);
+      ctx.stroke();
+      ctx.fillStyle = "#ffffff";
+      ctx.font = fonte(800, 48);
+      ctx.fillText(String(j.posicao), x + larg / 2, topo - 188);
+    }
     ctx.fillStyle = TEXTO;
     ctx.font = fonte(700, 46);
     ctx.fillText(caber(ctx, j.nome, larg - 10), x + larg / 2, topo - 100);
@@ -919,16 +944,21 @@ function registrarResultadoSala(sala) {
   salvarHistorico();
 }
 
-// "🏆 Você venceu (sala de 4)" / "🏆 Maria venceu · você ficou em 2º"
+// "Você venceu (sala de 4)" / "Maria venceu · você ficou em 2º" (com o troféu na frente)
 function textoDaSala(sala) {
   if (!sala) return "";
   const outros = sala.vencedores.filter(n => n !== sala.meuNome);
   if (sala.posicao === 1) {
     return outros.length
-      ? `🏆 Empate em 1º com ${outros.join(" e ")}`
-      : `🏆 Você venceu (sala de ${sala.jogadores})`;
+      ? `Empate em 1º com ${outros.join(" e ")}`
+      : `Você venceu (sala de ${sala.jogadores})`;
   }
-  return `🏆 ${sala.vencedores.join(" e ")} venceu · você ficou em ${sala.posicao}º`;
+  return `${sala.vencedores.join(" e ")} venceu · você ficou em ${sala.posicao}º`;
+}
+
+function mostrarTextoDaSala(el, sala) {
+  el.textContent = textoDaSala(sala);
+  if (sala) el.insertAdjacentHTML("afterbegin", icone("trofeu"));
 }
 
 function mostrarFimDeJogo(recordeAnterior) {
@@ -938,13 +968,17 @@ function mostrarFimDeJogo(recordeAnterior) {
 
   document.getElementById("fim-titulo").textContent = nomeJogador ? `Fim de jogo, ${nomeJogador}!` : "Fim de jogo!";
   document.getElementById("fim-total").textContent = geral;
-  document.getElementById("fim-recorde").textContent =
-    primeira ? "Sua primeira partida salva! 🎉"
-    : novoRecorde ? `🏆 Novo recorde! (o anterior era ${recordeAnterior})`
+  const textoRecorde = document.getElementById("fim-recorde");
+  textoRecorde.textContent =
+    primeira ? "Sua primeira partida salva!"
+    : novoRecorde ? `Novo recorde! (o anterior era ${recordeAnterior})`
     : geral === recordeAnterior ? `Igualou seu recorde de ${recordeAnterior}!`
     : `Seu recorde é ${recordeAnterior}.`;
   document.getElementById("fim-colunas").textContent =
     ["↓", "↑", "D", "S"].map((c, col) => `${c} ${calculados[`17-${col}`]}`).join("  ·  ");
+
+  if (primeira) textoRecorde.insertAdjacentHTML("afterbegin", icone("festa"));
+  if (novoRecorde) textoRecorde.insertAdjacentHTML("afterbegin", icone("trofeu"));
 
   ultimoResultado = { valores: { ...state }, total: geral, data: new Date().toISOString(), novoRecorde };
 
@@ -1083,7 +1117,7 @@ async function compartilharImagem(blob, dataIso) {
 async function compartilharFimDeJogo() {
   if (!ultimoResultado) return;
   const r = ultimoResultado;
-  const blob = await gerarImagemResultado(r.valores, r.total, r.data, r.novoRecorde ? "🏆 Novo recorde!" : "", nomeJogador);
+  const blob = await gerarImagemResultado(r.valores, r.total, r.data, r.novoRecorde ? "Novo recorde!" : "", nomeJogador);
   await compartilharImagem(blob, r.data);
 }
 
@@ -1091,7 +1125,7 @@ async function compartilharPartidaAberta() {
   if (!partidaAberta) return;
   const p = partidaAberta;
   const ehRecorde = historico.length > 1 && p.total === Math.max(...historico.map(h => h.total));
-  const blob = await gerarImagemResultado(p.valores, p.total, p.data, ehRecorde ? "🏆 Meu recorde!" : "", p.nome || nomeJogador);
+  const blob = await gerarImagemResultado(p.valores, p.total, p.data, ehRecorde ? "Meu recorde!" : "", p.nome || nomeJogador);
   await compartilharImagem(blob, p.data);
 }
 
@@ -1171,7 +1205,7 @@ function comemorarJogada(key, antes, depois) {
 }
 
 function festa(titulo, texto) {
-  mostrarLegenda([`🎉 ${titulo}`, texto], "festa");
+  mostrarLegenda([titulo, texto], "festa");
   soltarConfete(45);
   vibrar([40, 60, 40, 60, 80]);
 }
@@ -1267,12 +1301,14 @@ function abrirHistorico() {
       data.textContent = formatarData(partida.data);
       const total = document.createElement("strong");
       total.textContent = `${partida.total} pts`;
-      if (partida.total === recorde) total.textContent += " ⭐";
+      if (partida.total === recorde) total.insertAdjacentHTML("beforeend", icone("estrela", "estrela-recorde"));
 
       const esquerda = elemento("span", "item-info");
       esquerda.appendChild(data);
       if (partida.sala) {
-        esquerda.appendChild(elemento("small", partida.sala.posicao === 1 ? "sala-info venceu" : "sala-info", textoDaSala(partida.sala)));
+        const infoSala = elemento("small", partida.sala.posicao === 1 ? "sala-info venceu" : "sala-info");
+        mostrarTextoDaSala(infoSala, partida.sala);
+        esquerda.appendChild(infoSala);
       }
       botao.append(esquerda, total);
       botao.addEventListener("click", () => abrirPartida(partida.id));
@@ -1320,7 +1356,7 @@ function abrirPartida(id) {
 
   document.getElementById("titulo-partida").textContent = formatarData(partidaAberta.data);
   const infoSala = document.getElementById("sala-partida");
-  infoSala.textContent = textoDaSala(partidaAberta.sala);
+  mostrarTextoDaSala(infoSala, partidaAberta.sala);
   infoSala.hidden = !partidaAberta.sala;
   document.getElementById("ver-podio-partida").hidden = !(partidaAberta.sala && partidaAberta.sala.podio);
   const tbody = document.getElementById("tableBody-partida");
@@ -1438,12 +1474,12 @@ function abrirEstatisticas() {
   if (emSala.length) {
     const vitorias = emSala.filter(p => p.sala.posicao === 1).length;
     const podios = emSala.filter(p => p.sala.posicao <= 3).length;
-    itens.push(["🏆", `${vitorias} vitória${vitorias === 1 ? "" : "s"} em sala`,
+    itens.push(["trofeu", `${vitorias} vitória${vitorias === 1 ? "" : "s"} em sala`,
       `em ${emSala.length} partida${emSala.length === 1 ? "" : "s"} em sala · ${podios} pódio${podios === 1 ? "" : "s"}`]);
   }
   itens.push(
-    ["🎯", `Bônus em ${pct(comBonus, colunasTotal)}% das colunas`, `${comBonus} de ${colunasTotal}`],
-    ["🎲", `${yams} YAM${yams === 1 ? "" : "s"} feitos`, `em ${partidasComYam} de ${completas.length} partidas`],
+    ["alvo", `Bônus em ${pct(comBonus, colunasTotal)}% das colunas`, `${comBonus} de ${colunasTotal}`],
+    ["dado", `${yams} YAM${yams === 1 ? "" : "s"} feitos`, `em ${partidasComYam} de ${completas.length} partidas`],
   );
 
   // jogadas mais riscadas
@@ -1452,12 +1488,14 @@ function abrirEstatisticas() {
     vezes: completas.reduce((s, p) => s + [0, 1, 2, 3].filter(col => Number(p.valores[`${l}-${col}`]) === 0).length, 0)
   })).sort((a, b) => b.vezes - a.vezes).filter(r => r.vezes > 0).slice(0, 3);
   if (riscos.length) {
-    itens.push(["✖️", "Mais riscadas", riscos.map(r => `${siglaDaCasa(r.linha)} (${pct(r.vezes, colunasTotal)}%)`).join(" · ")]);
+    itens.push(["riscar", "Mais riscadas", riscos.map(r => `${siglaDaCasa(r.linha)} (${pct(r.vezes, colunasTotal)}%)`).join(" · ")]);
   }
 
-  itens.forEach(([icone, titulo, detalhe]) => {
+  itens.forEach(([nomeIcone, titulo, detalhe]) => {
     const li = elemento("li");
-    li.appendChild(elemento("span", "icone", icone));
+    const simbolo = elemento("span", "destaque-icone");
+    simbolo.innerHTML = icone(nomeIcone);
+    li.appendChild(simbolo);
     const texto = elemento("div");
     texto.appendChild(elemento("strong", "", titulo));
     texto.appendChild(elemento("small", "", detalhe));
@@ -1519,7 +1557,7 @@ function graficoEvolucao(partidas) {
     x: Math.min(Math.max(x(iRecorde), M.esq + 30), W - M.dir - 30), y: y(recorde) - 10,
     class: "rotulo-recorde", "text-anchor": "middle"
   });
-  rotulo.textContent = `⭐ ${recorde}`;
+  rotulo.textContent = `Recorde ${recorde}`;
 
   // dica ao tocar
   const dica = elemento("div", "dica-grafico");
@@ -1937,7 +1975,7 @@ function combinacoesMarcaveis(dados) {
 }
 
 // ---------- marcar pelos dados ----------
-// "✏️ Marcar" fecha os dados e destaca na tabela as casas onde a jogada pode ir,
+// "Marcar" fecha os dados e destaca na tabela as casas onde a jogada pode ir,
 // já com o valor de cada uma. Um toque na casa marca (como se tivesse digitado).
 // "— Riscar" troca os destaques pelas casas vazias: um toque risca (0, aparece —).
 // Se a jogada não cabe em lugar nenhum, já abre riscando.
@@ -1974,9 +2012,10 @@ function marcarPelosDados(riscar = false) {
   }
   destacarCasasMarcaveis(sugerida);
 
-  document.getElementById("marcar-dados").textContent =
-    mesa.valores.map(f => "⚀⚁⚂⚃⚄⚅"[f - 1]).join("");
-  document.getElementById("marcar-texto").textContent = riscar ? "Riscar qual?" : "Escolha a casa";
+  const dadosNaBarra = document.getElementById("marcar-dados");
+  dadosNaBarra.innerHTML = mesa.valores.map(dadoMini).join("");
+  dadosNaBarra.setAttribute("aria-label", `Dados: ${mesa.valores.join(", ")}`);
+  document.getElementById("marcar-texto").textContent = riscar ? "Riscar qual?" : "Onde marcar?";
   const trocar = document.getElementById("marcar-trocar");
   rotular(trocar, riscar ? "lapis" : "riscar", riscar ? "Valores" : "Riscar");
   trocar.hidden = riscar && !temValores; // nada para marcar: só dá para riscar
@@ -2127,7 +2166,7 @@ function desenharDados(rolando = [], assentaram = []) {
   botao.disabled = mesa.jogada >= 3 || rolandoDados || mesa.segurados.every(Boolean);
   document.getElementById("dados-nova-vez").hidden = mesa.jogada === 0;
 
-  // ✏️ Marcar: depois de rolar (se a jogada não cabe em lugar nenhum, vira
+  // Marcar: depois de rolar (se a jogada não cabe em lugar nenhum, vira
   // "— Riscar"); vira o botão principal quando não dá mais para rolar (3ª jogada)
   const marcar = document.getElementById("dados-marcar");
   marcar.hidden = mesa.jogada === 0 || rolando.length > 0 || !Object.keys(casasParaRiscar()).length;

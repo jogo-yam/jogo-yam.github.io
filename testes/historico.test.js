@@ -55,17 +55,20 @@ test("resultado de outra partida (total diferente) não é guardado", () => {
 
 test("texto da sala no histórico", () => {
   const { app } = carregarApp();
-  assert.equal(app.textoDaSala({ posicao: 1, meuNome: "Davi", jogadores: 4, vencedores: ["Davi"] }), "🏆 Você venceu (sala de 4)");
-  assert.equal(app.textoDaSala({ posicao: 1, meuNome: "Davi", jogadores: 4, vencedores: ["Davi", "Maria"] }), "🏆 Empate em 1º com Maria");
-  assert.equal(app.textoDaSala({ posicao: 2, meuNome: "Davi", jogadores: 4, vencedores: ["Maria"] }), "🏆 Maria venceu · você ficou em 2º");
+  assert.equal(app.textoDaSala({ posicao: 1, meuNome: "Davi", jogadores: 4, vencedores: ["Davi"] }), "Você venceu (sala de 4)");
+  assert.equal(app.textoDaSala({ posicao: 1, meuNome: "Davi", jogadores: 4, vencedores: ["Davi", "Maria"] }), "Empate em 1º com Maria");
+  assert.equal(app.textoDaSala({ posicao: 2, meuNome: "Davi", jogadores: 4, vencedores: ["Maria"] }), "Maria venceu · você ficou em 2º");
   assert.equal(app.textoDaSala(undefined), "");
 });
 
 test("título do pódio", () => {
   const { app } = carregarApp();
   assert.equal(app.tituloDoPodio([]), "Partida encerrada");
-  assert.equal(app.tituloDoPodio(["Maria"]), "🏆 Maria venceu!");
-  assert.equal(app.tituloDoPodio(["Maria", "João"]), "🏆 Empate: Maria e João!");
+  assert.equal(app.tituloDoPodio(["Maria"]), "Maria venceu!");
+  assert.equal(app.tituloDoPodio(["Maria", "João"]), "Empate: Maria e João!");
+  // pódio guardado por versões antigas, com o emoji
+  assert.equal(app.semTrofeu("🏆 Maria venceu!"), "Maria venceu!");
+  assert.equal(app.semTrofeu("Maria venceu!"), "Maria venceu!");
 });
 
 test("backup: só aceita partidas no formato do app", () => {

@@ -96,7 +96,9 @@ test("todo ícone usado existe na página", () => {
   const usados = [
     ...[...html.matchAll(/href="#i-([\w-]+)"/g)].map(m => m[1]),
     ...[appJs, familiaJs].flatMap(codigo => [...codigo.matchAll(/rotular\([^,]+,\s*(?:[^"]*?\?\s*)?"([\w-]+)"(?:\s*:\s*"([\w-]+)")?/g)])
-      .flatMap(m => [m[1], m[2]]).filter(Boolean)
+      .flatMap(m => [m[1], m[2]]).filter(Boolean),
+    ...[appJs, familiaJs].flatMap(codigo => [...codigo.matchAll(/\bicone\("([\w-]+)"/g)]).map(m => m[1]),
+    ...[...appJs.matchAll(/\[\s*"([a-z]+)",\s*[`"]/g)].map(m => m[1]).filter(n => ["trofeu", "alvo", "dado", "riscar"].includes(n))
   ];
   assert.ok(usados.length > 20);
   for (const nome of usados) assert.ok(simbolos.has(nome), `ícone i-${nome}`);

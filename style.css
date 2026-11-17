@@ -678,6 +678,21 @@ tbody tr td.piscar {
   line-height: 1;
 }
 
+.fim-icone .icone {
+  width: 48px;
+  height: 48px;
+  margin: 0;
+  color: var(--destaque);
+}
+
+.sala-info .icone,
+.fim-recorde .icone { color: #e0a800; }
+
+.estrela-recorde {
+  margin: 0 0 0 0.3em;
+  color: #e0a800;
+}
+
 .fim-dado .logo-dado {
   width: 52px;
   height: 52px;
@@ -1056,19 +1071,39 @@ button:disabled {
   font-size: 15px;
 }
 
+/* dadinhos em cima, "Onde marcar?" embaixo: cabe até em celular estreito */
 .barra-marcar .marcar-info {
   flex: 1;
   min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  line-height: 1.15;
+}
+
+.barra-marcar #marcar-texto {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--texto-suave);
 }
 
 .barra-marcar strong {
-  margin-right: 2px;
-  font-size: 20px;
+  margin-right: 4px;
   vertical-align: middle;
 }
+
+/* dadinhos desenhados na barra de marcar */
+.dado-mini {
+  width: 19px;
+  height: 19px;
+  margin-right: 1px;
+  vertical-align: -3px;
+}
+.dado-mini rect { fill: #ffffff; stroke: #9a9a96; stroke-width: 1.5; }
+.dado-mini circle { fill: #1d1d1f; }
 
 .barra-marcar button {
   flex-shrink: 0;
@@ -1216,10 +1251,13 @@ button:disabled {
   align-items: flex-start;
 }
 
-.destaques .icone {
+.destaque-icone {
   font-size: 20px;
   line-height: 1.2;
+  color: var(--destaque);
 }
+
+.destaque-icone .icone { margin-right: 0; }
 
 .destaques strong {
   display: block;
@@ -1527,7 +1565,25 @@ button.link {
   min-width: 0;
 }
 
-.medalha { font-size: 34px; line-height: 1; }
+/* medalha desenhada: círculo com a colocação */
+.medalha {
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  background: var(--borda);
+  box-shadow: inset 0 0 0 3px rgba(255, 255, 255, 0.45);
+  color: #ffffff;
+  font-size: 18px;
+  font-weight: 800;
+  line-height: 1;
+}
+.medalha.ouro { background: #e0a800; }
+.medalha.prata { background: #9aa4ad; }
+.medalha.bronze { background: #c27a3a; }
+
+#podio-titulo .icone { color: #e0a800; }
 
 .podio-nome {
   max-width: 100%;

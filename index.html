@@ -58,6 +58,11 @@
   <symbol id="i-mais" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
   <symbol id="i-entrar" viewBox="0 0 24 24"><path d="M14 3.5h4.5a2 2 0 0 1 2 2v13a2 2 0 0 1-2 2H14"/><path d="m9.5 16.5 4.5-4.5-4.5-4.5M14 12H3.5"/></symbol>
   <symbol id="i-instalar" viewBox="0 0 24 24"><path d="M12 3v12M7.5 10.5 12 15l4.5-4.5"/><path d="M5 20.5h14"/></symbol>
+  <symbol id="i-estrela" viewBox="0 0 24 24"><path d="M12 2.8l2.8 5.9 6.4.8-4.7 4.4 1.2 6.3L12 17.1l-5.7 3.1 1.2-6.3-4.7-4.4 6.4-.8z" fill="currentColor"/></symbol>
+  <symbol id="i-alvo" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9.5"/><circle cx="12" cy="12" r="5.5"/><circle cx="12" cy="12" r="1.6" fill="currentColor"/></symbol>
+  <symbol id="i-ampulheta" viewBox="0 0 24 24"><path d="M6 2.5h12M6 21.5h12"/><path d="M7.5 2.5V6a4.5 4.5 0 0 0 2.2 3.9L12 12l2.3 2.1A4.5 4.5 0 0 1 16.5 18v3.5"/><path d="M16.5 2.5V6a4.5 4.5 0 0 1-2.2 3.9L12 12l-2.3 2.1A4.5 4.5 0 0 0 7.5 18v3.5"/></symbol>
+  <symbol id="i-celular" viewBox="0 0 24 24"><rect x="6" y="2.5" width="12" height="19" rx="2.5"/><path d="M11 18.5h2"/></symbol>
+  <symbol id="i-festa" viewBox="0 0 24 24"><path d="M11 3l1.8 4.7 4.7 1.8-4.7 1.8L11 16l-1.8-4.7L4.5 9.5l4.7-1.8z"/><path d="M18.5 14.5l.8 2.2 2.2.8-2.2.8-.8 2.2-.8-2.2-2.2-.8 2.2-.8z"/></symbol>
   <symbol id="i-atualizar" viewBox="0 0 24 24"><path d="M20.5 12a8.5 8.5 0 1 1-2.5-6"/><path d="M20.5 3.5V9H15"/></symbol>
 </svg>
 
@@ -97,7 +102,7 @@
 
   <!-- marcando pelos dados: escolha a casa -->
   <div id="barra-marcar" class="barra-marcar" hidden>
-    <span class="marcar-info"><strong id="marcar-dados"></strong> <span id="marcar-texto">Escolha a casa</span></span>
+    <span class="marcar-info"><strong id="marcar-dados"></strong> <span id="marcar-texto">Onde marcar?</span></span>
     <button id="marcar-trocar" onclick="trocarMarcarRiscar()"><svg class="icone" aria-hidden="true"><use href="#i-riscar"/></svg>Riscar</button>
     <button class="marcar-cancelar" onclick="sairDoModoMarcar()" aria-label="Cancelar" title="Cancelar"><svg class="icone" aria-hidden="true"><use href="#i-fechar"/></svg></button>
   </div>
@@ -145,7 +150,7 @@
   </div>
   <div class="regras">
     <div class="bloco">
-      <h2>🎲 O jogo</h2>
+      <h2><svg class="icone" aria-hidden="true"><use href="#i-dado"/></svg>O jogo</h2>
       <p>Cada jogador tem a sua tabela. Na sua vez, jogue os <strong>5 dados</strong> até
         <strong>3 vezes</strong>: entre uma jogada e outra, separe os dados que quiser e jogue só o resto.</p>
       <p>No fim da vez, anote o resultado em <strong>uma casa</strong> da tabela. Se não der nada que
@@ -188,7 +193,7 @@
     </div>
 
     <div class="bloco">
-      <h2>📱 No app</h2>
+      <h2><svg class="icone" aria-hidden="true"><use href="#i-celular"/></svg>No app</h2>
       <ul class="lista-dicas">
         <li>Toque no nome de uma linha ou coluna para ver o que ela significa.</li>
         <li>O app só aceita valores possíveis e mostra qual é a próxima casa na descida e na subida.</li>
@@ -320,7 +325,7 @@
 <!-- Partida em família: esperando os outros -->
 <div id="familia-espera" class="fim-de-jogo" hidden>
   <div class="fim-caixa">
-    <div class="fim-dado" aria-hidden="true">⏳</div>
+    <div class="fim-dado fim-icone" aria-hidden="true"><svg class="icone" aria-hidden="true"><use href="#i-ampulheta"/></svg></div>
     <h2>Você terminou!</h2>
     <p class="fim-total"><span id="espera-total">0</span> pontos</p>
     <p id="espera-faltam" class="fim-recorde"></p>
@@ -335,7 +340,7 @@
 <!-- Partida em família: pódio -->
 <div id="podio" class="fim-de-jogo" hidden>
   <div class="fim-caixa podio-caixa">
-    <h2 id="podio-titulo">🏆</h2>
+    <h2 id="podio-titulo"></h2>
     <p id="podio-data" class="podio-data" hidden></p>
     <div id="podio-degraus" class="podio"></div>
     <ol id="podio-lista" class="podio-lista"></ol>
