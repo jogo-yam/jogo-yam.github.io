@@ -21,3 +21,8 @@ test("som: começa ligado e desligar fica guardado", () => {
   assert.equal(armazenado.get("yam-som"), "0");
   assert.equal(carregarApp({ armazenado: { "yam-som": "0" } }).rodar("somLigado"), false);
 });
+
+test("o link de convite abre nas boas-vindas", () => {
+  const { rodar } = carregarApp();
+  assert.match(rodar("LINK_CONVITE"), /#bem-vindo$/);
+});

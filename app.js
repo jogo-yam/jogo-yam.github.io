@@ -8,7 +8,7 @@ const rows = [
 const COLUNAS = 4;
 
 // Versão do app: igual ao número do CACHE_NAME do service-worker.js (um teste confere).
-const VERSAO = 41;
+const VERSAO = 42;
 
 // Ícone desenhado (o mesmo em todo celular, ao contrário dos emojis).
 function icone(nome, classe = "") {
@@ -1137,7 +1137,7 @@ async function compartilharPartidaAberta() {
 
 // Convite para novos jogadores: só o link do app.
 // O link do convite abre direto em "Como jogar" (para quem nunca jogou).
-const LINK_CONVITE = `${ENDERECO_APP}#como-jogar`;
+const LINK_CONVITE = `${ENDERECO_APP}#bem-vindo`;
 
 async function convidarJogadores() {
   const texto = "Vem jogar YAM com a gente! As regras e a tabela de pontos estão aqui:";
@@ -1860,14 +1860,15 @@ async function importarHistorico(campo) {
   avisar(`${novas.length} partida${novas.length === 1 ? "" : "s"} importada${novas.length === 1 ? "" : "s"}.`, "Pronto!");
 }
 
-// Link de convite: abre em "Como jogar" (também se o app já estava aberto)
-function verificarLinkRegras() {
-  if (location.hash !== "#como-jogar") return;
-  history.replaceState(null, "", location.pathname);
-  abrirRegras();
+// Link de convite: abre nas boas-vindas (também se o app já estava aberto).
+// "#como-jogar" é o endereço dos convites mandados antes; vai para o mesmo lugar.
+function verificarLinkConvite() {
+  if (location.hash !== "#bem-vindo" && location.hash !== "#como-jogar") return;
+  history.replaceState(null, "", location.pathname + location.search);
+  abrirBoasVindas();
 }
-window.addEventListener("hashchange", verificarLinkRegras);
-setTimeout(verificarLinkRegras, 0);
+window.addEventListener("hashchange", verificarLinkConvite);
+setTimeout(verificarLinkConvite, 0);
 
 // ---------- dados virtuais ----------
 // 5 dados, até 3 jogadas por vez; entre as jogadas, toque num dado para segurá-lo.
@@ -2466,6 +2467,7 @@ function mostrarSlide(n) {
 }
 
 function abrirBoasVindas() {
+  document.getElementById("bv-nome").value = nomeJogador || "";
   mostrarSlide(0);
   document.getElementById("boas-vindas").hidden = false;
 }
