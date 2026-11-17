@@ -58,6 +58,12 @@
   </table>
   </div>
 
+  <!-- marcando pelos dados: escolha a casa -->
+  <div id="barra-marcar" class="barra-marcar" hidden>
+    <span><strong id="marcar-dados"></strong> Escolha a casa</span>
+    <button onclick="sairDoModoMarcar()">Cancelar</button>
+  </div>
+
   <div class="acoes acoes-jogo">
     <button onclick="novoJogo()">Novo Jogo</button>
     <button id="botao-desfazer" onclick="desfazer()" aria-label="Desfazer a última jogada">↶ Desfazer</button>
@@ -337,9 +343,12 @@
     <p id="dados-valem" class="dados-valem"></p>
     <div class="fim-acoes">
       <button id="dados-rolar" class="principal" onclick="rolarDados()">🎲 Rolar</button>
-      <button id="dados-nova-vez" onclick="novaVez()">Nova vez</button>
+      <button id="dados-marcar" onclick="marcarPelosDados()" hidden>✏️ Marcar</button>
     </div>
-    <button class="link" onclick="fecharDados()">Fechar</button>
+    <div class="links-dados">
+      <button id="dados-nova-vez" class="link" onclick="novaVez()">Nova vez</button>
+      <button class="link" onclick="fecharDados()">Fechar</button>
+    </div>
   </div>
 </div>
 

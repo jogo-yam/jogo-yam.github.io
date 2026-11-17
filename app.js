@@ -502,6 +502,7 @@ const body = document.getElementById("tableBody");
 const totalGeral = document.getElementById("total-geral-final");
 
 function buildTable() {
+  if (typeof sairDoModoMarcar === "function") sairDoModoMarcar();
   montarTabela(body, state, true);
   calcular();
 }
@@ -1155,6 +1156,7 @@ function abrirMais() {
 }
 
 function mostrarTela(id) {
+  if (id !== "tela-jogo") sairDoModoMarcar();
   telas.forEach(t => { document.getElementById(t).hidden = t !== id; });
   window.scrollTo(0, 0);
 }
@@ -1748,6 +1750,7 @@ function sortearFace() {
 }
 
 function abrirDados() {
+  sairDoModoMarcar();
   if (dadosParaNovaVez) novaVez();
   desenharDados();
   document.getElementById("janela-dados").hidden = false;
@@ -1790,6 +1793,38 @@ function rolarDados() {
   }, 60);
 }
 
+// Quanto os dados valem numa linha da tabela (mesmas regras de valoresPossiveis);
+// null quando não valem nada ali (aí só riscando).
+function valorDaJogada(linha, dados) {
+  const qtd = [0, 0, 0, 0, 0, 0, 0];
+  dados.forEach(f => qtd[f]++);
+  const soma = dados.reduce((a, b) => a + b, 0);
+  const iguais = n => qtd.findIndex((q, f) => f > 0 && q === n);
+  const ordenados = [...dados].sort().join("");
+  if (linha <= 5) return qtd[linha + 1] ? (linha + 1) * qtd[linha + 1] : null;
+  switch (linha) {
+    case 9:  return iguais(4) > 0 ? 20 + 4 * iguais(4) : null; // Quadra: exatamente 4 iguais
+    case 10: return qtd.includes(3) && qtd.includes(2) ? 30 + soma : null;
+    case 11: return ordenados === "12345" ? 50 : null;
+    case 12: return ordenados === "23456" ? 60 : null;
+    case 13:
+    case 14: return soma;
+    case 15: return iguais(5) > 0 ? 50 + 5 * iguais(5) : null;
+  }
+  return null;
+}
+
+// Casas onde dá para marcar estes dados agora: { "linha-coluna": valor }.
+function casasParaMarcar(dados) {
+  const casas = {};
+  for (const linha of LINHAS_JOGO) {
+    const valor = valorDaJogada(linha, dados);
+    if (valor === null) continue;
+    for (const col of colunasLivres(linha, valor)) casas[`${linha}-${col}`] = valor;
+  }
+  return casas;
+}
+
 // O que a jogada atual vale (mesmas regras de valoresPossiveis):
 // 1) as combinações que dá para marcar agora na sua tabela; se não der nenhuma,
 //    o número com menor risco de perder o bônus e onde marcar;
@@ -1798,19 +1833,8 @@ function oQueValem(v) {
   const soma = v.reduce((a, b) => a + b, 0);
   const qtd = [0, 0, 0, 0, 0, 0, 0];
   v.forEach(f => qtd[f]++);
-  const combinacoes = []; // [nome, linha, valor]
-  const face = n => qtd.findIndex((q, f) => f > 0 && q >= n);
-  if (face(5) > 0) combinacoes.push(["YAM", 15, 50 + 5 * face(5)]);
-  // Quadra são exatamente 4 iguais: com os 5 iguais vale YAM, número ou MIN/MAX (não Quadra)
-  const quadra = qtd.findIndex((q, f) => f > 0 && q === 4);
-  if (quadra > 0) combinacoes.push(["Q", 9, 20 + 4 * quadra]);
-  if (qtd.includes(3) && qtd.includes(2)) combinacoes.push(["F", 10, 30 + soma]);
-  const ordenados = [...v].sort().join("");
-  if (ordenados === "12345") combinacoes.push(["S-", 11, 50]);
-  if (ordenados === "23456") combinacoes.push(["S+", 12, 60]);
-
   const linhas = [];
-  const marcaveis = combinacoes.filter(([, linha, valor]) => colunasLivres(linha, valor).length > 0);
+  const marcaveis = combinacoesMarcaveis(v);
   if (marcaveis.length) {
     linhas.push(marcaveis.map(([nome, , valor]) => `${nome} ${valor}`).join(" · "));
   } else {
@@ -1823,6 +1847,79 @@ function oQueValem(v) {
   linhas.push(`Soma dos dados: ${soma}`);
   return linhas.join("\n");
 }
+
+// Combinações do 2º total que estes dados fazem e têm casa livre: [nome, linha, valor].
+// Com os 5 iguais vale YAM, número ou MIN/MAX (não Quadra).
+function combinacoesMarcaveis(dados) {
+  return [["YAM", 15], ["Q", 9], ["F", 10], ["S-", 11], ["S+", 12]]
+    .map(([nome, linha]) => [nome, linha, valorDaJogada(linha, dados)])
+    .filter(([, linha, valor]) => valor !== null && colunasLivres(linha, valor).length > 0);
+}
+
+// ---------- marcar pelos dados ----------
+// "✏️ Marcar" fecha os dados e destaca na tabela as casas onde a jogada pode ir,
+// já com o valor de cada uma. Um toque na casa marca (como se tivesse digitado).
+
+let casasMarcaveis = null; // { "linha-coluna": valor } enquanto a pessoa escolhe
+
+function marcarPelosDados() {
+  const casas = casasParaMarcar(mesa.valores);
+  if (!Object.keys(casas).length) return;
+  fecharDados();
+  casasMarcaveis = casas;
+
+  // sem combinação para marcar: a casa sugerida (menor risco para o bônus) fica mais forte
+  let sugerida = null;
+  if (!combinacoesMarcaveis(mesa.valores).length) {
+    const qtd = [0, 0, 0, 0, 0, 0, 0];
+    mesa.valores.forEach(f => qtd[f]++);
+    const s = sugestaoDeNumero(qtd);
+    if (s) sugerida = `${s.face - 1}-${s.col}`;
+  }
+  destacarCasasMarcaveis(sugerida);
+
+  document.getElementById("marcar-dados").textContent =
+    mesa.valores.map(f => "⚀⚁⚂⚃⚄⚅"[f - 1]).join("");
+  document.getElementById("barra-marcar").hidden = false;
+  const alvo = body.querySelector(sugerida ? `[data-key="${sugerida}"]` : "td.pode-marcar");
+  if (alvo) alvo.scrollIntoView({ block: "nearest", behavior: "smooth" });
+}
+
+function destacarCasasMarcaveis(sugerida = null) {
+  body.classList.toggle("modo-marcar", !!casasMarcaveis);
+  body.querySelectorAll("td[data-key]").forEach(td => {
+    const valor = casasMarcaveis ? casasMarcaveis[td.dataset.key] : undefined;
+    td.classList.toggle("pode-marcar", valor !== undefined);
+    td.classList.toggle("sugerida", valor !== undefined && td.dataset.key === sugerida);
+    const input = td.querySelector("input");
+    if (input) input.placeholder = valor !== undefined ? String(valor) : "";
+  });
+}
+
+function sairDoModoMarcar() {
+  if (!casasMarcaveis) return;
+  casasMarcaveis = null;
+  destacarCasasMarcaveis();
+  document.getElementById("barra-marcar").hidden = true;
+}
+
+function marcarCasa(key, valor) {
+  const numero = String(valor);
+  sairDoModoMarcar();
+  registrarJogada(key, state[key] ?? "", numero);
+  update(key, numero);
+  const input = body.querySelector(`[data-key="${key}"] input`);
+  if (input) input.value = exibir(numero);
+  piscarCasa(key);
+  avisarSala();
+  verificarFimDeJogo();
+}
+
+body.addEventListener("click", evento => {
+  if (!casasMarcaveis) return;
+  const td = evento.target.closest("td[data-key]");
+  if (td && td.dataset.key in casasMarcaveis) marcarCasa(td.dataset.key, casasMarcaveis[td.dataset.key]);
+});
 
 // Colunas onde dá para marcar `valor` na linha agora: casa vazia, na ordem da
 // descida/subida, MIN < MAX, e a Seca (S) só na 1ª jogada.
@@ -1909,6 +2006,15 @@ function desenharDados(rolando = []) {
   }
   botao.disabled = mesa.jogada >= 3 || rolandoDados || mesa.segurados.every(Boolean);
   document.getElementById("dados-nova-vez").hidden = mesa.jogada === 0;
+
+  // ✏️ Marcar: depois de rolar, se a jogada cabe em alguma casa; vira o botão
+  // principal quando não dá mais para rolar (3ª jogada)
+  const marcar = document.getElementById("dados-marcar");
+  marcar.hidden = mesa.jogada === 0 || rolando.length > 0 || !Object.keys(casasParaMarcar(mesa.valores)).length;
+  const fim = mesa.jogada >= 3;
+  marcar.className = fim ? "principal" : "";
+  botao.className = fim ? "" : "principal";
+  botao.hidden = fim && !marcar.hidden;
 }
 
 // ---------- sem zoom no toque duplo ----------

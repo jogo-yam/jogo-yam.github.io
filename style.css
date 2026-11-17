@@ -881,6 +881,62 @@ button:disabled {
 
 .caixa-dados .fim-acoes button { white-space: nowrap; }
 
+.links-dados {
+  display: flex;
+  justify-content: center;
+  gap: 24px;
+}
+
+/* marcando pelos dados: casas onde a jogada pode ir, com o valor em cinza */
+#tableBody td.pode-marcar {
+  background: rgba(242, 177, 52, 0.18);
+  box-shadow: inset 0 0 0 2px var(--foco);
+  cursor: pointer;
+}
+
+#tableBody td.pode-marcar.sugerida {
+  background: rgba(242, 177, 52, 0.42);
+  box-shadow: inset 0 0 0 3px var(--foco);
+}
+
+#tableBody td.pode-marcar input::placeholder {
+  color: var(--texto);
+  opacity: 0.5;
+  font-weight: 700;
+}
+
+#tableBody.modo-marcar input {
+  pointer-events: none; /* o toque vai para a casa, sem abrir o teclado */
+}
+
+.barra-marcar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  max-width: 700px;
+  margin: 8px auto 0;
+  padding: 6px 8px 6px 12px;
+  border: 2px solid var(--foco);
+  border-radius: 12px;
+  background: var(--superficie);
+  font-size: 15px;
+}
+
+.barra-marcar strong {
+  margin-right: 4px;
+  font-size: 22px;
+  letter-spacing: 1px;
+  vertical-align: middle;
+}
+
+.barra-marcar button {
+  flex-shrink: 0;
+  padding: 6px 12px;
+  font-size: 14px;
+}
+
 .dados-valem {
   min-height: 2.8em;
   margin: 4px 0 12px;

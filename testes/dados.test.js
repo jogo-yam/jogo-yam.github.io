@@ -102,6 +102,52 @@ test("o que os dados mostram sempre pode ser marcado na tabela", () => {
   }
 });
 
+// ---------- marcar pelos dados ----------
+
+test("quanto a jogada vale em cada linha", () => {
+  const vale = (linha, dados) => app.valorDaJogada(linha, dados);
+  assert.equal(vale(2, [3, 3, 3, 5, 5]), 9);
+  assert.equal(vale(0, [3, 3, 3, 5, 5]), null, "sem 1, não vale na linha do 1");
+  assert.equal(vale(10, [3, 3, 3, 5, 5]), 49);
+  assert.equal(vale(9, [5, 5, 5, 5, 2]), 40);
+  assert.equal(vale(9, [5, 5, 5, 5, 5]), null, "cinco iguais não é Quadra");
+  assert.equal(vale(10, [5, 5, 5, 5, 5]), null, "nem Full");
+  assert.equal(vale(15, [5, 5, 5, 5, 5]), 75);
+  assert.equal(vale(11, [4, 2, 5, 1, 3]), 50);
+  assert.equal(vale(12, [4, 2, 5, 6, 3]), 60);
+  assert.equal(vale(13, [1, 1, 2, 2, 6]), 12);
+  assert.equal(vale(14, [1, 1, 2, 2, 6]), 12);
+});
+
+test("casas destacadas: só as livres, na ordem, e a S só na 1ª jogada", () => {
+  naTabela({}, 1);
+  const casas = JSON.parse(JSON.stringify(app.casasParaMarcar([3, 3, 3, 5, 5])));
+  assert.equal(casas["10-2"], 49, "Full na D");
+  assert.equal(casas["10-3"], 49, "Full na S (1ª jogada)");
+  assert.equal(casas["2-2"], 9);
+  assert.equal(casas["13-2"], 19);
+  assert.equal(casas["10-0"], undefined, "descida ainda está no 1");
+  assert.equal(casas["10-1"], undefined, "subida só depois da descida");
+  assert.equal(casas["0-2"], undefined, "sem 1 nos dados");
+  naTabela({ "10-2": "45" }, 2);
+  const depois = JSON.parse(JSON.stringify(app.casasParaMarcar([3, 3, 3, 5, 5])));
+  assert.equal(depois["10-2"], undefined, "casa já preenchida");
+  assert.equal(depois["10-3"], undefined, "S só na 1ª jogada");
+});
+
+test("tocar na casa marca o valor, e dá para desfazer", () => {
+  naTabela({}, 1);
+  rodar("mesa.valores = [3, 3, 3, 5, 5]; limparJogadas()");
+  app.marcarPelosDados();
+  assert.ok(rodar("casasMarcaveis !== null"), "entrou no modo de marcar");
+  app.marcarCasa("10-2", 49);
+  assert.equal(app.state["10-2"], "49");
+  assert.ok(rodar("casasMarcaveis === null"), "saiu do modo de marcar");
+  assert.equal(rodar("dadosParaNovaVez"), true, "a próxima vez dos dados começa do zero");
+  app.desfazer();
+  assert.equal(app.state["10-2"], undefined);
+});
+
 test("sorteio: só sai de 1 a 6, e sai de tudo", () => {
   const vezes = [0, 0, 0, 0, 0, 0, 0];
   for (let i = 0; i < 6000; i++) vezes[app.sortearFace()]++;
