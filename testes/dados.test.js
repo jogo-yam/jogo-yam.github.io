@@ -148,6 +148,35 @@ test("tocar na casa marca o valor, e dá para desfazer", () => {
   assert.equal(app.state["10-2"], undefined);
 });
 
+test("riscar pelos dados: destaca as casas vazias e risca com um toque", () => {
+  naTabela({ "0-0": "2", "10-2": "49" }, 2);
+  rodar("mesa.valores = [3, 3, 3, 5, 5]; limparJogadas()");
+  app.marcarPelosDados(true);
+  const casas = JSON.parse(JSON.stringify(rodar("casasMarcaveis")));
+  assert.equal(Object.keys(casas).length, 13 * 4 - 2, "todas as casas vazias");
+  assert.equal(casas["0-0"], undefined, "a preenchida fica de fora");
+  assert.equal(casas["15-1"], 0, "riscar pode fora da ordem da subida");
+  assert.equal(casas["9-3"], 0, "e na S depois da 1ª jogada");
+  app.marcarCasa("15-1", 0);
+  assert.equal(app.state["15-1"], "0");
+  assert.equal(app.calcularTotais(app.state).calculados["16-1"], 0);
+  app.desfazer();
+  assert.equal(app.state["15-1"], undefined);
+});
+
+test("jogada que não cabe em lugar nenhum já abre riscando", () => {
+  // só sobra o YAM da coluna D, e os dados não fazem YAM
+  const quase = {};
+  for (const l of app.LINHAS_JOGO) for (const c of [0, 1, 2, 3]) quase[`${l}-${c}`] = "0";
+  delete quase["15-2"];
+  naTabela(quase, 3);
+  rodar("mesa.valores = [1, 2, 3, 4, 6]");
+  app.marcarPelosDados();
+  igual(rodar("casasMarcaveis"), { "15-2": 0 });
+  assert.equal(rodar("riscandoPelosDados"), true);
+  app.sairDoModoMarcar();
+});
+
 test("sorteio: só sai de 1 a 6, e sai de tudo", () => {
   const vezes = [0, 0, 0, 0, 0, 0, 0];
   for (let i = 0; i < 6000; i++) vezes[app.sortearFace()]++;

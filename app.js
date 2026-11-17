@@ -1859,18 +1859,34 @@ function combinacoesMarcaveis(dados) {
 // ---------- marcar pelos dados ----------
 // "✏️ Marcar" fecha os dados e destaca na tabela as casas onde a jogada pode ir,
 // já com o valor de cada uma. Um toque na casa marca (como se tivesse digitado).
+// "— Riscar" troca os destaques pelas casas vazias: um toque risca (0, aparece —).
+// Se a jogada não cabe em lugar nenhum, já abre riscando.
 
 let casasMarcaveis = null; // { "linha-coluna": valor } enquanto a pessoa escolhe
+let riscandoPelosDados = false;
 
-function marcarPelosDados() {
-  const casas = casasParaMarcar(mesa.valores);
-  if (!Object.keys(casas).length) return;
+// Casas vazias que dá para riscar (riscar pode em qualquer casa, a qualquer hora).
+function casasParaRiscar() {
+  const casas = {};
+  for (const linha of LINHAS_JOGO) {
+    for (let col = 0; col < COLUNAS; col++) if (!preenchida(linha, col)) casas[`${linha}-${col}`] = 0;
+  }
+  return casas;
+}
+
+function marcarPelosDados(riscar = false) {
+  const valores = casasParaMarcar(mesa.valores);
+  const temValores = Object.keys(valores).length > 0;
+  riscar = riscar || !temValores;
+  const casas = riscar ? casasParaRiscar() : valores;
+  if (!Object.keys(casas).length) return; // tabela cheia
   fecharDados();
   casasMarcaveis = casas;
+  riscandoPelosDados = riscar;
 
   // sem combinação para marcar: a casa sugerida (menor risco para o bônus) fica mais forte
   let sugerida = null;
-  if (!combinacoesMarcaveis(mesa.valores).length) {
+  if (!riscar && !combinacoesMarcaveis(mesa.valores).length) {
     const qtd = [0, 0, 0, 0, 0, 0, 0];
     mesa.valores.forEach(f => qtd[f]++);
     const s = sugestaoDeNumero(qtd);
@@ -1880,9 +1896,20 @@ function marcarPelosDados() {
 
   document.getElementById("marcar-dados").textContent =
     mesa.valores.map(f => "⚀⚁⚂⚃⚄⚅"[f - 1]).join("");
-  document.getElementById("barra-marcar").hidden = false;
+  document.getElementById("marcar-texto").textContent = riscar ? "Riscar qual?" : "Escolha a casa";
+  const trocar = document.getElementById("marcar-trocar");
+  trocar.textContent = riscar ? "✏️ Valores" : "— Riscar";
+  trocar.hidden = riscar && !temValores; // nada para marcar: só dá para riscar
+  const barra = document.getElementById("barra-marcar");
+  barra.classList.toggle("riscando", riscar);
+  barra.hidden = false;
   const alvo = body.querySelector(sugerida ? `[data-key="${sugerida}"]` : "td.pode-marcar");
   if (alvo) alvo.scrollIntoView({ block: "nearest", behavior: "smooth" });
+}
+
+// Botão da barra: alterna entre marcar valores e riscar.
+function trocarMarcarRiscar() {
+  marcarPelosDados(!riscandoPelosDados);
 }
 
 function destacarCasasMarcaveis(sugerida = null) {
@@ -1890,15 +1917,17 @@ function destacarCasasMarcaveis(sugerida = null) {
   body.querySelectorAll("td[data-key]").forEach(td => {
     const valor = casasMarcaveis ? casasMarcaveis[td.dataset.key] : undefined;
     td.classList.toggle("pode-marcar", valor !== undefined);
+    td.classList.toggle("riscar", valor !== undefined && riscandoPelosDados);
     td.classList.toggle("sugerida", valor !== undefined && td.dataset.key === sugerida);
     const input = td.querySelector("input");
-    if (input) input.placeholder = valor !== undefined ? String(valor) : "";
+    if (input) input.placeholder = valor === undefined ? "" : exibir(String(valor));
   });
 }
 
 function sairDoModoMarcar() {
   if (!casasMarcaveis) return;
   casasMarcaveis = null;
+  riscandoPelosDados = false;
   destacarCasasMarcaveis();
   document.getElementById("barra-marcar").hidden = true;
 }
@@ -2007,10 +2036,13 @@ function desenharDados(rolando = []) {
   botao.disabled = mesa.jogada >= 3 || rolandoDados || mesa.segurados.every(Boolean);
   document.getElementById("dados-nova-vez").hidden = mesa.jogada === 0;
 
-  // ✏️ Marcar: depois de rolar, se a jogada cabe em alguma casa; vira o botão
-  // principal quando não dá mais para rolar (3ª jogada)
+  // ✏️ Marcar: depois de rolar (se a jogada não cabe em lugar nenhum, vira
+  // "— Riscar"); vira o botão principal quando não dá mais para rolar (3ª jogada)
   const marcar = document.getElementById("dados-marcar");
-  marcar.hidden = mesa.jogada === 0 || rolando.length > 0 || !Object.keys(casasParaMarcar(mesa.valores)).length;
+  marcar.hidden = mesa.jogada === 0 || rolando.length > 0 || !Object.keys(casasParaRiscar()).length;
+  if (!marcar.hidden) {
+    marcar.textContent = Object.keys(casasParaMarcar(mesa.valores)).length ? "✏️ Marcar" : "— Riscar";
+  }
   const fim = mesa.jogada >= 3;
   marcar.className = fim ? "principal" : "";
   botao.className = fim ? "" : "principal";

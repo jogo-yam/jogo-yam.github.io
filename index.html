@@ -60,8 +60,9 @@
 
   <!-- marcando pelos dados: escolha a casa -->
   <div id="barra-marcar" class="barra-marcar" hidden>
-    <span><strong id="marcar-dados"></strong> Escolha a casa</span>
-    <button onclick="sairDoModoMarcar()">Cancelar</button>
+    <span class="marcar-info"><strong id="marcar-dados"></strong> <span id="marcar-texto">Escolha a casa</span></span>
+    <button id="marcar-trocar" onclick="trocarMarcarRiscar()">— Riscar</button>
+    <button class="marcar-cancelar" onclick="sairDoModoMarcar()" aria-label="Cancelar" title="Cancelar">✕</button>
   </div>
 
   <div class="acoes acoes-jogo">
