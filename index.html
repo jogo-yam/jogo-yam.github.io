@@ -81,6 +81,16 @@
   <!-- em sala: código, quem terminou, sair (fora de sala fica escondida) -->
   <div id="familia-barra" class="familia-barra" hidden></div>
 
+  <!-- sala "cada um na sua vez": de quem é a vez, os dados dela e a última jogada -->
+  <div id="barra-vez" class="barra-vez" role="status" hidden>
+    <div class="vez-info">
+      <strong id="vez-quem"></strong>
+      <small id="vez-ultima"></small>
+    </div>
+    <span id="vez-dados" class="vez-dados"></span>
+    <button id="vez-acao" hidden></button>
+  </div>
+
   <div class="tabela">
   <table>
     <thead>
@@ -332,6 +342,12 @@
     <label class="rotulo-campo" for="familia-nome">Seu nome</label>
     <input id="familia-nome" type="text" maxlength="20" autocomplete="off" autocapitalize="words"
            placeholder="Ex.: Maria">
+    <div id="familia-modo" class="familia-modo" role="radiogroup" aria-label="Como vão jogar">
+      <button type="button" data-modo="livre" role="radio" aria-checked="true" onclick="familia.escolherModo('livre')">
+        <strong>Todos ao mesmo tempo</strong><small>Cada um joga quando quiser</small></button>
+      <button type="button" data-modo="vez" role="radio" aria-checked="false" onclick="familia.escolherModo('vez')">
+        <strong>Cada um na sua vez</strong><small>Como nos dados de verdade, um de cada vez</small></button>
+    </div>
     <div id="familia-campo-codigo" hidden>
       <label class="rotulo-campo" for="familia-codigo">Código da sala</label>
       <input id="familia-codigo" type="text" inputmode="numeric" maxlength="5" autocomplete="off"

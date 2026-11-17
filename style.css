@@ -410,6 +410,50 @@ body {
   font-size: 18px;
 }
 
+/* ---------- você contra cada um ---------- */
+
+.lista-confrontos {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+}
+
+.lista-confrontos li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 0;
+  border-top: 1px solid var(--borda);
+}
+
+.lista-confrontos li:first-child { border-top: none; }
+
+.confronto-info {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.confronto-info strong,
+.confronto-info small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.confronto-info small { font-size: 13px; color: var(--texto-suave); }
+
+.placar {
+  flex-shrink: 0;
+  font-size: 20px;
+  color: var(--texto-suave);
+}
+
+.placar b { color: var(--texto); }
+.placar.ganhando b:first-child { color: #2e7d32; }
+.placar.perdendo b:last-child { color: var(--perigo); }
+
 .versao {
   margin: 4px 0 8px;
   text-align: center;
@@ -1315,6 +1359,7 @@ button:disabled {
   vertical-align: -3px;
 }
 .dado-mini rect { fill: #ffffff; stroke: #9a9a96; stroke-width: 1.5; }
+.dado-mini.segurado rect { stroke: var(--foco); stroke-width: 3; }
 .dado-mini circle { fill: #1d1d1f; }
 
 .barra-marcar button {
@@ -1668,6 +1713,78 @@ button:disabled {
   padding: 5px 10px;
   font-size: 13px;
   border-width: 1px;
+}
+
+/* sala "cada um na sua vez" */
+.barra-vez {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  max-width: 700px;
+  margin: 0 auto 8px;
+  padding: 6px 8px 6px 12px;
+  border: 2px solid var(--borda);
+  border-radius: 12px;
+  background: var(--superficie);
+}
+
+.barra-vez.minha {
+  border-color: var(--foco);
+  background: color-mix(in srgb, var(--foco) 14%, var(--superficie));
+}
+
+.vez-info {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+  line-height: 1.2;
+}
+
+.vez-info strong,
+.vez-info small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.vez-info strong { font-size: 15px; }
+.vez-info small { font-size: 12px; color: var(--texto-suave); }
+
+.vez-dados { flex-shrink: 0; white-space: nowrap; }
+.vez-dados:empty { display: none; }
+.vez-dados .dado-mini { width: 17px; height: 17px; }
+
+.barra-vez button {
+  flex-shrink: 0;
+  padding: 6px 10px;
+  font-size: 14px;
+  border-width: 1px;
+}
+
+/* criar sala: todos ao mesmo tempo ou cada um na sua vez */
+.familia-modo {
+  display: grid;
+  gap: 8px;
+  margin: 4px 0 14px;
+}
+
+.familia-modo button {
+  display: block;
+  width: 100%;
+  padding: 10px 12px;
+  text-align: left;
+  border-width: 2px;
+  border-color: var(--borda);
+}
+
+.familia-modo button strong { display: block; font-size: 16px; }
+.familia-modo button small { display: block; font-size: 13px; color: var(--texto-suave); }
+
+.familia-modo button[aria-checked="true"] {
+  border-color: var(--destaque);
+  background: color-mix(in srgb, var(--destaque) 12%, var(--superficie));
 }
 
 /* janela "Jogar em sala": dois botões grandes com explicação */

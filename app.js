@@ -8,7 +8,7 @@ const rows = [
 const COLUNAS = 4;
 
 // Versão do app: igual ao número do CACHE_NAME do service-worker.js (um teste confere).
-const VERSAO = 44;
+const VERSAO = 45;
 
 // Ícone desenhado (o mesmo em todo celular, ao contrário dos emojis).
 function icone(nome, classe = "") {
@@ -16,10 +16,11 @@ function icone(nome, classe = "") {
 }
 
 // Dadinho desenhado com os pontos da face (barra de marcar).
-function dadoMini(face) {
+function dadoMini(face, segurado = false) {
   const pontos = PONTOS_DO_DADO[face].map(p =>
     `<circle cx="${5.5 + (p % 3) * 6.5}" cy="${5.5 + Math.floor(p / 3) * 6.5}" r="2"/>`).join("");
-  return `<svg class="dado-mini" viewBox="0 0 24 24" aria-hidden="true"><rect x="1" y="1" width="22" height="22" rx="5"/>${pontos}</svg>`;
+  return `<svg class="dado-mini${segurado ? " segurado" : ""}" viewBox="0 0 24 24" aria-hidden="true">` +
+    `<rect x="1" y="1" width="22" height="22" rx="5"/>${pontos}</svg>`;
 }
 
 // Partidas antigas guardaram o título do pódio com o emoji 🏆 na frente.
@@ -96,7 +97,7 @@ function mostrarLegenda([titulo, texto], tipo = "", acao = null) {
   caixa.classList.toggle("festa", tipo === "festa");
   caixa.hidden = false;
   clearTimeout(timerLegenda);
-  timerLegenda = setTimeout(() => { caixa.hidden = true; }, tipo === "festa" ? 4000 : tipo ? 7000 : 5000);
+  timerLegenda = setTimeout(() => { caixa.hidden = true; }, tipo === "festa" ? 4000 : (tipo || acao) ? 7000 : 5000);
 }
 
 // ---------- valores possíveis ----------
@@ -407,9 +408,14 @@ function montarTabela(tbody, valores, editavel) {
         // Se não é a vez desta casa (↓ ou ↑), já avisa o motivo e mostra a certa.
         // valor da casa antes desta edição (para o "Desfazer")
         let antes = "";
+        // sala com vez: só digita quem está na vez (conferido ao tocar e ao digitar,
+        // caso a casa já estivesse selecionada quando a vez mudou)
+        let liberado = false;
 
         input.addEventListener("focus", () => {
           antes = state[key] ?? "";
+          liberado = podeJogarAgora();
+          if (!liberado) { input.blur(); return; }
           input.select();
           const [linha, col] = key.split("-").map(Number);
           const problema = input.value === "" ? problemaDeOrdem(linha, col) : null;
@@ -434,7 +440,14 @@ function montarTabela(tbody, valores, editavel) {
           piscarCasa(problema.certa);
         });
 
+        input.addEventListener("blur", () => { liberado = false; });
+
         input.addEventListener("input", () => {
+          if (!liberado && !(liberado = podeJogarAgora())) {
+            input.value = exibir(state[key] ?? "");
+            input.blur();
+            return;
+          }
           const limpo = input.value.replace(/\D/g, "");
           if (limpo !== input.value) input.value = limpo;
           update(key, limpo);
@@ -1535,6 +1548,9 @@ function abrirEstatisticas() {
   destaques.appendChild(lista);
   area.appendChild(destaques);
 
+  const contra = blocoConfrontos(historico);
+  if (contra) area.appendChild(contra);
+
   mostrarTela("tela-estatisticas");
 }
 
@@ -1657,6 +1673,11 @@ function atualizarBotaoDesfazer() {
 const NOMES_COLUNAS = ["descida (↓)", "subida (↑)", "coluna D", "coluna S"];
 
 function desfazer() {
+  if (window.familia && familia.ativa() && !familia.podeDesfazer()) {
+    ultimoAviso = Date.now();
+    mostrarLegenda(["Não dá para desfazer", "A vez já passou para o próximo jogador."]);
+    return;
+  }
   const jogada = jogadas.pop();
   if (!jogada) return;
   localStorage.setItem(CHAVE_JOGADAS, JSON.stringify(jogadas));
@@ -1885,6 +1906,7 @@ function sortearFace() {
 }
 
 function abrirDados() {
+  if (!podeJogarAgora()) return;
   sairDoModoMarcar();
   if (dadosParaNovaVez) novaVez();
   desenharDados();
@@ -1900,12 +1922,19 @@ function novaVez() {
   mesa.segurados = [false, false, false, false, false];
   dadosParaNovaVez = false;
   desenharDados();
+  avisarMesa();
 }
 
 function segurarDado(i) {
   if (rolandoDados || mesa.jogada === 0 || mesa.jogada >= 3) return;
   mesa.segurados[i] = !mesa.segurados[i];
   desenharDados();
+  avisarMesa();
+}
+
+// Sala com vez: os outros veem os dados de quem está jogando.
+function avisarMesa() {
+  if (window.familia) familia.mesaMudou();
 }
 
 function rolarDados() {
@@ -1928,6 +1957,7 @@ function rolarDados() {
       rolandoDados = false;
       desenharDados([], soltos);
       vibrar(30);
+      avisarMesa();
     }
   }, 60);
 }
@@ -2045,7 +2075,7 @@ function marcarPelosDados(riscar = false) {
   destacarCasasMarcaveis(sugerida);
 
   const dadosNaBarra = document.getElementById("marcar-dados");
-  dadosNaBarra.innerHTML = mesa.valores.map(dadoMini).join("");
+  dadosNaBarra.innerHTML = mesa.valores.map(f => dadoMini(f)).join("");
   dadosNaBarra.setAttribute("aria-label", `Dados: ${mesa.valores.join(", ")}`);
   document.getElementById("marcar-texto").textContent = riscar ? "Riscar qual?" : "Onde marcar?";
   const trocar = document.getElementById("marcar-trocar");
@@ -2388,6 +2418,10 @@ const SONS = {
   festa(ctx) {
     [523.25, 659.25, 783.99, 1046.5].forEach((f, i) => nota(ctx, f, i * 0.09, 0.3));
   },
+  suaVez(ctx) {
+    nota(ctx, 784, 0, 0.16, { tipo: "sine", volume: 0.16 });
+    nota(ctx, 1175, 0.14, 0.3, { tipo: "sine", volume: 0.14 });
+  },
   podio(ctx) {
     [392, 523.25, 659.25, 783.99, 1046.5].forEach((f, i) => nota(ctx, f, i * 0.1, 0.35, { volume: 0.14 }));
     nota(ctx, 1046.5, 0.55, 0.7, { volume: 0.12 });
@@ -2502,6 +2536,134 @@ function fecharBoasVindas() {
 })();
 
 try { if (deveMostrarBoasVindas()) abrirBoasVindas(); } catch {}
+
+// ---------- sala "cada um na sua vez" ----------
+
+// De quem é a vez: de quem, na ordem de entrada (quem criou começa), jogou
+// menos vezes. Vezes = casas marcadas + "base" (quem entrou no meio começa na
+// rodada atual) + vezes que o criador pulou. Quem terminou sai da roda.
+function vezDaSala(jogadores, pulos = {}) {
+  const naRoda = jogadores.filter(j => !j.terminou)
+    .sort((a, b) => (a.entrouEm || 0) - (b.entrouEm || 0) || String(a.uid).localeCompare(String(b.uid)));
+  if (!naRoda.length) return null;
+  const vezes = j => (j.casas || 0) + (j.base || 0) + ((pulos || {})[j.uid] || 0);
+  const menor = Math.min(...naRoda.map(vezes));
+  return naRoda.find(j => vezes(j) === menor).uid;
+}
+
+// Casas da tabela já marcadas (com número ou riscadas).
+const casasMarcadas = (valores = state) =>
+  LINHAS_JOGO.reduce((n, l) => n + [0, 1, 2, 3].filter(c => (valores[`${l}-${c}`] ?? "") !== "").length, 0);
+
+// A última casa marcada (para os outros verem o que você fez).
+function ultimaJogadaFeita() {
+  for (let i = jogadas.length - 1; i >= 0; i--) {
+    const valor = state[jogadas[i].key] ?? "";
+    if (valor !== "") return { key: jogadas[i].key, valor: Number(valor) };
+  }
+  return null;
+}
+
+// "Maria marcou 18 no 6 na descida (↓)" / "Maria riscou o F na coluna D"
+function textoDaJogada(nome, key, valor) {
+  const [linha, col] = key.split("-").map(Number);
+  const casa = linha <= 5 ? String(linha + 1) : siglaDaCasa(linha);
+  return Number(valor) === 0
+    ? `${nome} riscou o ${casa} na ${NOMES_COLUNAS[col]}`
+    : `${nome} marcou ${valor} no ${casa} na ${NOMES_COLUNAS[col]}`;
+}
+
+// Tabela e dados só na sua vez (fora de sala, ou sala livre, sempre pode).
+function podeJogarAgora() {
+  if (!window.familia || !familia.ativa() || familia.podeJogar()) return true;
+  ultimoAviso = Date.now();
+  mostrarLegenda(familia.porQueNaoPode());
+  return false;
+}
+
+// ---------- você contra cada um ----------
+// Nas partidas em sala guardadas neste celular (cada celular só tem as salas em
+// que jogou), quantas vezes você ficou na frente de cada pessoa.
+
+const normalizarNome = nome => String(nome).normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+  .toLowerCase().trim().replace(/\s+/g, " ");
+
+function confrontos(partidas) {
+  const porPessoa = new Map();
+  for (const p of partidas) {
+    const podio = p.sala && p.sala.podio;
+    if (!podio || !Array.isArray(podio.terminaram)) continue;
+    const eu = podio.terminaram.find(j => j.eu);
+    if (!eu) continue;
+    for (const outro of podio.terminaram) {
+      if (outro.eu) continue;
+      const chave = normalizarNome(outro.nome);
+      const c = porPessoa.get(chave) ||
+        { nome: outro.nome, partidas: 0, vitorias: 0, derrotas: 0, empates: 0, meus: 0, deles: 0, data: "" };
+      c.partidas++;
+      c.meus += eu.total;
+      c.deles += outro.total;
+      if (eu.total > outro.total) c.vitorias++;
+      else if (eu.total < outro.total) c.derrotas++;
+      else c.empates++;
+      if ((p.data || "") >= c.data) { c.nome = outro.nome; c.data = p.data || ""; } // nome mais recente
+      porPessoa.set(chave, c);
+    }
+  }
+  return [...porPessoa.values()].sort((a, b) => b.partidas - a.partidas || a.nome.localeCompare(b.nome));
+}
+
+function blocoConfrontos(partidas) {
+  const lista = confrontos(partidas);
+  if (!lista.length) return null;
+  const caixa = elemento("section", "bloco confrontos");
+  caixa.appendChild(elemento("h2", "", "Você contra cada um"));
+  caixa.appendChild(elemento("p", "subtitulo", "Nas partidas em sala deste celular. Placar: você × a pessoa."));
+  const ul = elemento("ul", "lista-confrontos");
+  for (const c of lista) {
+    const li = elemento("li");
+    const info = elemento("div", "confronto-info");
+    info.appendChild(elemento("strong", "", c.nome));
+    const media = n => Math.round(n / c.partidas);
+    info.appendChild(elemento("small", "",
+      `${c.partidas} partida${c.partidas === 1 ? "" : "s"}${c.empates ? ` · ${c.empates} empate${c.empates === 1 ? "" : "s"}` : ""}` +
+      ` · média ${media(c.meus)} × ${media(c.deles)}`));
+    li.appendChild(info);
+    const placar = elemento("span", "placar" + (c.vitorias > c.derrotas ? " ganhando" : c.vitorias < c.derrotas ? " perdendo" : ""));
+    placar.appendChild(elemento("b", "", String(c.vitorias)));
+    placar.appendChild(elemento("span", "", " × "));
+    placar.appendChild(elemento("b", "", String(c.derrotas)));
+    placar.setAttribute("aria-label", `Você ${c.vitorias}, ${c.nome} ${c.derrotas}`);
+    li.appendChild(placar);
+    ul.appendChild(li);
+  }
+  caixa.appendChild(ul);
+  return caixa;
+}
+
+// ---------- lembrete de backup ----------
+// Com 3 partidas ou mais e sem backup há mais de 30 dias, lembra (no máximo a
+// cada 14 dias) que as partidas ficam só neste celular.
+
+const CHAVE_LEMBRETE_BACKUP = "yam-lembrete-backup";
+
+function precisaLembrarBackup(agora = Date.now()) {
+  if (historico.length < 3) return false;
+  const dias = iso => (iso ? (agora - new Date(iso).getTime()) / (24 * 60 * 60 * 1000) : Infinity);
+  return dias(ler(CHAVE_ULTIMO_BACKUP, null)) > 30 && dias(ler(CHAVE_LEMBRETE_BACKUP, null)) > 14;
+}
+
+const timerBackup = setTimeout(() => {
+  try {
+    if (!precisaLembrarBackup() || !document.getElementById("boas-vindas").hidden) return;
+    localStorage.setItem(CHAVE_LEMBRETE_BACKUP, JSON.stringify(new Date().toISOString()));
+    ultimoAviso = Date.now();
+    mostrarLegenda(["Que tal um backup?",
+      "Suas partidas ficam só neste celular. Um arquivo de backup evita perder o histórico se trocar de aparelho."],
+      "", { texto: "Fazer backup", fazer: exportarHistorico });
+  } catch {}
+}, 4000);
+if (timerBackup && timerBackup.unref) timerBackup.unref();
 
 // Atalhos do ícone (segurar o ícone do app): ?abrir=dados ou ?abrir=historico
 try {

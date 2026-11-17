@@ -31,6 +31,8 @@ let pararEscuta = null;
 let ultimoEnvio = "";
 let podioMostrado = false;
 let resultadoSala = null;              // colocação deste jogador no último pódio
+const CHAVE_MODO = "yam-modo-sala";    // última escolha ao criar: "livre" ou "vez"
+let modoEscolhido = localStorage.getItem(CHAVE_MODO) === "vez" ? "vez" : "livre";
 
 // ---------- utilidades ----------
 
@@ -69,7 +71,7 @@ const $ = id => document.getElementById(id);
 
 // ---------- criar / entrar / sair ----------
 
-async function entrar(codigo, nome) {
+async function entrar(codigo, nome, modo = null) {
   const user = await usuario();
   const raiz = `partidas/${codigo}`;
   const snap = await get(ref(db, raiz));
@@ -87,12 +89,25 @@ async function entrar(codigo, nome) {
   const chaveAntiga = snap.child(`jogadores/${user.uid}/chave`).val();
   if (chaveAntiga && chaveAntiga !== chave) await remove(ref(db, `${raiz}/nomes/${chaveAntiga}`));
 
+  // sala com vez: o modo vem de quem criou; quem entra no meio começa na rodada atual
+  const sala = snap.val();
+  const modoDaSalaAgora = modo || modoDaSala(sala);
+  const outros = jogadoresDe(sala).filter(j => j.uid !== user.uid && !j.terminou);
+  const pulos = pulosDe(sala);
+  const base = outros.length
+    ? Math.min(...outros.map(j => (j.casas || 0) + (j.base || 0) + (pulos[j.uid] || 0)))
+    : 0;
+  const jaEstava = snap.child(`jogadores/${user.uid}/entrouEm`).exists();
+
   await update(ref(db, `${raiz}/jogadores/${user.uid}`), {
-    nome, chave, entrouEm: serverTimestamp(), terminou: false, total: null, colunas: null, valores: null
+    nome, chave, terminou: false, total: null, colunas: null, valores: null,
+    modo: modoDaSalaAgora, casas: casasMarcadas(), base: jaEstava ? (sala.jogadores[user.uid].base || 0) : base,
+    ...(jaEstava ? {} : { entrouEm: serverTimestamp() }) // a ordem da vez não muda se entrar de novo
   });
   guardarSessao({ codigo, chave });
   ultimoEnvio = "";
   podioMostrado = false;
+  reiniciarVez();
   escutar();
 }
 
@@ -133,7 +148,7 @@ async function limparSalasAntigas() {
   return apagadas;
 }
 
-async function criar(nome) {
+async function criar(nome, modo = "livre") {
   const user = await usuario();
   for (let tentativa = 0; tentativa < 6; tentativa++) {
     const codigo = String(Math.floor(10000 + Math.random() * 90000));
@@ -141,7 +156,7 @@ async function criar(nome) {
       atual => atual === null ? user.uid : undefined);
     if (r.committed) {
       await update(ref(db, `partidas/${codigo}`), { criadaEm: serverTimestamp() });
-      await entrar(codigo, nome);
+      await entrar(codigo, nome, modo);
       guardarSalaCriada(codigo);
       limparSalasAntigas(); // em segundo plano
       return codigo;
@@ -162,6 +177,7 @@ async function sair() {
   pararDeEscutar();
   guardarSessao(null);
   partida = null;
+  reiniciarVez();
   atualizarBarra();
   fecharEspera();
   if (uid) {
@@ -185,10 +201,12 @@ function escutar() {
       pararDeEscutar();
       guardarSessao(null);
       partida = null;
+      reiniciarVez();
       atualizarBarra();
       return;
     }
     sincronizar();
+    avisarDaVez();
     atualizarBarra();
     atualizarEspera();
     verificarRevelacao();
@@ -201,7 +219,11 @@ function escutar() {
 
 // Envia só "terminou / total" quando a tabela fica completa (nunca os pontos no meio do jogo).
 function sincronizar() {
-  if (!sessao || !partida || partida.revelada || !auth.currentUser) return;
+  if (!sessao || !partida || partida.revelada || !auth.currentUser) {
+    atualizarBarraVez();
+    return;
+  }
+  acompanharVez();
   // só conta como terminada se todas as casas têm valores possíveis
   const completa = partidaCompleta() && tabelaValida(state);
   const { calculados, geral } = calcularTotais(state);
@@ -251,7 +273,8 @@ function atualizarBarra(erro) {
   } else if (partida) {
     const jogadores = jogadoresDe(partida);
     const terminaram = jogadores.filter(j => j.terminou).length;
-    status.textContent = `${jogadores.length} jogador${jogadores.length === 1 ? "" : "es"} · ${terminaram} ${terminaram === 1 ? "terminou" : "terminaram"}`;
+    status.textContent = `${jogadores.length} jogador${jogadores.length === 1 ? "" : "es"} · ${terminaram} ${terminaram === 1 ? "terminou" : "terminaram"}` +
+      (modoDaSala() === "vez" ? " · um de cada vez" : "");
   } else {
     status.textContent = "Conectando…";
   }
@@ -312,6 +335,8 @@ function abrir(modo = "criar") {
     ? "Digite o código que quem criou a sala te passou."
     : "Cada um joga no próprio celular. Os pontos de todos aparecem juntos, num pódio, quando o último terminar.";
   $("familia-campo-codigo").hidden = !entrar;
+  $("familia-modo").hidden = entrar;
+  escolherModo(modoEscolhido);
   $("familia-confirmar").textContent = entrar ? "Entrar na sala" : "Criar sala";
   $("familia-nome").value = nomeJogador;
   $("familia-codigo").value = "";
@@ -345,7 +370,7 @@ async function acaoJanela(tipo = modoJanela) {
   erro.textContent = tipo === "criar" ? "Criando a sala…" : "Entrando na sala…";
   document.querySelectorAll("#janela-familia button").forEach(b => { b.disabled = true; });
   try {
-    if (tipo === "criar") await criar(nome);
+    if (tipo === "criar") await criar(nome, modoEscolhido);
     else await entrar(codigo, nome);
     definirNome(nome); // só depois de entrar (nome aceito na sala)
     fecharJanela();
@@ -461,6 +486,7 @@ function sairDoPodio() {
   pararDeEscutar();
   guardarSessao(null);
   partida = null;
+  reiniciarVez();
 }
 
 async function jogarDeNovo() {
@@ -468,6 +494,7 @@ async function jogarDeNovo() {
   if (botao.disabled) return;
   const convite = revancheDeOutro();
   const antigo = sessao && sessao.codigo;
+  const modo = modoDaSala();
   const uid = auth.currentUser && auth.currentUser.uid;
   botao.disabled = true;
   botao.textContent = convite ? "Entrando…" : "Criando sala…";
@@ -481,7 +508,7 @@ async function jogarDeNovo() {
       ultimoAviso = Date.now();
       mostrarLegenda(["Revanche!", `Você entrou na sala ${convite.codigo}. Boa sorte!`]);
     } else {
-      const codigo = await criar(nomeJogador);
+      const codigo = await criar(nomeJogador, modo);
       // avisa quem ainda está no pódio da sala antiga
       if (antigo && uid) update(ref(db, `partidas/${antigo}/jogadores/${uid}`), { revanche: codigo }).catch(() => {});
       ultimoAviso = Date.now();
@@ -514,8 +541,223 @@ function fecharPodio() {
   pararDeEscutar();
   guardarSessao(null);
   partida = null;
+  reiniciarVez();
   atualizarBarra();
   aposPodio(); // depois do pódio, o resultado pessoal
+}
+
+// ---------- cada um na sua vez ----------
+// A vez não fica guardada num lugar só: as regras do banco só deixam cada um
+// escrever no próprio jogador. Cada um publica quantas casas já marcou
+// ("casas") e todos calculam de quem é a vez (vezDaSala, no app.js). Ao marcar,
+// a vez passa depois de 3 s (dá para desfazer antes). O criador pode pular a
+// vez de alguém: guarda "pulos" no próprio jogador.
+
+const ESPERA_PASSAR = 3000;
+let casasPublicadas = null;   // casas que este celular já publicou na sala
+let timerVez = null;
+let vezAnterior;              // de quem era a vez no último retrato da sala
+let jogadasVistas = null;     // uid -> número da última jogada já avisada
+let pulosVistos = null;       // quantas vezes já fui pulado (para avisar)
+
+function escolherModo(modo) {
+  modoEscolhido = modo === "vez" ? "vez" : "livre";
+  localStorage.setItem(CHAVE_MODO, modoEscolhido);
+  document.querySelectorAll("#familia-modo button").forEach(b => {
+    b.setAttribute("aria-checked", String(b.dataset.modo === modoEscolhido));
+  });
+}
+
+function modoDaSala(p = partida) {
+  if (!p || !p.jogadores) return "livre";
+  const criador = p.jogadores[p.criador];
+  if (criador && criador.modo) return criador.modo;
+  return jogadoresDe(p).some(j => j.modo === "vez") ? "vez" : "livre";
+}
+
+function pulosDe(p) {
+  const criador = p && p.jogadores && p.jogadores[p.criador];
+  return (criador && criador.pulos) || {};
+}
+
+const minhaUid = () => auth.currentUser && auth.currentUser.uid;
+const comVez = () => !!(sessao && partida && !partida.revelada && !partida.encerrada &&
+  partida.jogadores && partida.jogadores[minhaUid()] && modoDaSala() === "vez");
+const daVez = (p = partida) => vezDaSala(jogadoresDe(p), pulosDe(p));
+const nomeDe = uid => (uid && partida && partida.jogadores[uid] && partida.jogadores[uid].nome) || "";
+const esperandoPassar = () => casasPublicadas !== null && casasMarcadas() > casasPublicadas;
+
+function reiniciarVez() {
+  clearTimeout(timerVez);
+  timerVez = null;
+  casasPublicadas = null;
+  vezAnterior = undefined;
+  jogadasVistas = null;
+  pulosVistos = null;
+  atualizarBarraVez();
+}
+
+// O app pergunta antes de deixar mexer na tabela ou nos dados.
+function podeJogar() {
+  return !comVez() || (daVez() === minhaUid() && !esperandoPassar());
+}
+
+function porQueNaoPode() {
+  if (esperandoPassar()) return ["Você já jogou", "A vez está passando para o próximo. Para trocar, use Desfazer."];
+  return ["Não é a sua vez", `Agora é a vez de ${nomeDe(daVez())}. Avisamos quando chegar a sua.`];
+}
+
+// Desfazer só antes de a vez passar (depois, a jogada já é dos outros).
+function podeDesfazer() {
+  return !comVez() || esperandoPassar();
+}
+
+// Marcou uma casa na sua vez: espera 3 s e passa a vez.
+function acompanharVez() {
+  if (!comVez()) {
+    clearTimeout(timerVez);
+    timerVez = null;
+    atualizarBarraVez();
+    return;
+  }
+  const eu = partida.jogadores[minhaUid()];
+  if (casasPublicadas === null) casasPublicadas = typeof eu.casas === "number" ? eu.casas : 0;
+  const agora = casasMarcadas();
+  if (agora > casasPublicadas) {
+    if (!timerVez) timerVez = setTimeout(passarVez, ESPERA_PASSAR);
+  } else {
+    clearTimeout(timerVez);
+    timerVez = null;
+    if (agora < casasPublicadas) {
+      // a tabela ficou com menos casas (zerada, ou um backup importado): a sala acompanha
+      casasPublicadas = agora;
+      update(ref(db, `partidas/${sessao.codigo}/jogadores/${minhaUid()}`), { casas: agora }).catch(() => {});
+    }
+  }
+  atualizarBarraVez();
+}
+
+function passarVez() {
+  timerVez = null;
+  if (!comVez()) return;
+  // ainda digitando o número: espera terminar
+  const ativo = document.activeElement;
+  if (ativo && ativo.tagName === "INPUT" && $("tableBody").contains(ativo)) {
+    timerVez = setTimeout(passarVez, 800);
+    return;
+  }
+  const agora = casasMarcadas();
+  if (agora <= casasPublicadas) return;
+  const anterior = casasPublicadas;
+  casasPublicadas = agora;
+  const ultima = ultimaJogadaFeita();
+  update(ref(db, `partidas/${sessao.codigo}/jogadores/${minhaUid()}`), {
+    casas: agora, mesa: null,
+    ultima: ultima ? { ...ultima, n: agora, em: serverTimestamp() } : null
+  }).catch(() => { casasPublicadas = anterior; acompanharVez(); }); // sem conexão: tenta de novo
+  atualizarBarraVez();
+}
+
+// Na sua vez, os dados vão para a sala (os outros veem rolando).
+function mesaMudou() {
+  if (!comVez() || daVez() !== minhaUid() || esperandoPassar()) return;
+  update(ref(db, `partidas/${sessao.codigo}/jogadores/${minhaUid()}`), {
+    mesa: { valores: [...mesa.valores], segurados: [...mesa.segurados], jogada: mesa.jogada }
+  }).catch(() => {});
+}
+
+async function pularVez(uid) {
+  const nome = nomeDe(uid);
+  if (!await confirmar(`Pular a vez de ${nome}?`,
+    `${nome} perde esta jogada e a vez passa para o próximo.`, "Pular")) return;
+  if (daVez() !== uid) return; // a vez mudou enquanto perguntava
+  try {
+    await runTransaction(ref(db, `partidas/${sessao.codigo}/jogadores/${minhaUid()}/pulos/${uid}`), n => (n || 0) + 1);
+  } catch (e) { avisar(mensagemDeErro(e), "Não deu para pular"); }
+}
+
+// Avisos: "Sua vez!" e o que cada um marcou.
+function avisarDaVez() {
+  if (!comVez()) return;
+  const uid = minhaUid();
+  const vez = daVez();
+
+  const vistas = {};
+  for (const j of jogadoresDe(partida)) {
+    const n = j.ultima ? j.ultima.n : 0;
+    vistas[j.uid] = n;
+    if (jogadasVistas && j.uid !== uid && j.ultima && n > (jogadasVistas[j.uid] || 0)) {
+      ultimoAviso = Date.now();
+      mostrarLegenda([textoDaJogada(j.nome, j.ultima.key, j.ultima.valor),
+        vez === uid ? "Agora é a sua vez!" : `Agora é a vez de ${nomeDe(vez)}.`]);
+    }
+  }
+  jogadasVistas = vistas;
+
+  const meusPulos = pulosDe(partida)[uid] || 0;
+  if (pulosVistos !== null && meusPulos > pulosVistos) {
+    ultimoAviso = Date.now();
+    mostrarLegenda(["Sua vez foi pulada", `${nomeDe(partida.criador)} passou a vez. Agora é a vez de ${nomeDe(vez)}.`]);
+  }
+  pulosVistos = meusPulos;
+
+  if (vez === uid && vezAnterior !== uid && !esperandoPassar()) {
+    vibrar([60, 50, 60]);
+    tocar("suaVez");
+    if (vezAnterior !== undefined && Date.now() - ultimoAviso > 800) {
+      ultimoAviso = Date.now();
+      mostrarLegenda(["Sua vez!", "Role os dados ou marque na tabela."]);
+    }
+  }
+  vezAnterior = vez;
+}
+
+// Faixa acima da tabela: de quem é a vez, os dados dela e a última jogada.
+function atualizarBarraVez() {
+  const barra = $("barra-vez");
+  if (!barra) return;
+  if (!comVez()) { barra.hidden = true; return; }
+  barra.hidden = false;
+  const uid = minhaUid();
+  const vez = daVez();
+  const quem = $("vez-quem"), dados = $("vez-dados"), acao = $("vez-acao");
+  const passando = esperandoPassar();
+  barra.classList.toggle("minha", vez === uid && !passando);
+  dados.innerHTML = "";
+  acao.hidden = true;
+
+  if (passando) {
+    // quem vem depois de mim
+    const simulado = jogadoresDe(partida).map(j => (j.uid === uid ? { ...j, casas: casasMarcadas() } : j));
+    quem.textContent = `Passando a vez para ${nomeDe(vezDaSala(simulado, pulosDe(partida))) || "o próximo"}…`;
+    acao.hidden = false;
+    rotular(acao, "desfazer", "Desfazer");
+    acao.onclick = () => desfazer();
+  } else if (vez === uid) {
+    quem.textContent = "Sua vez!";
+  } else {
+    const j = partida.jogadores[vez];
+    quem.textContent = `Vez de ${nomeDe(vez)}`;
+    if (j && j.mesa && j.mesa.jogada > 0 && Array.isArray(j.mesa.valores)) {
+      quem.textContent += ` · ${j.mesa.jogada}ª jogada`;
+      const segurados = j.mesa.segurados || [];
+      dados.innerHTML = j.mesa.valores.map((f, i) => dadoMini(f, !!segurados[i])).join("");
+      dados.setAttribute("aria-label", `Dados de ${j.nome}: ${j.mesa.valores.join(", ")} (${j.mesa.jogada}ª jogada)`);
+    }
+    if (partida.criador === uid) {
+      acao.hidden = false;
+      acao.textContent = "Pular";
+      acao.onclick = () => pularVez(vez);
+    }
+  }
+
+  // a jogada mais recente da sala
+  const ultima = jogadoresDe(partida).filter(j => j.ultima && j.ultima.key)
+    .sort((a, b) => (b.ultima.em || 0) - (a.ultima.em || 0))[0];
+  $("vez-ultima").textContent = ultima
+    ? (ultima.uid === uid ? textoDaJogada("Você", ultima.ultima.key, ultima.ultima.valor)
+      : textoDaJogada(ultima.nome, ultima.ultima.key, ultima.ultima.valor))
+    : (vez === uid ? "Você começa." : "Ninguém jogou ainda.");
 }
 
 // ---------- ligação com o resto do app ----------
@@ -523,6 +765,7 @@ function fecharPodio() {
 window.familia = {
   abrir, fecharJanela, acaoJanela, sair, confirmarSair, compartilharCodigo,
   aoTerminar, fecharEspera, fecharPodio, jogarDeNovo, limparSalasAntigas, sincronizar, registrarResultado,
+  escolherModo, podeJogar, porQueNaoPode, podeDesfazer, mesaMudou,
   ativa: () => !!sessao,
   revelada: () => !!(partida && (partida.revelada || partida.encerrada))
 };
