@@ -1,0 +1,18 @@
+# Roda os testes (pasta testes/) a cada envio. Se algum falhar, o GitHub avisa por e-mail.
+# Não bloqueia a publicação do site: é um aviso de que algo quebrou.
+name: Testes
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  testes:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: node --test
