@@ -68,9 +68,10 @@ function mostrarLegenda([titulo, texto], tipo = "", acao = null) {
   if (acao) botao.textContent = acao.texto;
   caixa.classList.toggle("erro", tipo === "erro");
   caixa.classList.toggle("aviso", tipo === "aviso");
+  caixa.classList.toggle("festa", tipo === "festa");
   caixa.hidden = false;
   clearTimeout(timerLegenda);
-  timerLegenda = setTimeout(() => { caixa.hidden = true; }, tipo ? 7000 : 5000);
+  timerLegenda = setTimeout(() => { caixa.hidden = true; }, tipo === "festa" ? 4000 : tipo ? 7000 : 5000);
 }
 
 // ---------- valores possíveis ----------
@@ -438,6 +439,10 @@ function montarTabela(tbody, valores, editavel) {
           registrarJogada(key, antes, numero);
           input.value = exibir(numero);
           update(key, numero);
+          if (numero !== antes) {
+            vibrar(15);
+            comemorarJogada(key, antes, numero);
+          }
           avisarSala();
           verificarFimDeJogo();
         });
@@ -453,10 +458,28 @@ function montarTabela(tbody, valores, editavel) {
   });
 }
 
+// Linhas que cada total soma: enquanto nenhuma delas tem jogada, o total
+// aparece apagado ("–") em vez de um monte de zeros.
+const ORIGEM_DO_TOTAL = {
+  6: [0, 5], 7: [0, 5], 8: [0, 5], 16: [9, 15], 17: [0, 15]
+};
+
+function totalSemJogada(valores, linha, col) {
+  const [inicio, fim] = ORIGEM_DO_TOTAL[linha];
+  for (let l = inicio; l <= fim; l++) {
+    if (!ehLinhaCalculada(rows[l]) && (valores[`${l}-${col}`] ?? "") !== "") return false;
+  }
+  return true;
+}
+
 function atualizarTotais(tbody, totalCell, valores) {
   const { calculados, geral } = calcularTotais(valores);
   for (const [key, valor] of Object.entries(calculados)) {
-    tbody.querySelector(`[data-key="${key}"]`).textContent = valor;
+    const [linha, col] = key.split("-").map(Number);
+    const td = tbody.querySelector(`[data-key="${key}"]`);
+    const vazio = totalSemJogada(valores, linha, col);
+    td.classList.toggle("total-vazio", vazio);
+    td.textContent = vazio ? "–" : valor;
   }
   totalCell.textContent = geral;
   marcarRiscados(tbody, valores);
@@ -1095,19 +1118,48 @@ function comecarNovaPartida() {
 }
 
 // Confete simples de comemoração do recorde.
-function soltarConfete() {
+// Confete caindo pela tela toda (recorde, pódio, YAM, bônus).
+let timerConfete = null;
+function soltarConfete(quantos = 60) {
   const cores = ["#f2b134", "#3d6ea8", "#ffffff", "#e8604c", "#5cb85c"];
   const area = document.getElementById("confete");
   area.innerHTML = "";
-  for (let i = 0; i < 60; i++) {
+  for (let i = 0; i < quantos; i++) {
     const p = document.createElement("i");
     p.style.left = Math.random() * 100 + "%";
     p.style.background = cores[i % cores.length];
-    p.style.animationDelay = Math.random() * 0.6 + "s";
-    p.style.animationDuration = 1.8 + Math.random() * 1.2 + "s";
+    p.style.animationDelay = Math.random() * 0.7 + "s";
+    p.style.animationDuration = 1.8 + Math.random() * 1.4 + "s";
     area.appendChild(p);
   }
-  setTimeout(() => { area.innerHTML = ""; }, 3800);
+  clearTimeout(timerConfete);
+  timerConfete = setTimeout(() => { area.innerHTML = ""; }, 4200);
+}
+
+// Vibração curta (só no Android; o iPhone não deixa sites vibrarem).
+function vibrar(padrao) {
+  try { if (navigator.vibrate) navigator.vibrate(padrao); } catch {}
+}
+
+// Depois de anotar uma casa: comemora um YAM ou a coluna que acabou de
+// garantir o bônus de +30.
+function comemorarJogada(key, antes, depois) {
+  const [linha, col] = key.split("-").map(Number);
+  if (!(Number(depois) > 0)) return;
+  if (linha === 15) {
+    festa(`YAM! +${Number(depois)}`, `Na ${NOMES_COLUNAS[col]}.`);
+  } else if (linha <= 5) {
+    const tinha = somaColuna({ ...state, [key]: antes }, col, 0, 5);
+    if (tinha < META_BONUS && somaColuna(state, col, 0, 5) >= META_BONUS) {
+      festa("Bônus +30 garantido!", `Na ${NOMES_COLUNAS[col]}.`);
+    }
+  }
+}
+
+function festa(titulo, texto) {
+  mostrarLegenda([`🎉 ${titulo}`, texto], "festa");
+  soltarConfete(45);
+  vibrar([40, 60, 40, 60, 80]);
 }
 
 async function novoJogo() {
@@ -1780,17 +1832,31 @@ function rolarDados() {
   rolandoDados = true;
   dadosParaNovaVez = false;
   mesa.jogada++;
+  soltos.forEach(i => { mesa.valores[i] = sortearFace(); });
+  desenharDados(soltos); // começa a animação (giro e pulo de cada dado)
+  vibrar([12, 50, 12, 50, 12]);
   let passos = 0;
   const animar = setInterval(() => {
     soltos.forEach(i => { mesa.valores[i] = sortearFace(); });
-    desenharDados(soltos);
+    trocarFaces(soltos);
     if (++passos >= 8) {
       clearInterval(animar);
       rolandoDados = false;
-      desenharDados();
-      if (navigator.vibrate) navigator.vibrate(30);
+      desenharDados([], soltos);
+      vibrar(30);
     }
   }, 60);
+}
+
+// Durante a rolagem só troca os pontos, sem refazer o dado (a animação segue).
+function trocarFaces(indices) {
+  const dados = document.getElementById("dados-mesa").children;
+  indices.forEach(i => {
+    if (!dados[i]) return;
+    Array.from(dados[i].children).forEach((ponto, p) => {
+      ponto.className = PONTOS_DO_DADO[mesa.valores[i]].includes(p) ? "on" : "";
+    });
+  });
 }
 
 // Quanto os dados valem numa linha da tabela (mesmas regras de valoresPossiveis);
@@ -1934,12 +2000,15 @@ function sairDoModoMarcar() {
 
 function marcarCasa(key, valor) {
   const numero = String(valor);
+  const antes = state[key] ?? "";
   sairDoModoMarcar();
-  registrarJogada(key, state[key] ?? "", numero);
+  registrarJogada(key, antes, numero);
   update(key, numero);
   const input = body.querySelector(`[data-key="${key}"] input`);
   if (input) input.value = exibir(numero);
   piscarCasa(key);
+  vibrar(15);
+  comemorarJogada(key, antes, numero);
   avisarSala();
   verificarFimDeJogo();
 }
@@ -1998,14 +2067,21 @@ function sugestaoDeNumero(qtd) {
   return melhor;
 }
 
-function desenharDados(rolando = []) {
+function desenharDados(rolando = [], assentaram = []) {
   const area = document.getElementById("dados-mesa");
   area.innerHTML = "";
   mesa.valores.forEach((valor, i) => {
     const dado = document.createElement("button");
     dado.className = "dado";
     if (mesa.segurados[i]) dado.classList.add("segurado");
-    if (rolando.includes(i)) dado.classList.add("rolando");
+    if (rolando.includes(i)) {
+      dado.classList.add("rolando");
+      // cada dado gira para um lado e um tanto (sempre volta reto)
+      const voltas = (Math.random() < 0.5 ? -1 : 1) * (Math.random() < 0.5 ? 360 : 720);
+      dado.style.setProperty("--giro", `${voltas}deg`);
+      dado.style.animationDelay = `${Math.floor(Math.random() * 40)}ms`;
+    }
+    if (assentaram.includes(i)) dado.classList.add("assentou");
     if (mesa.jogada === 0) dado.classList.add("parado");
     dado.setAttribute("aria-label", `Dado ${valor}${mesa.segurados[i] ? ", segurado" : ""}`);
     for (let p = 0; p < 9; p++) {

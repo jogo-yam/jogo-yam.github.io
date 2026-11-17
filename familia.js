@@ -236,14 +236,10 @@ function atualizarBarra(erro) {
   if (!barra) return;
   barra.innerHTML = "";
 
-  if (!sessao) {
-    const botao = document.createElement("button");
-    botao.className = "familia-entrar";
-    botao.textContent = "👥 Jogar em sala";
-    botao.onclick = () => escolherSala(); // pergunta: criar ou entrar
-    barra.appendChild(botao);
-    return;
-  }
+  // fora de sala: só o botão "Jogar em sala" no topo, ao lado do YAM
+  $("botao-sala").hidden = !!sessao;
+  barra.hidden = !sessao;
+  if (!sessao) return;
 
   const info = document.createElement("div");
   info.className = "familia-info";
@@ -507,18 +503,8 @@ function registrarResultado() {
 }
 
 function confetePodio() {
-  const cores = ["#f2b134", "#3d6ea8", "#ffffff", "#e8604c", "#5cb85c"];
-  const area = $("confete-podio");
-  area.innerHTML = "";
-  for (let i = 0; i < 80; i++) {
-    const p = document.createElement("i");
-    p.style.left = Math.random() * 100 + "%";
-    p.style.background = cores[i % cores.length];
-    p.style.animationDelay = Math.random() * 0.8 + "s";
-    p.style.animationDuration = 2 + Math.random() * 1.5 + "s";
-    area.appendChild(p);
-  }
-  setTimeout(() => { area.innerHTML = ""; }, 4500);
+  soltarConfete(80);
+  vibrar([40, 60, 40, 60, 120]);
 }
 
 // Fechar o pódio encerra a partida em família neste celular.

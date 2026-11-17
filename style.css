@@ -186,8 +186,10 @@ section > * {
 
 /* Moldura da tabela e área que rola. Ocupa o espaço que sobrar na tela. */
 .tabela {
-  flex: 0 1 auto;
+  flex: 1 1 0;
   min-height: 0;
+  /* altura natural da tabela: em tela alta ela não estica além disso */
+  max-height: 860px;
   width: 100%;
   max-width: 700px;
   margin: 0 auto;
@@ -199,8 +201,11 @@ section > * {
   -webkit-overflow-scrolling: touch;
 }
 
+/* a tabela enche a moldura: com pouco espaço as linhas ficam mais baixas
+   (até 30px) para caber tudo sem rolar; só abaixo disso a tabela rola */
 table {
   width: 100%;
+  height: 100%;
   border-collapse: separate;
   border-spacing: 0;
   table-layout: fixed;
@@ -211,7 +216,7 @@ th, td {
   border-bottom: 1px solid var(--borda);
   padding: 0;
   text-align: center;
-  height: 42px;
+  height: 30px;
   font-size: 17px;
 }
 
@@ -230,6 +235,7 @@ th:last-child, td:last-child {
 
 /* cabeçalho fixo ao rolar (dentro da moldura) */
 thead th {
+  height: 36px;
   position: sticky;
   top: 0;
   z-index: 1;
@@ -321,7 +327,7 @@ tr.fim-secao td {
 }
 
 .total-geral td {
-  height: 52px;
+  height: 44px;
   background: var(--destaque);
   color: var(--destaque-texto);
   border-bottom: none;
@@ -514,6 +520,13 @@ button.perigo {
   color: #ffffff;
 }
 
+/* comemoração: YAM, bônus garantido */
+.legenda.festa {
+  background: #2e7d32;
+  color: #ffffff;
+  text-align: center;
+}
+
 .legenda.aviso {
   background: #f2b134;
   color: #1d1d1f;
@@ -616,12 +629,13 @@ tbody tr td.piscar {
   gap: 10px;
 }
 
-/* confete do recorde */
+/* confete (recorde, pódio, YAM, bônus): cobre a tela toda, por cima de tudo */
 .confete {
-  position: absolute;
+  position: fixed;
   inset: 0;
   overflow: hidden;
   pointer-events: none;
+  z-index: 50;
 }
 
 .confete i {
@@ -655,6 +669,13 @@ tbody tr td.piscar {
   color: var(--perigo);
   opacity: 0.8;
   white-space: normal; /* "sem bônus" quebra em duas linhas e não vaza da casa */
+}
+
+/* total de coluna ainda sem jogada */
+tr td.total-vazio {
+  color: var(--texto-suave);
+  font-weight: normal;
+  opacity: 0.6;
 }
 
 tr.total td.bonus-ok {
@@ -871,12 +892,25 @@ button:disabled {
   box-shadow: 0 0 0 3px var(--foco);
   transform: translateY(-6px);
 }
-.dado.rolando { animation: chacoalhar 0.12s infinite; }
+/* rolando: cada dado pula, gira e quica; ao parar dá um "tum" */
+.dado.rolando { animation: rolar 0.44s ease-out both; }
+.dado.assentou { animation: assentar 0.22s ease-out; }
 
-@keyframes chacoalhar {
-  0% { transform: rotate(-8deg); }
-  50% { transform: rotate(8deg); }
-  100% { transform: rotate(-8deg); }
+@keyframes rolar {
+  0%   { transform: translateY(0) rotate(0deg); }
+  25%  { transform: translateY(-14px) rotate(calc(var(--giro) * 0.45)); }
+  50%  { transform: translateY(0) rotate(calc(var(--giro) * 0.8)); }
+  70%  { transform: translateY(-5px) rotate(calc(var(--giro) * 0.95)); }
+  100% { transform: translateY(0) rotate(var(--giro)); }
+}
+
+@keyframes assentar {
+  0%   { transform: scale(1.12); }
+  100% { transform: scale(1); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dado.rolando, .dado.assentou { animation: none; }
 }
 
 .caixa-dados .fim-acoes button { white-space: nowrap; }
@@ -1125,13 +1159,32 @@ button:disabled {
   letter-spacing: 1px;
 }
 
+/* logo: dadinho com o 5 (o mesmo do ícone do app) + YAM */
+.logo {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-weight: 800;
+  letter-spacing: 2px;
+}
+
+.logo-dado {
+  width: 26px;
+  height: 26px;
+  flex-shrink: 0;
+  transform: rotate(-10deg);
+}
+
+.logo-dado rect { fill: var(--destaque); }
+.logo-dado circle { fill: #ffffff; }
+
 .cabecalho-jogo button {
   padding: 5px 12px;
   font-size: 14px;
   border-width: 1px;
 }
 
-.cabecalho-jogo .botao-mais {
+.cabecalho-jogo .botao-icone {
   padding: 4px 9px;
   font-size: 17px;
   line-height: 1.2;

@@ -27,13 +27,13 @@
 <!-- Jogo atual -->
 <section id="tela-jogo">
   <div class="cabecalho-jogo">
-    <h1>YAM</h1>
-    <button onclick="abrirRegras()">❔ Como jogar</button>
-    <button class="botao-mais" onclick="abrirMais()" aria-label="Mais opções" title="Mais opções">⚙️</button>
+    <h1 class="logo"><svg class="logo-dado" viewBox="0 0 32 32" aria-hidden="true"><rect x="1" y="1" width="30" height="30" rx="8"/><circle cx="9.5" cy="9.5" r="3"/><circle cx="22.5" cy="9.5" r="3"/><circle cx="16" cy="16" r="3"/><circle cx="9.5" cy="22.5" r="3"/><circle cx="22.5" cy="22.5" r="3"/></svg>YAM</h1>
+    <button id="botao-sala" onclick="escolherSala()">👥 Jogar em sala</button>
+    <button class="botao-icone" onclick="abrirRegras()" aria-label="Como jogar" title="Como jogar">❔</button>
+    <button class="botao-icone" onclick="abrirMais()" aria-label="Mais opções" title="Mais opções">⚙️</button>
   </div>
-  <div id="familia-barra" class="familia-barra">
-    <button class="familia-entrar" onclick="escolherSala()">👥 Jogar em sala</button>
-  </div>
+  <!-- em sala: código, quem terminou, sair (fora de sala fica escondida) -->
+  <div id="familia-barra" class="familia-barra" hidden></div>
 
   <div class="tabela">
   <table>
@@ -307,7 +307,6 @@
     </div>
     <button class="compartilhar" onclick="compartilharPodioDaTela()">📤 Compartilhar pódio</button>
   </div>
-  <div id="confete-podio" class="confete" aria-hidden="true"></div>
 </div>
 
 <!-- Fim de jogo -->
@@ -325,8 +324,10 @@
     </div>
     <button class="compartilhar" onclick="compartilharFimDeJogo()">📤 Compartilhar resultado</button>
   </div>
-  <div id="confete" class="confete" aria-hidden="true"></div>
 </div>
+
+<!-- confete (recorde, pódio, YAM, bônus): por cima de tudo, não pega toque -->
+<div id="confete" class="confete" aria-hidden="true"></div>
 
 <!-- Explicação das siglas -->
 <div id="legenda" class="legenda" role="status" hidden>

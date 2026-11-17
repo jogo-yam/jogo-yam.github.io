@@ -216,3 +216,32 @@ test("rolar e segurar: até 3 jogadas por vez", async () => {
   assert.equal(mesa().jogada, 0);
   assert.deepEqual(mesa().segurados, [false, false, false, false, false]);
 });
+
+// ---------- totais apagados e comemorações ----------
+
+test("total sem nenhuma jogada fica apagado", () => {
+  const vazio = (valores, linha, col) => app.totalSemJogada(valores, linha, col);
+  assert.equal(vazio({}, 6, 0), true);
+  assert.equal(vazio({ "2-0": "9" }, 6, 0), false, "1º total com jogada");
+  assert.equal(vazio({ "2-0": "9" }, 16, 0), true, "3º total ainda sem combinação");
+  assert.equal(vazio({ "2-0": "9" }, 17, 0), false, "2º + 3º soma tudo");
+  assert.equal(vazio({ "9-0": "0" }, 16, 0), false, "riscado conta como jogada");
+  assert.equal(vazio({ "2-1": "9" }, 6, 0), true, "outra coluna não conta");
+});
+
+test("comemora YAM e o bônus garantido, uma vez só", () => {
+  rodar("var festas = []; festa = (titulo, texto) => festas.push(titulo + ' ' + texto)");
+  const festas = () => JSON.parse(rodar("JSON.stringify(festas)"));
+  // D com 50 pontos: o 6 com dois dados (12) garante o bônus
+  naTabela({ "0-2": "3", "1-2": "6", "2-2": "9", "3-2": "12", "4-2": "20" }, 2);
+  app.marcarCasa("5-2", 12);
+  igual(festas(), ["Bônus +30 garantido! Na coluna D."]);
+  // mexer numa coluna que já tinha bônus não comemora de novo
+  naTabela({ "0-2": "3", "1-2": "6", "2-2": "12", "3-2": "16", "4-2": "25" }, 2); // 62
+  app.marcarCasa("5-2", 6);
+  assert.equal(festas().length, 1);
+  app.marcarCasa("15-3", 0);
+  assert.equal(festas().length, 1, "YAM riscado não comemora");
+  app.marcarCasa("15-0", 80);
+  assert.equal(festas()[1], "YAM! +80 Na descida (↓).");
+});
