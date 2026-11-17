@@ -37,7 +37,8 @@
     </button>
   </div>
   <h1>YAM – Tabela de Pontuação</h1>
-  <p class="dica">Toque no nome de uma linha ou coluna para ver o que significa.</p>
+  <p class="dica">Toque no nome de uma linha ou coluna para ver o que significa.
+    <button class="link-dica" onclick="abrirRegras()">Como jogar</button></p>
   <div id="familia-barra" class="familia-barra">
     <button class="familia-entrar" onclick="abrirFamilia('criar')">👥 Criar sala</button>
     <button class="familia-entrar" onclick="abrirFamilia('entrar')">🔑 Entrar em sala</button>
@@ -110,6 +111,69 @@
     <h1>Estatísticas</h1>
   </div>
   <div id="estatisticas" class="estatisticas"></div>
+</section>
+
+<!-- Como jogar -->
+<section id="tela-regras" hidden>
+  <div class="topo">
+    <button onclick="mostrarTela('tela-jogo')">← Voltar</button>
+    <h1>Como jogar</h1>
+  </div>
+  <div class="regras">
+    <div class="bloco">
+      <h2>🎲 O jogo</h2>
+      <p>Cada jogador tem a sua tabela. Na sua vez, jogue os <strong>5 dados</strong> até
+        <strong>3 vezes</strong>: entre uma jogada e outra, separe os dados que quiser e jogue só o resto.</p>
+      <p>No fim da vez, anote o resultado em <strong>uma casa</strong> da tabela. Se não der nada que
+        sirva, <strong>risque</strong> uma casa (digite 0, aparece —).</p>
+      <p>O jogo acaba quando todas as casas estão preenchidas. Ganha quem fizer mais pontos no
+        <strong>TOTAL GERAL</strong>, a soma das quatro colunas.</p>
+    </div>
+
+    <div class="bloco">
+      <h2>As 4 colunas</h2>
+      <dl class="lista-regras">
+        <dt>↓ Descida</dt><dd>De cima para baixo, na ordem.</dd>
+        <dt>↑ Subida</dt><dd>Só depois de terminar a descida, de baixo para cima, na ordem.</dd>
+        <dt>D Desordem</dt><dd>Em qualquer ordem.</dd>
+        <dt>S Seca</dt><dd>Vale só o que sair na primeira jogada dos dados.</dd>
+      </dl>
+      <p class="nota">Riscar pode em qualquer casa, a qualquer hora, até fora da ordem.</p>
+    </div>
+
+    <div class="bloco">
+      <h2>Números (1 a 6)</h2>
+      <p>Some só os dados do número da linha. Ex.: três dados 5 = 15 na linha do 5.</p>
+      <p>Se o <strong>1º total</strong> (soma dessas seis linhas) chegar a <strong>60</strong>,
+        a coluna ganha <strong>+30 de bônus</strong>. A tabela mostra quanto falta.
+        A referência de cada linha (2, 4, 9, 12, 15 e 18) soma exatamente 60.</p>
+    </div>
+
+    <div class="bloco">
+      <h2>Combinações</h2>
+      <dl class="lista-regras">
+        <dt>Q Quadra</dt><dd>4 dados iguais: 20 + a soma dos quatro (ex.: quatro 5 = 40).</dd>
+        <dt>F Full</dt><dd>Uma trinca e um par (ex.: 3-3-3-5-5): 30 + a soma dos dados.</dd>
+        <dt>S- Sequência menor</dt><dd>1-2-3-4-5: vale 50.</dd>
+        <dt>S+ Sequência maior</dt><dd>2-3-4-5-6: vale 60.</dd>
+        <dt>X MIN</dt><dd>Soma dos 5 dados, tentando fazer o menor valor.</dd>
+        <dt>X MAX</dt><dd>Soma dos 5 dados, tentando fazer o maior. Na mesma coluna, o MAX tem que ser maior que o MIN.</dd>
+        <dt>YAM</dt><dd>5 dados iguais: 50 + a soma dos dados (ex.: cinco 6 = 80).</dd>
+      </dl>
+    </div>
+
+    <div class="bloco">
+      <h2>📱 No app</h2>
+      <ul class="lista-dicas">
+        <li>Toque no nome de uma linha ou coluna para ver o que ela significa.</li>
+        <li>O app só aceita valores possíveis e mostra qual é a próxima casa na descida e na subida.</li>
+        <li>Errou? Use <strong>↶ Desfazer</strong>.</li>
+        <li>Para jogar junto, cada um no seu celular: <strong>Criar sala</strong> e passe o código.
+          O pódio aparece quando todos terminam.</li>
+        <li>Suas partidas ficam no <strong>Histórico</strong>, com estatísticas.</li>
+      </ul>
+    </div>
+  </div>
 </section>
 
 <!-- Detalhe de uma partida salva -->

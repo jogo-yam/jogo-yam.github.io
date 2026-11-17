@@ -821,22 +821,25 @@ async function compartilharPartidaAberta() {
 }
 
 // Convite para novos jogadores: só o link do app.
+// O link do convite abre direto em "Como jogar" (para quem nunca jogou).
+const LINK_CONVITE = `${ENDERECO_APP}#como-jogar`;
+
 async function convidarJogadores() {
-  const texto = "Vem jogar YAM com a gente! Marque os pontos por aqui:";
+  const texto = "Vem jogar YAM com a gente! As regras e a tabela de pontos estão aqui:";
   try {
     if (navigator.share) {
-      await navigator.share({ title: "YAM", text: texto, url: ENDERECO_APP });
+      await navigator.share({ title: "YAM", text: texto, url: LINK_CONVITE });
       return;
     }
   } catch (erro) {
     if (erro && erro.name === "AbortError") return;
   }
   try {
-    await navigator.clipboard.writeText(`${texto} ${ENDERECO_APP}`);
+    await navigator.clipboard.writeText(`${texto} ${LINK_CONVITE}`);
     ultimoAviso = Date.now();
     mostrarLegenda(["Link copiado", "Agora é só colar no WhatsApp."]);
   } catch {
-    avisar(ENDERECO_APP, "Copie o link do app");
+    avisar(LINK_CONVITE, "Copie o link do app");
   }
 }
 
@@ -891,7 +894,12 @@ async function novoJogo() {
 
 // ---------- telas ----------
 
-const telas = ["tela-jogo", "tela-historico", "tela-partida", "tela-estatisticas"];
+const telas = ["tela-jogo", "tela-historico", "tela-partida", "tela-estatisticas", "tela-regras"];
+
+function abrirRegras() {
+  mostrarTela("tela-regras");
+  document.querySelector("#tela-regras .regras").scrollTop = 0;
+}
 
 function mostrarTela(id) {
   telas.forEach(t => { document.getElementById(t).hidden = t !== id; });
@@ -1459,6 +1467,15 @@ async function importarHistorico(campo) {
   abrirHistorico();
   avisar(`${novas.length} partida${novas.length === 1 ? "" : "s"} importada${novas.length === 1 ? "" : "s"}.`, "Pronto!");
 }
+
+// Link de convite: abre em "Como jogar" (também se o app já estava aberto)
+function verificarLinkRegras() {
+  if (location.hash !== "#como-jogar") return;
+  history.replaceState(null, "", location.pathname);
+  abrirRegras();
+}
+window.addEventListener("hashchange", verificarLinkRegras);
+setTimeout(verificarLinkRegras, 0);
 
 // Pede ao navegador para não apagar os dados do app por falta de espaço ou de uso.
 if (navigator.storage && navigator.storage.persist) {
