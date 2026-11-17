@@ -138,6 +138,13 @@ html {
   overscroll-behavior: none;
 }
 
+/* Toque duplo não dá zoom (no app se toca rápido e seguido: tabela, dados).
+   Ampliar com dois dedos continua funcionando. Vai em tudo porque o
+   touch-action não passa de pai para filho. */
+* {
+  touch-action: manipulation;
+}
+
 body {
   margin: 0;
   height: 100%;
