@@ -917,9 +917,39 @@ function abrirHistorico() {
   mostrarTela("tela-historico");
 }
 
+// A tela da partida mostra uma partida do histórico ou, no pódio, a tabela
+// de outro jogador da sala (sem compartilhar/excluir; "Voltar" volta ao pódio).
+let voltarPara = null;
+
+function voltarDaPartida() {
+  if (voltarPara) {
+    const voltar = voltarPara;
+    voltarPara = null;
+    voltar();
+  } else {
+    abrirHistorico();
+  }
+}
+
+function abrirTabelaJogador(nome, valores, total, aoVoltar) {
+  voltarPara = aoVoltar;
+  partidaAberta = null;
+  document.getElementById("titulo-partida").textContent = `Tabela de ${nome}`;
+  const info = document.getElementById("sala-partida");
+  info.textContent = `${total} pontos`;
+  info.hidden = false;
+  document.getElementById("acoes-partida").hidden = true;
+  const tbody = document.getElementById("tableBody-partida");
+  montarTabela(tbody, valores, false);
+  atualizarTotais(tbody, document.getElementById("total-geral-partida"), valores);
+  mostrarTela("tela-partida");
+}
+
 function abrirPartida(id) {
   partidaAberta = historico.find(p => p.id === id);
   if (!partidaAberta) return;
+  voltarPara = null;
+  document.getElementById("acoes-partida").hidden = false;
 
   document.getElementById("titulo-partida").textContent = formatarData(partidaAberta.data);
   const infoSala = document.getElementById("sala-partida");

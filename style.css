@@ -1111,6 +1111,26 @@ button.link {
   white-space: nowrap;
 }
 
+button.podio-nome {
+  padding: 0;
+  border: none;
+  background: none;
+  color: inherit;
+  font-family: inherit;
+  text-decoration: underline dotted;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+.podio-dica {
+  margin: 10px 0 0;
+  font-size: 13px;
+  color: var(--texto-suave);
+}
+
+.podio-lista li.clicavel { cursor: pointer; }
+.podio-lista li.clicavel .nome { text-decoration: underline dotted; text-underline-offset: 3px; }
+
 .podio-pontos {
   font-size: 13px;
   color: var(--texto-suave);
@@ -1160,3 +1180,11 @@ button.link {
 .podio-lista li.eu .nome { color: var(--destaque); font-weight: bold; }
 .podio-lista li.nao-terminou { color: var(--texto-suave); }
 .podio-lista li.nao-terminou .pts { font-weight: normal; font-size: 13px; }
+
+/* título da tela da partida ("Tabela de ...") não passa por baixo do Voltar */
+#titulo-partida {
+  padding: 0 92px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

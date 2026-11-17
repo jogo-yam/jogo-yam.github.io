@@ -115,7 +115,7 @@
 <!-- Detalhe de uma partida salva -->
 <section id="tela-partida" hidden>
   <div class="topo">
-    <button onclick="abrirHistorico()">← Voltar</button>
+    <button id="voltar-partida" onclick="voltarDaPartida()">← Voltar</button>
     <h1 id="titulo-partida">Partida</h1>
     <p id="sala-partida" class="sala-partida" hidden></p>
   </div>
@@ -143,7 +143,7 @@
   </table>
   </div>
 
-  <div class="acoes">
+  <div id="acoes-partida" class="acoes">
     <button onclick="compartilharPartidaAberta()">📤 Compartilhar</button>
     <button class="perigo" onclick="excluirPartida()">Excluir partida</button>
   </div>
@@ -203,6 +203,7 @@
     <h2 id="podio-titulo">🏆</h2>
     <div id="podio-degraus" class="podio"></div>
     <ol id="podio-lista" class="podio-lista"></ol>
+    <p id="podio-dica" class="podio-dica" hidden>Toque num nome para ver a tabela da pessoa.</p>
     <div class="fim-acoes">
       <button class="principal" onclick="familia.fecharPodio()">Fechar</button>
     </div>

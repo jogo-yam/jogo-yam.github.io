@@ -89,7 +89,7 @@ async function entrar(codigo, nome) {
   if (chaveAntiga && chaveAntiga !== chave) await remove(ref(db, `${raiz}/nomes/${chaveAntiga}`));
 
   await update(ref(db, `${raiz}/jogadores/${user.uid}`), {
-    nome, chave, entrouEm: serverTimestamp(), terminou: false, total: null, colunas: null
+    nome, chave, entrouEm: serverTimestamp(), terminou: false, total: null, colunas: null, valores: null
   });
   guardarSessao({ codigo, chave });
   ultimoEnvio = "";
@@ -166,9 +166,13 @@ function sincronizar() {
   // só conta como terminada se todas as casas têm valores possíveis
   const completa = partidaCompleta() && tabelaValida(state);
   const { calculados, geral } = calcularTotais(state);
+  const valores = {};
+  if (completa) {
+    for (const l of LINHAS_JOGO) for (const c of [0, 1, 2, 3]) valores[`${l}-${c}`] = String(state[`${l}-${c}`]);
+  }
   const dados = completa
-    ? { terminou: true, total: geral, colunas: [0, 1, 2, 3].map(c => calculados[`17-${c}`]) }
-    : { terminou: false, total: null, colunas: null };
+    ? { terminou: true, total: geral, colunas: [0, 1, 2, 3].map(c => calculados[`17-${c}`]), valores }
+    : { terminou: false, total: null, colunas: null, valores: null };
   const assinatura = JSON.stringify(dados);
   if (assinatura === ultimoEnvio) return;
   ultimoEnvio = assinatura;
@@ -364,6 +368,16 @@ function mostrarPodio() {
   const nomeCom = j => j.uid === uid ? `${j.nome} (você)` : j.nome;
 
   const vencedores = terminaram.filter(j => posicao(j) === 1);
+
+  // tocar no nome abre a tabela daquela pessoa (quem tem a versão nova do app envia a tabela)
+  const podeVer = j => j.valores && typeof j.valores === "object";
+  const verTabela = j => () => {
+    $("podio").hidden = true;
+    abrirTabelaJogador(j.nome, j.valores, j.total, () => {
+      mostrarTela("tela-jogo");
+      $("podio").hidden = false;
+    });
+  };
   $("podio-titulo").textContent = vencedores.length === 0 ? "Partida encerrada"
     : vencedores.length === 1 ? `🏆 ${vencedores[0].nome} venceu!`
     : `🏆 Empate: ${vencedores.map(v => v.nome).join(" e ")}!`;
@@ -381,9 +395,10 @@ function mostrarPodio() {
       const medalha = document.createElement("div");
       medalha.className = "medalha";
       medalha.textContent = medalhas[p] || `${p}º`;
-      const nome = document.createElement("div");
+      const nome = document.createElement(podeVer(j) ? "button" : "div");
       nome.className = "podio-nome";
       nome.textContent = nomeCom(j);
+      if (podeVer(j)) nome.onclick = verTabela(j);
       const pontos = document.createElement("div");
       pontos.className = "podio-pontos";
       pontos.textContent = `${j.total} pts`;
@@ -405,6 +420,10 @@ function mostrarPodio() {
   terminaram.slice(3).forEach(j => {
     const li = document.createElement("li");
     if (j.uid === uid) li.classList.add("eu");
+    if (podeVer(j)) {
+      li.classList.add("clicavel");
+      li.onclick = verTabela(j);
+    }
     const pos = document.createElement("span");
     pos.className = "pos";
     pos.textContent = `${posicao(j)}º`;
@@ -433,6 +452,7 @@ function mostrarPodio() {
     lista.appendChild(li);
   });
   lista.hidden = lista.children.length === 0;
+  $("podio-dica").hidden = !terminaram.some(podeVer);
 
   ultimoPodio = {
     codigo: sessao.codigo,
