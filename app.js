@@ -8,7 +8,7 @@ const rows = [
 const COLUNAS = 4;
 
 // Versão do app: igual ao número do CACHE_NAME do service-worker.js (um teste confere).
-const VERSAO = 42;
+const VERSAO = 44;
 
 // Ícone desenhado (o mesmo em todo celular, ao contrário dos emojis).
 function icone(nome, classe = "") {
@@ -2421,18 +2421,15 @@ atualizarBotaoSom();
 
 const LINHA_NORMAL = 30, LINHA_APERTADA = 25;
 
+// Mede de verdade (a altura mínima de cada linha muda com o celular e a letra):
+// tenta 30px, 29px, ... até 25px e fica com a primeira que cabe.
 function caberNaTela(moldura) {
   if (!moldura || !moldura.clientHeight) return;
-  let linha = LINHA_NORMAL;
-  moldura.style.setProperty("--linha", `${linha}px`);
-  for (let i = 0; i < 4; i++) {
-    const sobra = moldura.scrollHeight - moldura.clientHeight;
-    if (sobra <= 0) return;
-    linha -= Math.max(1, Math.ceil(sobra / 19));
-    if (linha < LINHA_APERTADA) break;
+  for (let linha = LINHA_NORMAL; linha >= LINHA_APERTADA; linha--) {
     moldura.style.setProperty("--linha", `${linha}px`);
+    if (moldura.scrollHeight <= moldura.clientHeight) return;
   }
-  if (moldura.scrollHeight > moldura.clientHeight) moldura.style.setProperty("--linha", `${LINHA_NORMAL}px`);
+  moldura.style.setProperty("--linha", `${LINHA_NORMAL}px`); // não cabe nem apertando: rola
 }
 
 if (typeof ResizeObserver === "function") {

@@ -484,7 +484,7 @@ section > * {
   background: var(--superficie);
   border: 2px solid var(--borda-forte);
   border-radius: 10px;
-  overflow: auto;
+  overflow: hidden auto; /* só rola na vertical (e só se não couber) */
   overscroll-behavior: none; /* sem o "elástico" ao puxar no iPhone */
   -webkit-overflow-scrolling: touch;
 }
@@ -506,6 +506,7 @@ th, td {
   text-align: center;
   height: var(--linha, 30px);
   font-size: 17px;
+  line-height: 1.1; /* letra compacta: a linha pode encolher sem o texto empurrar */
 }
 
 th:last-child, td:last-child {
@@ -541,9 +542,14 @@ tbody td.mpb {
 }
 
 input {
+  display: block;
   width: 100%;
   height: 100%;
+  margin: 0;
+  padding: 0;
+  line-height: 1; /* o campo não deixa a linha da tabela mais alta (iPhone) */
   border: none;
+  border-radius: 0;
   outline: none;
   text-align: center;
   font: inherit;
@@ -551,6 +557,17 @@ input {
   color: var(--texto);
   background: transparent;
   -moz-appearance: textfield;
+}
+
+/* na tabela o campo cobre a casa inteira, mas não decide a altura da linha:
+   assim a linha encolhe o quanto precisar para a tabela caber (iPhone) */
+tbody td {
+  position: relative;
+}
+
+tbody td > input {
+  position: absolute;
+  inset: 0;
 }
 
 input::-webkit-outer-spin-button,
@@ -966,9 +983,9 @@ tbody tr td.piscar {
 .dica-bonus {
   display: block;
   margin-top: 1px;
-  font-size: 11px;
-  font-weight: 600;
-  line-height: 1.1;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1;
   color: var(--texto-suave);
   white-space: nowrap;
 }
