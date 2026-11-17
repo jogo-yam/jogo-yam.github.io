@@ -1032,6 +1032,70 @@ button:disabled {
 
 /* ---------- nome do jogador ---------- */
 
+/* topo do jogo: "YAM" à esquerda; Como jogar e Mais à direita */
+.cabecalho-jogo {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 700px;
+  margin: 0 auto 6px;
+}
+
+.cabecalho-jogo h1 {
+  flex: 1;
+  margin: 0;
+  text-align: left;
+  font-size: 24px;
+  letter-spacing: 1px;
+}
+
+.cabecalho-jogo button {
+  padding: 5px 12px;
+  font-size: 14px;
+  border-width: 1px;
+}
+
+.cabecalho-jogo .botao-mais {
+  padding: 4px 9px;
+  font-size: 17px;
+  line-height: 1.2;
+}
+
+/* tela Mais */
+.mais {
+  flex: 0 1 auto;
+  min-height: 0;
+  overflow: auto;
+  width: 100%;
+  max-width: 700px;
+  margin: 0 auto;
+  padding-bottom: 8px;
+}
+
+.mais .bloco h2 { margin-bottom: 8px; }
+
+.mais .linha-mais {
+  display: block;
+  width: 100%;
+  max-width: none;
+  margin: 6px 0 0;
+  padding: 12px 14px;
+  font-size: 16px;
+  text-align: left;
+}
+
+.linha-tema {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 8px;
+  padding: 4px 4px 0 14px;
+  font-size: 16px;
+}
+
+.mais .acoes { margin: 8px 0 4px; }
+.mais .bloco .dica { text-align: left; margin: 4px 0; }
+
 .nome-jogador {
   max-width: 40%;
   padding: 4px 12px;
@@ -1128,6 +1192,25 @@ button:disabled {
   font-size: 13px;
   border-width: 1px;
 }
+
+/* janela "Jogar em sala": dois botões grandes com explicação */
+.escolha-sala {
+  display: block;
+  width: 100%;
+  margin: 10px 0 0;
+  padding: 12px 14px;
+  font-size: 17px;
+  line-height: 1.3;
+}
+
+.escolha-sala small {
+  display: block;
+  font-size: 13px;
+  font-weight: normal;
+  opacity: 0.85;
+}
+
+#janela-sala .link { margin-top: 12px; }
 
 .familia-barra .familia-entrar {
   font-size: 14px;

@@ -1,6 +1,6 @@
 const rows = [
   "2 / 1","4 / 2","9 / 3","12 / 4","15 / 5","18 / 6",
-  "1º TOTAL","BÔNUS (+30 se ≥ 60)","2º TOTAL",
+  "1º TOTAL","BÔNUS +30","2º TOTAL",
   "20 Q","30 F","35 S-","40 S+","X MIN","X MAX","50 YAM",
   "3º TOTAL",
   "2º + 3º TOTAL"
@@ -46,7 +46,7 @@ const LEGENDA_LINHAS = [
 ];
 
 const LEGENDA_COLUNAS = {
-  "MPB": ["MPB", "Nome de cada jogada. Toque em uma linha para ver o que ela significa."],
+  "Jogada": ["Jogada", "Nome de cada jogada. Toque em uma linha para ver o que ela significa."],
   "↓": ["↓ – Descida", "Preencha de cima para baixo, na ordem. A casa da vez fica destacada. Para riscar, digite 0 (aparece —): pode em qualquer casa; nas casas fora da vez, use o botão “Riscar esta casa”."],
   "↑": ["↑ – Subida", "Começa depois de terminar a descida, de baixo para cima, na ordem. Para riscar, digite 0 (aparece —): pode em qualquer casa."],
   "D": ["D – Desordem", "Preencha em qualquer ordem."],
@@ -487,7 +487,8 @@ function mostrarFaltaBonus(tbody, valores) {
     const td = tbody.querySelector(`[data-key="7-${col}"]`);
     const situacao = situacaoBonus(valores, col);
     td.classList.toggle("bonus-ok", situacao === null);
-    if (!situacao) continue;
+    const comecou = [0, 1, 2, 3, 4, 5].some(l => (valores[`${l}-${col}`] ?? "") !== "");
+    if (!situacao || !comecou) continue;
     const dica = document.createElement("small");
     dica.className = situacao.perdido ? "dica-bonus perdido" : "dica-bonus";
     dica.textContent = situacao.texto;
@@ -564,6 +565,20 @@ const confirmar = (titulo, texto, sim = "Sim", perigo = false) =>
 function abrirFamilia(modo) {
   if (window.familia) familia.abrir(modo);
   else avisar("Verifique a conexão e tente de novo.", "A sala precisa de internet");
+}
+
+// Botão "Jogar em sala": pergunta se a pessoa quer criar ou entrar numa sala.
+function escolherSala(modo) {
+  if (!modo) {
+    document.getElementById("janela-sala").hidden = false;
+    return;
+  }
+  fecharEscolhaSala();
+  abrirFamilia(modo);
+}
+
+function fecharEscolhaSala() {
+  document.getElementById("janela-sala").hidden = true;
 }
 
 function update(key, value) {
@@ -1116,11 +1131,27 @@ async function novoJogo() {
 
 // ---------- telas ----------
 
-const telas = ["tela-jogo", "tela-historico", "tela-partida", "tela-estatisticas", "tela-regras"];
+const telas = ["tela-jogo", "tela-historico", "tela-partida", "tela-estatisticas", "tela-regras", "tela-mais"];
+
+// "Como jogar" abre do jogo ou do Mais; o Voltar leva de volta para lá.
+let voltarDasRegrasPara = "tela-jogo";
 
 function abrirRegras() {
+  const atual = telas.find(id => !document.getElementById(id).hidden);
+  voltarDasRegrasPara = atual && atual !== "tela-regras" ? atual : "tela-jogo";
   mostrarTela("tela-regras");
   document.querySelector("#tela-regras .regras").scrollTop = 0;
+}
+
+function voltarDasRegras() {
+  mostrarTela(voltarDasRegrasPara);
+}
+
+// Tela "Mais": nome, tema, como jogar, convidar e backup.
+function abrirMais() {
+  mostrarUltimoBackup();
+  mostrarTela("tela-mais");
+  document.querySelector("#tela-mais .mais").scrollTop = 0;
 }
 
 function mostrarTela(id) {

@@ -26,29 +26,20 @@
 
 <!-- Jogo atual -->
 <section id="tela-jogo">
-  <div class="barra">
-    <button class="convidar" onclick="convidarJogadores()">📲 Convidar</button>
-    <button id="botao-nome" class="nome-jogador" onclick="editarNome()">👤 Seu nome</button>
-    <button id="botao-tema" class="tema" role="switch" aria-checked="false"
-            aria-label="Modo escuro" onclick="alternarTema()">
-      <span aria-hidden="true">☀️</span>
-      <span class="trilho"><span class="bolinha"></span></span>
-      <span aria-hidden="true">🌙</span>
-    </button>
+  <div class="cabecalho-jogo">
+    <h1>YAM</h1>
+    <button onclick="abrirRegras()">❔ Como jogar</button>
+    <button class="botao-mais" onclick="abrirMais()" aria-label="Mais opções" title="Mais opções">⚙️</button>
   </div>
-  <h1>YAM – Tabela de Pontuação</h1>
-  <p class="dica">Toque no nome de uma linha ou coluna para ver o que significa.
-    <button class="link-dica" onclick="abrirRegras()">Como jogar</button></p>
   <div id="familia-barra" class="familia-barra">
-    <button class="familia-entrar" onclick="abrirFamilia('criar')">👥 Criar sala</button>
-    <button class="familia-entrar" onclick="abrirFamilia('entrar')">🔑 Entrar em sala</button>
+    <button class="familia-entrar" onclick="escolherSala()">👥 Jogar em sala</button>
   </div>
 
   <div class="tabela">
   <table>
     <thead>
       <tr>
-        <th class="mpb">MPB</th>
+        <th class="mpb">Jogada</th>
         <th>↓</th>
         <th>↑</th>
         <th>D</th>
@@ -68,9 +59,9 @@
   </div>
 
   <div class="acoes acoes-jogo">
-    <button class="principal" onclick="novoJogo()">Novo Jogo</button>
+    <button onclick="novoJogo()">Novo Jogo</button>
     <button id="botao-desfazer" onclick="desfazer()" aria-label="Desfazer a última jogada">↶ Desfazer</button>
-    <button class="botao-dados" onclick="abrirDados()" aria-label="Dados" title="Dados">🎲</button>
+    <button class="botao-dados principal" onclick="abrirDados()" aria-label="Dados" title="Dados">🎲</button>
     <button onclick="abrirHistorico()">Histórico</button>
   </div>
 </section>
@@ -91,18 +82,6 @@
 
   <ul id="lista-historico" class="lista-historico"></ul>
 
-  <div class="backup">
-    <h2>Backup</h2>
-    <p class="dica">As partidas ficam guardadas só neste celular. Exporte um arquivo de vez em quando
-      (e mande para você mesmo no WhatsApp ou e-mail) para não perder o histórico se trocar de aparelho.</p>
-    <div class="acoes">
-      <button onclick="exportarHistorico()">Exportar</button>
-      <button onclick="document.getElementById('arquivo-backup').click()">Importar</button>
-    </div>
-    <p id="ultimo-backup" class="dica"></p>
-    <input type="file" id="arquivo-backup" accept=".json,application/json" hidden
-           onchange="importarHistorico(this)">
-  </div>
 </section>
 
 <!-- Estatísticas -->
@@ -117,7 +96,7 @@
 <!-- Como jogar -->
 <section id="tela-regras" hidden>
   <div class="topo">
-    <button onclick="mostrarTela('tela-jogo')">← Voltar</button>
+    <button onclick="voltarDasRegras()">← Voltar</button>
     <h1>Como jogar</h1>
   </div>
   <div class="regras">
@@ -170,10 +149,52 @@
         <li>Toque no nome de uma linha ou coluna para ver o que ela significa.</li>
         <li>O app só aceita valores possíveis e mostra qual é a próxima casa na descida e na subida.</li>
         <li>Errou? Use <strong>↶ Desfazer</strong>.</li>
-        <li>Para jogar junto, cada um no seu celular: <strong>Criar sala</strong> e passe o código.
+        <li>Para jogar junto, cada um no seu celular: <strong>Jogar em sala → Criar sala</strong> e passe o código.
           O pódio aparece quando todos terminam.</li>
         <li>Suas partidas ficam no <strong>Histórico</strong>, com estatísticas.</li>
       </ul>
+    </div>
+  </div>
+</section>
+
+<!-- Mais opções -->
+<section id="tela-mais" hidden>
+  <div class="topo">
+    <button onclick="mostrarTela('tela-jogo')">← Voltar</button>
+    <h1>Mais</h1>
+  </div>
+  <div class="mais">
+    <div class="bloco">
+      <h2>Você</h2>
+      <button id="botao-nome" class="linha-mais nome-jogador" onclick="editarNome()">👤 Seu nome</button>
+      <div class="linha-tema">
+        <span>Modo escuro</span>
+        <button id="botao-tema" class="tema" role="switch" aria-checked="false"
+                aria-label="Modo escuro" onclick="alternarTema()">
+          <span aria-hidden="true">☀️</span>
+          <span class="trilho"><span class="bolinha"></span></span>
+          <span aria-hidden="true">🌙</span>
+        </button>
+      </div>
+    </div>
+
+    <div class="bloco">
+      <h2>Jogo</h2>
+      <button class="linha-mais" onclick="abrirRegras()">❔ Como jogar</button>
+      <button class="linha-mais" onclick="convidarJogadores()">📲 Convidar jogadores</button>
+    </div>
+
+    <div class="bloco">
+      <h2>Backup</h2>
+      <p class="dica">As partidas ficam guardadas só neste celular. Exporte um arquivo de vez em quando
+        (e mande para você mesmo no WhatsApp ou e-mail) para não perder o histórico se trocar de aparelho.</p>
+      <div class="acoes">
+        <button onclick="exportarHistorico()">Exportar</button>
+        <button onclick="document.getElementById('arquivo-backup').click()">Importar</button>
+      </div>
+      <p id="ultimo-backup" class="dica"></p>
+      <input type="file" id="arquivo-backup" accept=".json,application/json" hidden
+             onchange="importarHistorico(this)">
     </div>
   </div>
 </section>
@@ -190,7 +211,7 @@
   <table>
     <thead>
       <tr>
-        <th class="mpb">MPB</th>
+        <th class="mpb">Jogada</th>
         <th>↓</th>
         <th>↑</th>
         <th>D</th>
@@ -319,6 +340,19 @@
       <button id="dados-nova-vez" onclick="novaVez()">Nova vez</button>
     </div>
     <button class="link" onclick="fecharDados()">Fechar</button>
+  </div>
+</div>
+
+<!-- Jogar em sala: criar ou entrar -->
+<div id="janela-sala" class="janela" hidden onclick="if (event.target === this) fecharEscolhaSala()">
+  <div class="janela-caixa" role="dialog" aria-modal="true" aria-labelledby="sala-titulo">
+    <h2 id="sala-titulo">Jogar em sala</h2>
+    <p class="dica">Cada um joga no próprio celular e o pódio aparece quando todos terminam.</p>
+    <button class="principal largo escolha-sala" onclick="escolherSala('criar')">👥 Criar sala
+      <small>Você cria e passa o código para os outros</small></button>
+    <button class="largo escolha-sala" onclick="escolherSala('entrar')">🔑 Entrar em sala
+      <small>Alguém já criou e te passou o código</small></button>
+    <button class="link" onclick="fecharEscolhaSala()">Cancelar</button>
   </div>
 </div>
 

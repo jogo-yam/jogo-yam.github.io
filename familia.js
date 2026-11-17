@@ -237,13 +237,11 @@ function atualizarBarra(erro) {
   barra.innerHTML = "";
 
   if (!sessao) {
-    for (const [modo, texto] of [["criar", "👥 Criar sala"], ["entrar", "🔑 Entrar em sala"]]) {
-      const botao = document.createElement("button");
-      botao.className = "familia-entrar";
-      botao.textContent = texto;
-      botao.onclick = () => abrir(modo);
-      barra.appendChild(botao);
-    }
+    const botao = document.createElement("button");
+    botao.className = "familia-entrar";
+    botao.textContent = "👥 Jogar em sala";
+    botao.onclick = () => escolherSala(); // pergunta: criar ou entrar
+    barra.appendChild(botao);
     return;
   }
 
