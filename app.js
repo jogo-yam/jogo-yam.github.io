@@ -34,7 +34,7 @@ const LEGENDA_LINHAS = [
   ["1º total", "Soma das seis linhas de cima. As referências somam 60, o necessário para o bônus."],
   ["Bônus", "Ganha 30 pontos se o 1º total for 60 ou mais. Embaixo do valor aparece quanto ainda falta, ou \"sem bônus\" quando não dá mais para chegar a 60 nem fazendo o máximo nas casas que sobraram."],
   ["2º total", "1º total + bônus."],
-  ["Q – Quadra", "Quatro dados iguais. Vale 20 + a soma dos quatro (ex.: quatro 5 = 40)."],
+  ["Q – Quadra", "Exatamente quatro dados iguais (com os cinco iguais é YAM). Vale 20 + a soma dos quatro (ex.: quatro 5 = 40)."],
   ["F – Full", "Uma trinca e um par (ex.: 3-3-3-5-5). Vale 30 + a soma dos dados."],
   ["S- – Sequência menor", "1-2-3-4-5. Vale 35 + 15 = 50."],
   ["S+ – Sequência maior", "2-3-4-5-6. Vale 40 + 20 = 60."],
@@ -1246,6 +1246,7 @@ let jogadas = ler(CHAVE_JOGADAS, []);  // [{ key, antes }], a última no fim
 // quando nada mudou (ex.: tocou e saiu sem alterar).
 function registrarJogada(key, antes, depois = "") {
   if ((antes ?? "") === (depois ?? "")) return;
+  dadosParaNovaVez = true; // anotou na tabela: os dados começam uma vez nova
   jogadas.push({ key, antes: antes ?? "" });
   if (jogadas.length > MAX_JOGADAS) jogadas.shift();
   localStorage.setItem(CHAVE_JOGADAS, JSON.stringify(jogadas));
@@ -1476,6 +1477,122 @@ function verificarLinkRegras() {
 }
 window.addEventListener("hashchange", verificarLinkRegras);
 setTimeout(verificarLinkRegras, 0);
+
+// ---------- dados virtuais ----------
+// 5 dados, até 3 jogadas por vez; entre as jogadas, toque num dado para segurá-lo.
+
+const mesa = { valores: [1, 2, 3, 4, 5], segurados: [false, false, false, false, false], jogada: 0 };
+let dadosParaNovaVez = false;
+let rolandoDados = false;
+const PONTOS_DO_DADO = { 1: [4], 2: [0, 8], 3: [0, 4, 8], 4: [0, 2, 6, 8], 5: [0, 2, 4, 6, 8], 6: [0, 2, 3, 5, 6, 8] };
+
+function sortearFace() {
+  const n = new Uint32Array(1);
+  crypto.getRandomValues(n);
+  return 1 + (n[0] % 6);
+}
+
+function abrirDados() {
+  if (dadosParaNovaVez) novaVez();
+  desenharDados();
+  document.getElementById("janela-dados").hidden = false;
+}
+
+function fecharDados() {
+  document.getElementById("janela-dados").hidden = true;
+}
+
+function novaVez() {
+  mesa.jogada = 0;
+  mesa.segurados = [false, false, false, false, false];
+  dadosParaNovaVez = false;
+  desenharDados();
+}
+
+function segurarDado(i) {
+  if (rolandoDados || mesa.jogada === 0 || mesa.jogada >= 3) return;
+  mesa.segurados[i] = !mesa.segurados[i];
+  desenharDados();
+}
+
+function rolarDados() {
+  if (rolandoDados || mesa.jogada >= 3) return;
+  const soltos = [0, 1, 2, 3, 4].filter(i => !mesa.segurados[i]);
+  if (soltos.length === 0) return;
+  rolandoDados = true;
+  dadosParaNovaVez = false;
+  mesa.jogada++;
+  let passos = 0;
+  const animar = setInterval(() => {
+    soltos.forEach(i => { mesa.valores[i] = sortearFace(); });
+    desenharDados(soltos);
+    if (++passos >= 8) {
+      clearInterval(animar);
+      rolandoDados = false;
+      desenharDados();
+      if (navigator.vibrate) navigator.vibrate(30);
+    }
+  }, 60);
+}
+
+// O que a jogada atual vale nas linhas da tabela (mesmas regras de valoresPossiveis).
+function oQueValem(v) {
+  const soma = v.reduce((a, b) => a + b, 0);
+  const qtd = [0, 0, 0, 0, 0, 0, 0];
+  v.forEach(f => qtd[f]++);
+  const itens = [];
+  const face = n => qtd.findIndex((q, f) => f > 0 && q >= n);
+  if (face(5) > 0) itens.push(`YAM ${50 + 5 * face(5)}`);
+  // Quadra são exatamente 4 iguais: com os 5 iguais vale YAM, número ou X (não Quadra)
+  const quadra = qtd.findIndex((q, f) => f > 0 && q === 4);
+  if (quadra > 0) itens.push(`Q ${20 + 4 * quadra}`);
+  if (qtd.includes(3) && qtd.includes(2)) itens.push(`F ${30 + soma}`);
+  const ordenados = [...v].sort().join("");
+  if (ordenados === "12345") itens.push("S- 50");
+  if (ordenados === "23456") itens.push("S+ 60");
+  itens.push(`X ${soma}`);
+  const numeros = [1, 2, 3, 4, 5, 6].filter(f => qtd[f] > 0).map(f => `${f} → ${f * qtd[f]}`);
+  return `${itens.join(" · ")}\nNúmeros: ${numeros.join(" · ")}`;
+}
+
+function desenharDados(rolando = []) {
+  const area = document.getElementById("dados-mesa");
+  area.innerHTML = "";
+  mesa.valores.forEach((valor, i) => {
+    const dado = document.createElement("button");
+    dado.className = "dado";
+    if (mesa.segurados[i]) dado.classList.add("segurado");
+    if (rolando.includes(i)) dado.classList.add("rolando");
+    if (mesa.jogada === 0) dado.classList.add("parado");
+    dado.setAttribute("aria-label", `Dado ${valor}${mesa.segurados[i] ? ", segurado" : ""}`);
+    for (let p = 0; p < 9; p++) {
+      const ponto = document.createElement("i");
+      if (PONTOS_DO_DADO[valor].includes(p)) ponto.className = "on";
+      dado.appendChild(ponto);
+    }
+    dado.onclick = () => segurarDado(i);
+    area.appendChild(dado);
+  });
+
+  const status = document.getElementById("dados-status");
+  const botao = document.getElementById("dados-rolar");
+  const valem = document.getElementById("dados-valem");
+  if (mesa.jogada === 0) {
+    status.textContent = "Toque em Rolar para começar a sua vez.";
+    botao.textContent = "🎲 Rolar";
+    valem.textContent = "";
+  } else {
+    status.textContent = mesa.jogada === 1
+      ? "1ª jogada (vale para a S – Seca). Toque nos dados que quer segurar."
+      : mesa.jogada < 3
+        ? `${mesa.jogada}ª jogada de 3. Toque nos dados que quer segurar.`
+        : "3ª jogada: agora é anotar na tabela.";
+    botao.textContent = mesa.jogada < 3 ? `🎲 Rolar (${mesa.jogada + 1}ª)` : "Fim da vez";
+    valem.textContent = rolando.length ? "" : oQueValem(mesa.valores);
+  }
+  botao.disabled = mesa.jogada >= 3 || rolandoDados || mesa.segurados.every(Boolean);
+  document.getElementById("dados-nova-vez").hidden = mesa.jogada === 0;
+}
 
 // Pede ao navegador para não apagar os dados do app por falta de espaço ou de uso.
 if (navigator.storage && navigator.storage.persist) {

@@ -67,9 +67,10 @@
   </table>
   </div>
 
-  <div class="acoes">
+  <div class="acoes acoes-jogo">
     <button class="principal" onclick="novoJogo()">Novo Jogo</button>
     <button id="botao-desfazer" onclick="desfazer()" aria-label="Desfazer a última jogada">↶ Desfazer</button>
+    <button class="botao-dados" onclick="abrirDados()" aria-label="Dados" title="Dados">🎲</button>
     <button onclick="abrirHistorico()">Histórico</button>
   </div>
 </section>
@@ -152,13 +153,14 @@
     <div class="bloco">
       <h2>Combinações</h2>
       <dl class="lista-regras">
-        <dt>Q Quadra</dt><dd>4 dados iguais: 20 + a soma dos quatro (ex.: quatro 5 = 40).</dd>
+        <dt>Q Quadra</dt><dd>Exatamente 4 dados iguais: 20 + a soma dos quatro (ex.: quatro 5 = 40).</dd>
         <dt>F Full</dt><dd>Uma trinca e um par (ex.: 3-3-3-5-5): 30 + a soma dos dados.</dd>
         <dt>S- Sequência menor</dt><dd>1-2-3-4-5: vale 50.</dd>
         <dt>S+ Sequência maior</dt><dd>2-3-4-5-6: vale 60.</dd>
         <dt>X MIN</dt><dd>Soma dos 5 dados, tentando fazer o menor valor.</dd>
         <dt>X MAX</dt><dd>Soma dos 5 dados, tentando fazer o maior. Na mesma coluna, o MAX tem que ser maior que o MIN.</dd>
-        <dt>YAM</dt><dd>5 dados iguais: 50 + a soma dos dados (ex.: cinco 6 = 80).</dd>
+        <dt>YAM</dt><dd>5 dados iguais: 50 + a soma dos dados (ex.: cinco 6 = 80).
+          Os 5 iguais também podem ir na linha do número (cinco 6 = 30) ou no X MIN/MAX, mas não na Quadra.</dd>
       </dl>
     </div>
 
@@ -301,6 +303,21 @@
   <strong></strong>
   <span></span>
   <button type="button" class="acao-legenda" hidden></button>
+</div>
+
+<!-- Dados virtuais -->
+<div id="janela-dados" class="janela janela-baixo" hidden onclick="if (event.target === this) fecharDados()">
+  <div class="janela-caixa caixa-dados" role="dialog" aria-modal="true" aria-labelledby="dados-titulo">
+    <h2 id="dados-titulo">Dados</h2>
+    <p id="dados-status" class="dica"></p>
+    <div id="dados-mesa" class="dados-mesa"></div>
+    <p id="dados-valem" class="dados-valem"></p>
+    <div class="fim-acoes">
+      <button id="dados-rolar" class="principal" onclick="rolarDados()">🎲 Rolar</button>
+      <button id="dados-nova-vez" onclick="novaVez()">Nova vez</button>
+    </div>
+    <button class="link" onclick="fecharDados()">Fechar</button>
+  </div>
 </div>
 
 <!-- Avisos e perguntas do app (no lugar das caixinhas do navegador) -->
