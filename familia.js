@@ -420,7 +420,7 @@ function abrir(modo = "criar") {
   $("familia-nome").readOnly = !!registrado;
   $("familia-nota-nome").textContent = registrado
     ? "Seu nome de usuário. Para trocar, vá em Mais opções."
-    : "Vai ser o seu nome de usuário: ninguém mais pode usar.";
+    : "Vai ser o seu nome de usuário, só seu. Use seu nome de verdade (ou o apelido que a família conhece): assim todo mundo sabe quem é quem no pódio.";
   $("familia-recuperar").hidden = true;
   $("familia-codigo").value = "";
   $("familia-erro").textContent = "";

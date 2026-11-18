@@ -8,7 +8,7 @@ const rows = [
 const COLUNAS = 4;
 
 // Versão do app: igual ao número do CACHE_NAME do service-worker.js (um teste confere).
-const VERSAO = 46;
+const VERSAO = 47;
 
 // Ícone desenhado (o mesmo em todo celular, ao contrário dos emojis).
 function icone(nome, classe = "") {
@@ -1724,7 +1724,7 @@ function editarNome() {
   document.getElementById("nome-erro").textContent = "";
   document.getElementById("nome-explica").textContent = lerUsuario()
     ? "É o seu nome de usuário (único). Trocar libera o nome antigo; o código continua o mesmo."
-    : "Aparece nas salas e no resultado compartilhado.";
+    : "Use seu nome de verdade (ou o apelido que a família conhece): assim todo mundo sabe quem é quem no pódio.";
   document.getElementById("janela-nome").hidden = false;
   campo.focus();
   campo.select();
