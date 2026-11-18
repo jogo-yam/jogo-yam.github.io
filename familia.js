@@ -59,11 +59,61 @@ async function usuario() {
   return (await signInAnonymously(auth)).user;
 }
 
+const ehErroDeConexao = erro => /network|offline|unavailable/i.test(String((erro && (erro.code || erro.message)) || erro));
+
 function mensagemDeErro(erro) {
   const texto = String((erro && (erro.code || erro.message)) || erro);
-  if (/permission/i.test(texto)) return "O banco recusou o acesso. Confira se as regras do Firebase foram publicadas.";
-  if (/network|offline|unavailable/i.test(texto)) return "Sem conexão. A sala precisa de internet.";
+  if (/permission/i.test(texto)) return "O banco recusou o acesso. Atualize o app (feche e abra) e tente de novo.";
+  if (ehErroDeConexao(erro)) {
+    return `Não deu para falar com o servidor das salas. Confira a internet e tente de novo em alguns segundos. (${texto.slice(0, 60)})`;
+  }
   return (erro && erro.message) || "Algo deu errado. Tente de novo.";
+}
+
+// Espera a conexão com o banco abrir (até `ms`). Ao voltar do segundo plano, o
+// celular leva alguns segundos para reconectar.
+function esperarConexao(ms) {
+  return new Promise(pronto => {
+    let parar = null;
+    let acabou = false;
+    const terminar = valor => {
+      if (acabou) return;
+      acabou = true;
+      clearTimeout(limite);
+      if (parar) parar();
+      pronto(valor);
+    };
+    const limite = setTimeout(() => terminar(false), ms);
+    parar = onValue(ref(db, ".info/connected"), snap => { if (snap.val() === true) terminar(true); });
+    if (acabou && parar) parar();
+  });
+}
+
+// Gravações esperam o servidor sem limite: aqui, depois de `ms`, desiste com erro de conexão.
+function comLimite(promessa, ms = 15000) {
+  return Promise.race([
+    promessa,
+    new Promise((_, falhou) => setTimeout(() => falhou(new Error("network: o servidor não respondeu")), ms))
+  ]);
+}
+
+// Antes de criar ou entrar: espera a conexão (até 8 s); sem ela, avisa em vez de travar.
+async function precisaDeConexao() {
+  if (!await esperarConexao(8000)) throw new Error("network: sem conexão com o banco");
+}
+
+// get() falha na hora ("client is offline") se a conexão ainda está abrindo:
+// espera conectar e tenta de novo (até 3 vezes) antes de desistir.
+async function lerDoBanco(caminho) {
+  for (let tentativa = 0; tentativa < 3; tentativa++) {
+    try {
+      return await get(ref(db, caminho));
+    } catch (e) {
+      if (!ehErroDeConexao(e)) throw e;
+      await esperarConexao(5000);
+    }
+  }
+  return get(ref(db, caminho));
 }
 
 const jogadoresDe = p => Object.entries((p && p.jogadores) || {}).map(([uid, j]) => ({ uid, ...j }));
@@ -74,7 +124,7 @@ const $ = id => document.getElementById(id);
 async function entrar(codigo, nome, modo = null) {
   const user = await usuario();
   const raiz = `partidas/${codigo}`;
-  const snap = await get(ref(db, raiz));
+  const snap = await lerDoBanco(raiz);
   if (!snap.exists() || !snap.child("criador").exists()) throw new Error("Não existe sala com esse código.");
   if (snap.child("revelada").val()) throw new Error("A partida dessa sala já terminou.");
 
@@ -136,7 +186,7 @@ async function limparSalasAntigas() {
   for (const sala of antigas) {
     if (sessao && sessao.codigo === sala.codigo) continue; // ainda estou nela
     try {
-      const existe = (await get(ref(db, `partidas/${sala.codigo}/criadaEm`))).exists();
+      const existe = (await lerDoBanco(`partidas/${sala.codigo}/criadaEm`)).exists();
       if (existe) await remove(ref(db, `partidas/${sala.codigo}`));
       apagadas.push(sala.codigo); // apagada agora ou já não existia
     } catch {
@@ -214,9 +264,9 @@ async function gravarNome(nome, codigo) {
   const user = await usuario();
   const chave = chaveDoNome(nome);
   const cod = formatarCodigo(String(codigo).replace(/\D/g, ""));
-  await set(ref(db, `usuarios/${chave}`), {
+  await comLimite(set(ref(db, `usuarios/${chave}`), {
     dono: user.uid, segredo: await segredoDe(chave, cod), nome, em: serverTimestamp()
-  });
+  }));
   return { nome, chave, codigo: cod };
 }
 
@@ -452,9 +502,12 @@ async function acaoJanela(tipo = modoJanela) {
   $("familia-recuperar").hidden = true;
 
   // o nome de usuário tem que ser deste celular (registra na primeira vez)
-  erro.textContent = "Conferindo seu nome…";
+  erro.textContent = "Conectando…";
   let registrouAgora = false;
   try {
+    await usuario();
+    await precisaDeConexao();
+    erro.textContent = "Conferindo seu nome…";
     registrouAgora = await garantirUsuario(nome);
   } catch (e) {
     erro.textContent = e.tomado ? e.message : mensagemDeErro(e);
