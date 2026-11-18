@@ -8,7 +8,7 @@ const rows = [
 const COLUNAS = 4;
 
 // Versão do app: igual ao número do CACHE_NAME do service-worker.js (um teste confere).
-const VERSAO = 49;
+const VERSAO = 50;
 
 // Ícone desenhado (o mesmo em todo celular, ao contrário dos emojis).
 function icone(nome, classe = "") {
@@ -2058,7 +2058,7 @@ function novaVez() {
 }
 
 function segurarDado(i) {
-  if (rolandoDados || mesa.jogada === 0 || mesa.jogada >= 3) return;
+  if (rolandoDados || mesa.jogada === 0) return; // depois da 3ª também (não muda nada, mas fica à vontade)
   mesa.segurados[i] = !mesa.segurados[i];
   guardarMesa();
   desenharDados();

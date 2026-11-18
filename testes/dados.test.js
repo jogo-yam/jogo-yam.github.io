@@ -221,7 +221,9 @@ test("rolar e segurar: até 3 jogadas por vez", async () => {
   app.rolarDados();
   assert.equal(mesa().jogada, 3, "não passa da 3ª jogada");
   app.segurarDado(1);
-  assert.equal(mesa().segurados[1], false, "depois da 3ª não segura mais");
+  assert.equal(mesa().segurados[1], true, "depois da 3ª ainda dá para segurar (não muda nada)");
+  app.segurarDado(1);
+  assert.equal(mesa().segurados[1], false, "e soltar");
 
   app.novaVez();
   assert.equal(mesa().jogada, 0);
