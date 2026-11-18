@@ -1864,6 +1864,13 @@ button:disabled {
   font-size: 14px;
 }
 
+.dica-avisos {
+  margin: 2px 0 6px;
+  text-align: left;
+}
+
+#botao-avisos:disabled { opacity: 0.45; }
+
 .dica-codigo {
   margin: 6px 0 0;
   text-align: left;

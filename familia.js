@@ -284,6 +284,7 @@ function escutar() {
     }
     sincronizar();
     avisarDaVez();
+    sugerirAvisos();
     atualizarBarra();
     atualizarEspera();
     verificarRevelacao();
@@ -659,6 +660,9 @@ let timerVez = null;
 let vezAnterior;              // de quem era a vez no último retrato da sala
 let jogadasVistas = null;     // uid -> número da última jogada já avisada
 let pulosVistos = null;       // quantas vezes já fui pulado (para avisar)
+let avisosPublicados = null;  // inscrição de push já gravada nesta sala ("" = nenhuma)
+let perguntouAvisos = false;  // já sugeriu ligar os avisos nesta sala
+let timerVisto = null;
 
 function escolherModo(modo) {
   modoEscolhido = modo === "vez" ? "vez" : "livre";
@@ -694,6 +698,10 @@ function reiniciarVez() {
   vezAnterior = undefined;
   jogadasVistas = null;
   pulosVistos = null;
+  avisosPublicados = null;
+  perguntouAvisos = false;
+  clearInterval(timerVisto);
+  timerVisto = null;
   atualizarBarraVez();
 }
 
@@ -754,8 +762,75 @@ function passarVez() {
   update(ref(db, `partidas/${sessao.codigo}/jogadores/${minhaUid()}`), {
     casas: agora, mesa: null,
     ultima: ultima ? { ...ultima, n: agora, em: serverTimestamp() } : null
-  }).catch(() => { casasPublicadas = anterior; acompanharVez(); }); // sem conexão: tenta de novo
+  }).then(() => avisarProximo(ultima ? textoDaJogada(nomeJogador, ultima.key, ultima.valor) : `${nomeJogador} jogou.`))
+    .catch(() => { casasPublicadas = anterior; acompanharVez(); }); // sem conexão: tenta de novo
   atualizarBarraVez();
+}
+
+// ---------- avisos com o app fechado ----------
+
+// Pede ao servidor de avisos que avise quem está na vez agora (ele confere tudo no banco).
+async function avisarProximo(texto) {
+  if (!AVISOS_URL || !auth.currentUser || !sessao) return;
+  try {
+    const token = await auth.currentUser.getIdToken();
+    await fetch(`${AVISOS_URL}/vez`, {
+      method: "POST",
+      headers: { "Content-Type": "text/plain" },
+      body: JSON.stringify({ codigo: sessao.codigo, token, texto }),
+      keepalive: true
+    });
+  } catch { /* sem aviso desta vez; o jogo segue */ }
+}
+
+// Grava (ou apaga) na sala a inscrição de push deste celular.
+async function avisosMudaram() {
+  if (!sessao || !partida || !comVez()) return;
+  const caminho = `partidas/${sessao.codigo}/jogadores/${minhaUid()}`;
+  if (!avisosLigados()) {
+    if (avisosPublicados !== "") {
+      avisosPublicados = "";
+      update(ref(db, caminho), { push: null, visivel: null, vistoEm: null }).catch(() => { avisosPublicados = null; });
+    }
+    clearInterval(timerVisto);
+    timerVisto = null;
+    return;
+  }
+  try {
+    const inscricao = await inscricaoPush();
+    if (avisosPublicados !== inscricao.endpoint) {
+      avisosPublicados = inscricao.endpoint;
+      await update(ref(db, caminho), { push: inscricao });
+    }
+  } catch { avisosPublicados = null; }
+  marcarVisto();
+  if (!timerVisto) timerVisto = setInterval(marcarVisto, 60 * 1000);
+}
+
+// "Estou com o app aberto": o servidor não manda notificação para quem está olhando.
+function marcarVisto() {
+  if (!sessao || !auth.currentUser || !avisosLigados() || !comVez()) return;
+  update(ref(db, `partidas/${sessao.codigo}/jogadores/${minhaUid()}`), {
+    visivel: document.visibilityState === "visible", vistoEm: serverTimestamp()
+  }).catch(() => {});
+}
+
+document.addEventListener("visibilitychange", marcarVisto);
+
+// Na primeira vez numa sala com vez, sugere ligar os avisos (uma vez por sala).
+function sugerirAvisos() {
+  if (perguntouAvisos || !comVez()) return;
+  perguntouAvisos = true;
+  if (avisosLigados()) { avisosMudaram(); return; }
+  let permissao = "default";
+  try { permissao = Notification.permission; } catch {}
+  if (!avisosSuportados() || localStorage.getItem(CHAVE_AVISOS) === "0" || permissao === "denied") return;
+  setTimeout(() => {
+    ultimoAviso = Date.now();
+    mostrarLegenda(["Quer ser avisado da sua vez?",
+      "Chega uma notificação quando for a sua vez, mesmo com o app fechado."], "",
+      { texto: "Avisar minha vez", fazer: ligarAvisos });
+  }, 1500);
 }
 
 // Na sua vez, os dados vão para a sala (os outros veem rolando).
@@ -773,6 +848,7 @@ async function pularVez(uid) {
   if (daVez() !== uid) return; // a vez mudou enquanto perguntava
   try {
     await runTransaction(ref(db, `partidas/${sessao.codigo}/jogadores/${minhaUid()}/pulos/${uid}`), n => (n || 0) + 1);
+    avisarProximo(`${nomeJogador} pulou a vez de ${nome}.`);
   } catch (e) { avisar(mensagemDeErro(e), "Não deu para pular"); }
 }
 
@@ -865,7 +941,7 @@ function atualizarBarraVez() {
 window.familia = {
   abrir, fecharJanela, acaoJanela, sair, confirmarSair, compartilharCodigo,
   aoTerminar, fecharEspera, fecharPodio, jogarDeNovo, limparSalasAntigas, sincronizar, registrarResultado,
-  escolherModo, podeJogar, porQueNaoPode, podeDesfazer, mesaMudou, recuperar, trocarNome,
+  escolherModo, podeJogar, porQueNaoPode, podeDesfazer, mesaMudou, recuperar, trocarNome, avisosMudaram,
   ativa: () => !!sessao,
   revelada: () => !!(partida && (partida.revelada || partida.encerrada))
 };

@@ -1,5 +1,5 @@
 // Ao publicar mudanças, aumente a versão para limpar o cache antigo.
-const CACHE_NAME = "yam-cache-v52";
+const CACHE_NAME = "yam-cache-v53";
 const FILES_TO_CACHE = [
   "./",
   "./index.html",
@@ -30,6 +30,30 @@ self.addEventListener("activate", event => {
         keys.filter(key => key !== CACHE_NAME).map(key => caches.delete(key))
       ))
       .then(() => self.clients.claim())
+  );
+});
+
+// Aviso da vez (sala "cada um na sua vez"), mandado pelo servidor de avisos.
+self.addEventListener("push", event => {
+  let dados = {};
+  try { dados = event.data ? event.data.json() : {}; } catch {}
+  event.waitUntil(self.registration.showNotification(dados.titulo || "Sua vez no YAM!", {
+    body: dados.texto ? `${dados.texto}\nAgora é a sua vez.` : "Toque para jogar.",
+    icon: "icon-192.png",
+    tag: `vez-${dados.codigo || ""}`, // um aviso por sala: o novo substitui o antigo
+    renotify: true,
+    data: { url: "./" }
+  }));
+});
+
+// Tocar no aviso abre o app (ou traz para a frente, se já estava aberto).
+self.addEventListener("notificationclick", event => {
+  event.notification.close();
+  event.waitUntil(
+    self.clients.matchAll({ type: "window", includeUncontrolled: true }).then(janelas => {
+      const aberta = janelas.find(j => "focus" in j);
+      return aberta ? aberta.focus() : self.clients.openWindow("./");
+    })
   );
 });
 

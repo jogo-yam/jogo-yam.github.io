@@ -1,0 +1,10 @@
+# Servidor de avisos do YAM (Cloudflare Workers, plano grátis).
+# Publicar: npx wrangler deploy   (a chave privada é um segredo: npx wrangler secret put VAPID_PRIVADA)
+name = "yam-avisos"
+main = "avisos.mjs"
+compatibility_date = "2024-11-01"
+
+[vars]
+FIREBASE_DB = "https://yam-familia-default-rtdb.firebaseio.com"
+ORIGENS = "https://jogo-yam.github.io,http://localhost:8765,http://127.0.0.1:8765"
+VAPID_PUBLICA = "BKjDTbSOlrqKGROPZ2HkxqcPXUbsumI8DfVP0UUX8HW4CW1ApDoFGLLLoe9ahWpei0TeakpD7x9puO8hOn9aspM"

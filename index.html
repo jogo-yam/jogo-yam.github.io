@@ -68,6 +68,8 @@
   <symbol id="i-som" viewBox="0 0 24 24"><path d="M3.5 9.5H7l4.5-4v13L7 14.5H3.5z"/><path d="M15.5 9a4 4 0 0 1 0 6M18.5 6.5a7.5 7.5 0 0 1 0 11"/></symbol>
   <symbol id="i-mudo" viewBox="0 0 24 24"><path d="M3.5 9.5H7l4.5-4v13L7 14.5H3.5z"/><path d="m16 9.5 5 5M21 9.5l-5 5"/></symbol>
   <symbol id="i-cadeado" viewBox="0 0 24 24"><rect x="4.5" y="10.5" width="15" height="11" rx="2.5"/><path d="M8 10.5V7.5a4 4 0 0 1 8 0v3"/></symbol>
+  <symbol id="i-sino" viewBox="0 0 24 24"><path d="M6 9.5a6 6 0 0 1 12 0c0 5.5 2.5 7 2.5 7h-17S6 15 6 9.5z"/><path d="M10 20a2.2 2.2 0 0 0 4 0"/></symbol>
+  <symbol id="i-sino-off" viewBox="0 0 24 24"><path d="M6 9.5a6 6 0 0 1 12 0c0 5.5 2.5 7 2.5 7h-17S6 15 6 9.5z"/><path d="M10 20a2.2 2.2 0 0 0 4 0"/><path d="M3.5 3.5l17 17"/></symbol>
   <symbol id="i-atualizar" viewBox="0 0 24 24"><path d="M20.5 12a8.5 8.5 0 1 1-2.5-6"/><path d="M20.5 3.5V9H15"/></symbol>
 </svg>
 
@@ -258,6 +260,18 @@
           <span class="trilho"><span class="bolinha"></span></span>
           <span class="letra-a grande" aria-hidden="true">A</span>
         </button>
+      </div>
+      <div id="bloco-avisos" hidden>
+        <div class="linha-tema">
+          <span>Avisar a minha vez</span>
+          <button id="botao-avisos" class="tema" role="switch" aria-checked="false"
+                  aria-label="Avisar a minha vez" onclick="alternarAvisos()">
+            <svg class="icone" aria-hidden="true"><use href="#i-sino-off"/></svg>
+            <span class="trilho"><span class="bolinha"></span></span>
+            <svg class="icone" aria-hidden="true"><use href="#i-sino"/></svg>
+          </button>
+        </div>
+        <p id="avisos-dica" class="dica dica-avisos"></p>
       </div>
       <div class="linha-tema">
         <span>Sons</span>

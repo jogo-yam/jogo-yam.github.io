@@ -8,7 +8,12 @@ const rows = [
 const COLUNAS = 4;
 
 // Versão do app: igual ao número do CACHE_NAME do service-worker.js (um teste confere).
-const VERSAO = 52;
+const VERSAO = 53;
+
+// Avisos da vez com o app fechado: servidor na Cloudflare (worker/avisos.mjs).
+// Sem o endereço, a opção "Avisar a minha vez" não aparece.
+const AVISOS_URL = "https://yam-avisos.jogo-yam.workers.dev";
+const VAPID_PUBLICA = "BKjDTbSOlrqKGROPZ2HkxqcPXUbsumI8DfVP0UUX8HW4CW1ApDoFGLLLoe9ahWpei0TeakpD7x9puO8hOn9aspM"; // a mesma do worker/wrangler.toml
 
 // Ícone desenhado (o mesmo em todo celular, ao contrário dos emojis).
 function icone(nome, classe = "") {
@@ -2842,6 +2847,104 @@ const timerBackup = setTimeout(() => {
   } catch {}
 }, 4000);
 if (timerBackup && timerBackup.unref) timerBackup.unref();
+
+// ---------- avisos da vez (notificação com o app fechado) ----------
+// Na sala "cada um na sua vez", quem passa a vez pede ao servidor de avisos
+// que mande uma notificação para o próximo (só se ele ligou os avisos e não
+// está com o app aberto). No iPhone, só com o app instalado na tela inicial.
+
+const CHAVE_AVISOS = "yam-avisos"; // "1" ligado, "0" desligado
+
+function avisosSuportados() {
+  try {
+    return !!AVISOS_URL && "serviceWorker" in navigator && "PushManager" in window && "Notification" in window;
+  } catch { return false; }
+}
+
+function avisosLigados() {
+  try {
+    return avisosSuportados() && localStorage.getItem(CHAVE_AVISOS) === "1" && Notification.permission === "granted";
+  } catch { return false; }
+}
+
+function bytesDeB64url(texto) {
+  const s = atob(texto.replace(/-/g, "+").replace(/_/g, "/") + "===".slice((texto.length + 3) % 4));
+  return Uint8Array.from(s, c => c.charCodeAt(0));
+}
+
+// Inscrição deste celular no push ({ endpoint, p256dh, auth }).
+async function inscricaoPush() {
+  const reg = await navigator.serviceWorker.ready;
+  const chave = bytesDeB64url(VAPID_PUBLICA);
+  let inscricao = await reg.pushManager.getSubscription();
+  // inscrição feita com outra chave (o servidor trocou de chave): refaz
+  if (inscricao && inscricao.options && inscricao.options.applicationServerKey) {
+    const atual = new Uint8Array(inscricao.options.applicationServerKey);
+    if (atual.length !== chave.length || atual.some((b, i) => b !== chave[i])) {
+      await inscricao.unsubscribe();
+      inscricao = null;
+    }
+  }
+  if (!inscricao) inscricao = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: chave });
+  const j = inscricao.toJSON();
+  return { endpoint: j.endpoint, p256dh: j.keys.p256dh, auth: j.keys.auth };
+}
+
+function atualizarBotaoAvisos() {
+  document.getElementById("bloco-avisos").hidden = !AVISOS_URL;
+  if (!AVISOS_URL) return;
+  const suportado = avisosSuportados();
+  const botao = document.getElementById("botao-avisos");
+  botao.disabled = !suportado;
+  botao.setAttribute("aria-checked", String(avisosLigados()));
+  let permissao = "default";
+  try { permissao = Notification.permission; } catch {}
+  document.getElementById("avisos-dica").textContent =
+    !suportado ? (ehIphone() && !appInstalado()
+      ? "No iPhone, os avisos só funcionam com o app instalado na tela inicial (Mais opções → Instalar)."
+      : "Este navegador não recebe avisos.")
+    : permissao === "denied" ? "Os avisos estão bloqueados nos ajustes do celular para este app."
+    : "Na sala \u201ccada um na sua vez\u201d, chega uma notificação quando for a sua vez, mesmo com o app fechado.";
+}
+
+// Precisa vir de um toque (o celular só pergunta depois de um toque).
+async function ligarAvisos() {
+  if (!avisosSuportados()) { atualizarBotaoAvisos(); return false; }
+  const permissao = await Notification.requestPermission();
+  if (permissao !== "granted") {
+    localStorage.setItem(CHAVE_AVISOS, "0");
+    atualizarBotaoAvisos();
+    ultimoAviso = Date.now();
+    mostrarLegenda(["Avisos desligados", "Sem permissão para notificações. Dá para liberar nos ajustes do celular."]);
+    return false;
+  }
+  try {
+    await inscricaoPush();
+  } catch {
+    ultimoAviso = Date.now();
+    mostrarLegenda(["Não deu para ligar os avisos", "Confira a internet e tente de novo."], "erro");
+    return false;
+  }
+  localStorage.setItem(CHAVE_AVISOS, "1");
+  atualizarBotaoAvisos();
+  if (window.familia) familia.avisosMudaram();
+  ultimoAviso = Date.now();
+  mostrarLegenda(["Avisos ligados", "Quando for a sua vez numa sala, chega uma notificação."]);
+  return true;
+}
+
+function desligarAvisos() {
+  localStorage.setItem(CHAVE_AVISOS, "0");
+  atualizarBotaoAvisos();
+  if (window.familia) familia.avisosMudaram();
+}
+
+async function alternarAvisos() {
+  if (avisosLigados()) desligarAvisos();
+  else await ligarAvisos();
+}
+
+atualizarBotaoAvisos();
 
 // Atalhos do ícone (segurar o ícone do app): ?abrir=dados ou ?abrir=historico
 try {

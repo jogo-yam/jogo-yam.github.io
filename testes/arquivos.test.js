@@ -49,7 +49,7 @@ test("o familia.js só usa funções do app que existem", () => {
     ...semComentarios.matchAll(/import\s*\{([^}]*)\}/g),
     ...semComentarios.matchAll(/(?:\(([\w\s,]*)\)|\b(\w+))\s*=>/g) // parâmetros de arrow functions
   ].flatMap(m => (m[1] ?? m[2] ?? "").split(",").map(s => s.trim())).filter(Boolean));
-  const palavras = new Set(["if", "for", "while", "switch", "catch", "function", "return", "typeof", "await", "new", "import"]);
+  const palavras = new Set(["if", "for", "while", "switch", "catch", "function", "return", "typeof", "await", "new", "import", "fetch"]); // fetch: do navegador
   const chamadas = new Set([...semComentarios.matchAll(/(?<![.\w$])([a-zA-Z_]\w*)\s*\(/g)].map(m => m[1]));
   for (const nome of chamadas) {
     if (palavras.has(nome) || definidas.has(nome)) continue;
