@@ -8,7 +8,7 @@ const rows = [
 const COLUNAS = 4;
 
 // Versão do app: igual ao número do CACHE_NAME do service-worker.js (um teste confere).
-const VERSAO = 50;
+const VERSAO = 51;
 
 // Ícone desenhado (o mesmo em todo celular, ao contrário dos emojis).
 function icone(nome, classe = "") {
@@ -2794,7 +2794,7 @@ function confrontos(partidas) {
 function blocoConfrontos(partidas) {
   const lista = confrontos(partidas);
   if (!lista.length) return null;
-  const caixa = elemento("section", "bloco confrontos");
+  const caixa = elemento("div", "bloco confrontos"); // div: "section" no app é uma tela inteira
   caixa.appendChild(elemento("h2", "", "Você contra cada um"));
   caixa.appendChild(elemento("p", "subtitulo", "Nas partidas em sala deste celular. Placar: você × a pessoa."));
   const ul = elemento("ul", "lista-confrontos");
