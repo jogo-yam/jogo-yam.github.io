@@ -8,7 +8,7 @@ const rows = [
 const COLUNAS = 4;
 
 // Versão do app: igual ao número do CACHE_NAME do service-worker.js (um teste confere).
-const VERSAO = 45;
+const VERSAO = 46;
 
 // Ícone desenhado (o mesmo em todo celular, ao contrário dos emojis).
 function icone(nome, classe = "") {
@@ -1721,6 +1721,10 @@ function editarNome() {
   }
   const campo = document.getElementById("campo-nome");
   campo.value = nomeJogador;
+  document.getElementById("nome-erro").textContent = "";
+  document.getElementById("nome-explica").textContent = lerUsuario()
+    ? "É o seu nome de usuário (único). Trocar libera o nome antigo; o código continua o mesmo."
+    : "Aparece nas salas e no resultado compartilhado.";
   document.getElementById("janela-nome").hidden = false;
   campo.focus();
   campo.select();
@@ -1737,14 +1741,107 @@ function fecharJanelaNome() {
   document.getElementById("janela-nome").hidden = true;
 }
 
-function salvarNome(evento) {
+async function salvarNome(evento) {
   evento.preventDefault();
-  const digitado = document.getElementById("campo-nome").value;
-  nomeJogador = digitado.trim().replace(/\s+/g, " ").slice(0, TAMANHO_MAX_NOME);
+  const digitado = document.getElementById("campo-nome").value.trim().replace(/\s+/g, " ").slice(0, TAMANHO_MAX_NOME);
+  const erro = document.getElementById("nome-erro");
+
+  // com nome de usuário: trocar o nome troca o registro (precisa de internet)
+  if (lerUsuario()) {
+    if (!digitado) { erro.textContent = "Digite o novo nome."; return; }
+    if (digitado === lerUsuario().nome) { fecharJanelaNome(); return; }
+    if (!window.familia) { erro.textContent = "Precisa de internet para trocar o nome de usuário."; return; }
+    erro.textContent = "Trocando o nome…";
+    try {
+      await familia.trocarNome(digitado);
+      fecharJanelaNome();
+      ultimoAviso = Date.now();
+      mostrarLegenda(["Nome trocado", `Agora seu nome de usuário é ${digitado}. O código de recuperação continua o mesmo.`]);
+    } catch (e) {
+      erro.textContent = e.message;
+    }
+    return;
+  }
+
+  nomeJogador = digitado;
   if (nomeJogador) localStorage.setItem(CHAVE_NOME, JSON.stringify(nomeJogador));
   else localStorage.removeItem(CHAVE_NOME);
   mostrarNome();
   fecharJanelaNome();
+}
+
+// ---------- nome de usuário ----------
+// Para jogar em sala, o nome é único: fica registrado no Firebase como deste
+// celular. O código de recuperação leva o nome para outro celular (também vai
+// no backup). A parte que fala com o Firebase está no familia.js.
+
+const CHAVE_USUARIO = "yam-usuario"; // { nome, chave, codigo }
+const lerUsuario = () => ler(CHAVE_USUARIO, null);
+
+function guardarUsuario(u) {
+  if (u) {
+    localStorage.setItem(CHAVE_USUARIO, JSON.stringify(u));
+    definirNome(u.nome);
+  } else {
+    localStorage.removeItem(CHAVE_USUARIO);
+  }
+  mostrarUsuario();
+}
+
+function mostrarUsuario() {
+  const u = lerUsuario();
+  document.getElementById("codigo-recuperacao").hidden = !u;
+  document.getElementById("explica-codigo").hidden = !u;
+  document.getElementById("link-recuperar").hidden = !!u;
+  if (u) document.getElementById("codigo-valor").textContent = u.codigo;
+}
+
+async function copiarCodigo() {
+  const u = lerUsuario();
+  if (!u) return;
+  const texto = `YAM · nome de usuário: ${u.nome} · código de recuperação: ${u.codigo}`;
+  try {
+    await navigator.clipboard.writeText(texto);
+    ultimoAviso = Date.now();
+    mostrarLegenda(["Código copiado", "Guarde num lugar seguro, por exemplo mandando para você mesmo no WhatsApp."]);
+  } catch {
+    avisar(texto, "Anote seu código");
+  }
+}
+
+function abrirRecuperar(nome = "") {
+  document.getElementById("janela-familia").hidden = true;
+  document.getElementById("recuperar-nome").value = String(nome || "").trim();
+  document.getElementById("recuperar-codigo").value = "";
+  document.getElementById("recuperar-erro").textContent = "";
+  document.getElementById("janela-recuperar").hidden = false;
+  document.getElementById(nome ? "recuperar-codigo" : "recuperar-nome").focus();
+}
+
+function fecharRecuperar() {
+  document.getElementById("janela-recuperar").hidden = true;
+}
+
+async function recuperarNome(evento) {
+  evento.preventDefault();
+  const nome = document.getElementById("recuperar-nome").value.trim().replace(/\s+/g, " ").slice(0, TAMANHO_MAX_NOME);
+  const codigo = document.getElementById("recuperar-codigo").value.replace(/\D/g, "");
+  const erro = document.getElementById("recuperar-erro");
+  if (!nome) { erro.textContent = "Digite seu nome de usuário."; return; }
+  if (codigo.length !== 8) { erro.textContent = "O código tem 8 números (0000-0000)."; return; }
+  if (!window.familia) { erro.textContent = "Precisa de internet para recuperar o nome."; return; }
+  erro.textContent = "Recuperando…";
+  const botao = document.getElementById("recuperar-confirmar");
+  botao.disabled = true;
+  try {
+    await familia.recuperar(nome, codigo);
+    fecharRecuperar();
+    avisar(`Agora você é ${lerUsuario().nome} neste celular.`, "Nome recuperado!");
+  } catch (e) {
+    erro.textContent = e.message;
+  } finally {
+    botao.disabled = false;
+  }
 }
 
 // ---------- tema claro / escuro ----------
@@ -1808,7 +1905,8 @@ async function exportarHistorico() {
     versao: 1,
     exportadoEm: agora.toISOString(),
     historico,
-    partidaAtual: state
+    partidaAtual: state,
+    usuario: lerUsuario() // nome de usuário e código de recuperação
   };
   const nome = `yam-backup-${agora.toISOString().slice(0, 10)}.json`;
   const arquivo = new File([JSON.stringify(dados, null, 2)], nome, { type: "application/json" });
@@ -1860,6 +1958,13 @@ async function importarHistorico(campo) {
   if (!Array.isArray(lista) || !lista.every(partidaValida)) {
     avisar("Escolha o arquivo .json exportado pelo botão Exportar.", "Esse arquivo não é um backup do YAM");
     return;
+  }
+
+  // num celular novo, o nome de usuário volta junto (vale na próxima sala)
+  const doBackup = dados && dados.usuario;
+  if (!lerUsuario() && doBackup && typeof doBackup.nome === "string" && typeof doBackup.chave === "string" &&
+      /^\d{4}-\d{4}$/.test(doBackup.codigo)) {
+    guardarUsuario({ nome: doBackup.nome, chave: doBackup.chave, codigo: doBackup.codigo });
   }
 
   const ids = new Set(historico.map(p => p.id));
@@ -2447,6 +2552,7 @@ function alternarSom() {
 }
 
 atualizarBotaoSom();
+mostrarUsuario();
 
 // ---------- a tabela cabe na tela ----------
 // As linhas têm 30px no mínimo. Se faltarem só alguns pixels para a tabela

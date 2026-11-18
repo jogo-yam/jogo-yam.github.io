@@ -230,6 +230,16 @@
     <div class="bloco">
       <h2>Você</h2>
       <button id="botao-nome" class="linha-mais nome-jogador" onclick="editarNome()"><svg class="icone" aria-hidden="true"><use href="#i-pessoa"/></svg>Seu nome</button>
+      <div id="codigo-recuperacao" class="codigo-recuperacao" hidden>
+        <div class="codigo-texto">
+          <small>Código de recuperação</small>
+          <strong id="codigo-valor"></strong>
+        </div>
+        <button onclick="copiarCodigo()">Copiar</button>
+      </div>
+      <p id="explica-codigo" class="dica dica-codigo" hidden>Seu nome de usuário é só seu. Guarde o código: com ele você
+        recupera o nome em outro celular. Ele também vai junto no backup.</p>
+      <button id="link-recuperar" class="link link-recuperar" onclick="abrirRecuperar()">Já tem nome de usuário? Recuperar com o código</button>
       <div class="linha-tema">
         <span>Modo escuro</span>
         <button id="botao-tema" class="tema" role="switch" aria-checked="false"
@@ -324,13 +334,30 @@
 <div id="janela-nome" class="janela" hidden>
   <form class="janela-caixa" onsubmit="salvarNome(event)">
     <h2>Seu nome</h2>
-    <p class="dica">Aparece nas salas e no resultado compartilhado.</p>
+    <p id="nome-explica" class="dica">Aparece nas salas e no resultado compartilhado.</p>
     <input id="campo-nome" type="text" maxlength="20" autocomplete="off"
            autocapitalize="words" placeholder="Ex.: Maria">
+    <p id="nome-erro" class="familia-erro" role="alert"></p>
     <div class="fim-acoes">
       <button type="submit" class="principal">Salvar</button>
       <button type="button" onclick="fecharJanelaNome()">Cancelar</button>
     </div>
+  </form>
+</div>
+
+<!-- Recuperar o nome de usuário em outro celular -->
+<div id="janela-recuperar" class="janela" hidden>
+  <form class="janela-caixa" onsubmit="recuperarNome(event)">
+    <h2>Recuperar nome</h2>
+    <p class="dica">Digite seu nome de usuário e o código de recuperação. O código fica em Mais opções no
+      celular antigo e no arquivo de backup.</p>
+    <label class="rotulo-campo" for="recuperar-nome">Nome de usuário</label>
+    <input id="recuperar-nome" type="text" maxlength="20" autocomplete="off" autocapitalize="words" placeholder="Ex.: Maria">
+    <label class="rotulo-campo" for="recuperar-codigo">Código de recuperação</label>
+    <input id="recuperar-codigo" type="text" inputmode="numeric" maxlength="9" autocomplete="off" placeholder="0000-0000">
+    <button id="recuperar-confirmar" type="submit" class="principal largo">Recuperar</button>
+    <p id="recuperar-erro" class="familia-erro" role="alert"></p>
+    <button type="button" class="link" onclick="fecharRecuperar()">Cancelar</button>
   </form>
 </div>
 
@@ -342,6 +369,7 @@
     <label class="rotulo-campo" for="familia-nome">Seu nome</label>
     <input id="familia-nome" type="text" maxlength="20" autocomplete="off" autocapitalize="words"
            placeholder="Ex.: Maria">
+    <p id="familia-nota-nome" class="nota-nome"></p>
     <div id="familia-modo" class="familia-modo" role="radiogroup" aria-label="Como vão jogar">
       <button type="button" data-modo="livre" role="radio" aria-checked="true" onclick="familia.escolherModo('livre')">
         <strong>Todos ao mesmo tempo</strong><small>Cada um joga quando quiser</small></button>
@@ -355,6 +383,7 @@
     </div>
     <button id="familia-confirmar" class="principal largo" onclick="familia.acaoJanela()">Criar sala</button>
     <p id="familia-erro" class="familia-erro" role="alert"></p>
+    <button id="familia-recuperar" class="largo" onclick="abrirRecuperar(document.getElementById('familia-nome').value)" hidden>É o meu nome: recuperar com o código</button>
     <button class="link" onclick="familia.fecharJanela()">Cancelar</button>
   </div>
 </div>

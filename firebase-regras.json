@@ -1,0 +1,31 @@
+{
+  "rules": {
+    "usuarios": {
+      "$chave": {
+        ".write": "auth != null && ((!newData.exists() && data.child('dono').val() === auth.uid) || (newData.child('dono').val() === auth.uid && (!data.exists() || data.child('dono').val() === auth.uid || data.child('segredo').val() === newData.child('segredo').val())))",
+        ".validate": "newData.hasChildren(['dono', 'segredo', 'nome']) && newData.child('segredo').isString() && newData.child('segredo').val().length === 64 && newData.child('nome').isString() && newData.child('nome').val().length > 0 && newData.child('nome').val().length <= 20"
+      }
+    },
+    "partidas": {
+      ".indexOn": ["criadaEm"],
+      ".read": "auth != null && query.orderByChild == 'criadaEm' && query.endAt <= now - 259200000 && query.limitToFirst <= 20",
+      "$codigo": {
+        ".read": "auth != null",
+        ".write": "auth != null && !newData.exists() && data.child('criadaEm').isNumber() && data.child('criadaEm').val() < now - 259200000",
+        "criador": { ".write": "auth != null && !data.exists() && newData.val() === auth.uid" },
+        "criadaEm": { ".write": "auth != null && !data.exists()" },
+        "revelada": { ".write": "auth != null && newData.val() === true" },
+        "encerrada": { ".write": "auth != null && newData.val() === true && data.parent().child('criador').val() === auth.uid" },
+        "nomes": {
+          "$chave": { ".write": "auth != null && (!data.exists() || data.val() === auth.uid) && (!newData.exists() || (newData.val() === auth.uid && root.child('usuarios').child($chave).child('dono').val() === auth.uid))" }
+        },
+        "jogadores": {
+          "$uid": {
+            ".write": "auth != null && auth.uid === $uid",
+            "nome": { ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 20" }
+          }
+        }
+      }
+    }
+  }
+}

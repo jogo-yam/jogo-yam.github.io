@@ -78,3 +78,15 @@ test("backup: só aceita partidas no formato do app", () => {
   assert.ok(!app.partidaValida({ id: 1, data: "x", total: 1 }));
   assert.ok(!app.partidaValida(null));
 });
+
+test("o backup leva o nome de usuário e um celular novo recupera", async () => {
+  const usuario = { nome: "Maria", chave: "maria", codigo: "1234-5678" };
+  const { app, rodar } = carregarApp({ armazenado: { "yam-usuario": JSON.stringify(usuario) } });
+  igual(rodar("lerUsuario()"), usuario);
+  const novo = carregarApp();
+  assert.equal(novo.rodar("lerUsuario()"), null);
+  novo.app.guardarUsuario(usuario);
+  igual(novo.rodar("lerUsuario()"), usuario);
+  assert.equal(novo.rodar("nomeJogador"), "Maria", "o nome do jogador vira o nome de usuário");
+  assert.ok(app);
+});

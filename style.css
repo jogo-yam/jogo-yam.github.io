@@ -1763,6 +1763,59 @@ button:disabled {
   border-width: 1px;
 }
 
+/* nome de usuário */
+.nota-nome {
+  margin: -8px 0 12px;
+  font-size: 13px;
+  color: var(--texto-suave);
+}
+
+#familia-nome[readonly] {
+  color: var(--texto-suave);
+  background: var(--calculado);
+}
+
+#familia-recuperar {
+  margin-bottom: 4px;
+  font-size: 15px;
+}
+
+.codigo-recuperacao {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 10px;
+  padding: 8px 10px 8px 12px;
+  border: 1px dashed var(--borda);
+  border-radius: 10px;
+}
+
+.codigo-texto {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+}
+
+.codigo-texto small { font-size: 12px; color: var(--texto-suave); }
+.codigo-texto strong { font-size: 20px; letter-spacing: 2px; }
+
+.codigo-recuperacao button {
+  padding: 6px 12px;
+  font-size: 14px;
+}
+
+.dica-codigo {
+  margin: 6px 0 0;
+  text-align: left;
+}
+
+.link-recuperar {
+  display: block;
+  margin: 6px auto 0;
+  padding: 6px;
+  font-size: 14px;
+}
+
 /* criar sala: todos ao mesmo tempo ou cada um na sua vez */
 .familia-modo {
   display: grid;

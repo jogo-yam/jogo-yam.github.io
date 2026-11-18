@@ -103,3 +103,9 @@ test("todo ícone usado existe na página", () => {
   assert.ok(usados.length > 20);
   for (const nome of usados) assert.ok(simbolos.has(nome), `ícone i-${nome}`);
 });
+
+test("regras do Firebase: JSON válido, nomes únicos e sala só com o próprio nome", () => {
+  const regras = JSON.parse(lerArquivo("firebase-regras.json")).rules;
+  assert.ok(regras.usuarios.$chave[".write"].includes("segredo"), "pegar um nome só com o mesmo segredo");
+  assert.match(regras.partidas.$codigo.nomes.$chave[".write"], /usuarios/, "na sala, só o nome que é seu");
+});

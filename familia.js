@@ -5,7 +5,7 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import {
-  getDatabase, ref, get, update, remove, onValue, runTransaction, serverTimestamp
+  getDatabase, ref, get, set, update, remove, onValue, runTransaction, serverTimestamp
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
 
 // Configuração do projeto "yam-familia". Não é segredo: o que protege o banco
@@ -188,6 +188,83 @@ async function sair() {
   }
 }
 
+// ---------- nome de usuário ----------
+// usuarios/<chave do nome> = { dono, segredo, nome }. As regras deixam gravar
+// um nome livre, regravar o próprio e "pegar" um nome de outro celular só com
+// o mesmo segredo (o resumo SHA-256 do código de recuperação). Ninguém lê essa
+// lista: um nome tomado aparece como "permissão negada" ao tentar gravar.
+
+const formatarCodigo = digitos => `${digitos.slice(0, 4)}-${digitos.slice(4, 8)}`;
+
+function gerarCodigo() {
+  const n = new Uint32Array(1);
+  crypto.getRandomValues(n);
+  return formatarCodigo(String(n[0] % 100000000).padStart(8, "0"));
+}
+
+async function segredoDe(chave, codigo) {
+  const digitos = String(codigo).replace(/\D/g, "");
+  const bytes = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(`yam:${chave}:${digitos}`));
+  return [...new Uint8Array(bytes)].map(b => b.toString(16).padStart(2, "0")).join("");
+}
+
+const negado = e => /permission/i.test(String((e && (e.code || e.message)) || e));
+
+async function gravarNome(nome, codigo) {
+  const user = await usuario();
+  const chave = chaveDoNome(nome);
+  const cod = formatarCodigo(String(codigo).replace(/\D/g, ""));
+  await set(ref(db, `usuarios/${chave}`), {
+    dono: user.uid, segredo: await segredoDe(chave, cod), nome, em: serverTimestamp()
+  });
+  return { nome, chave, codigo: cod };
+}
+
+function nomeTomado(nome) {
+  const erro = new Error(`Já existe alguém com o nome "${nome}". Escolha outro nome ` +
+    "(pode ser com sobrenome ou apelido). Se é você em outro celular, recupere com o código.");
+  erro.tomado = true;
+  return erro;
+}
+
+// Antes de criar ou entrar numa sala. Devolve true se registrou agora (nome novo).
+async function garantirUsuario(nome) {
+  const local = lerUsuario();
+  const mesmo = !!local && local.chave === chaveDoNome(nome);
+  try {
+    const u = await gravarNome(nome, mesmo ? local.codigo : gerarCodigo());
+    guardarUsuario(u);
+    return !mesmo;
+  } catch (e) {
+    if (negado(e)) throw nomeTomado(nome);
+    throw e;
+  }
+}
+
+// Outro celular: o nome volta com o código certo.
+async function recuperar(nome, codigo) {
+  try {
+    guardarUsuario(await gravarNome(nome, codigo));
+  } catch (e) {
+    if (negado(e)) throw new Error("Nome ou código não confere. Confira e tente de novo.");
+    throw new Error(mensagemDeErro(e));
+  }
+}
+
+// Trocar o nome de usuário: registra o novo (mesmo código) e libera o antigo.
+async function trocarNome(novo) {
+  const antigo = lerUsuario();
+  let u;
+  try {
+    u = await gravarNome(novo, antigo.codigo);
+  } catch (e) {
+    if (negado(e)) throw nomeTomado(novo);
+    throw new Error(mensagemDeErro(e));
+  }
+  if (antigo.chave !== u.chave) await remove(ref(db, `usuarios/${antigo.chave}`)).catch(() => {});
+  guardarUsuario(u);
+}
+
 // ---------- acompanhar a partida ----------
 
 function escutar() {
@@ -338,11 +415,17 @@ function abrir(modo = "criar") {
   $("familia-modo").hidden = entrar;
   escolherModo(modoEscolhido);
   $("familia-confirmar").textContent = entrar ? "Entrar na sala" : "Criar sala";
-  $("familia-nome").value = nomeJogador;
+  const registrado = lerUsuario();
+  $("familia-nome").value = registrado ? registrado.nome : nomeJogador;
+  $("familia-nome").readOnly = !!registrado;
+  $("familia-nota-nome").textContent = registrado
+    ? "Seu nome de usuário. Para trocar, vá em Mais opções."
+    : "Vai ser o seu nome de usuário: ninguém mais pode usar.";
+  $("familia-recuperar").hidden = true;
   $("familia-codigo").value = "";
   $("familia-erro").textContent = "";
   $("janela-familia").hidden = false;
-  (entrar && nomeJogador ? $("familia-codigo") : $("familia-nome")).focus();
+  (entrar && $("familia-nome").value ? $("familia-codigo") : $("familia-nome")).focus();
 }
 
 function fecharJanela() {
@@ -365,7 +448,19 @@ async function acaoJanela(tipo = modoJanela) {
   const codigo = $("familia-codigo").value.replace(/\D/g, "");
   if (!nome) { erro.textContent = "Digite seu nome para entrar na sala."; $("familia-nome").focus(); return; }
   if (tipo === "entrar" && codigo.length !== 5) { erro.textContent = "O código tem 5 números."; $("familia-codigo").focus(); return; }
-  if (!await prepararTabela()) return;
+  $("familia-recuperar").hidden = true;
+
+  // o nome de usuário tem que ser deste celular (registra na primeira vez)
+  erro.textContent = "Conferindo seu nome…";
+  let registrouAgora = false;
+  try {
+    registrouAgora = await garantirUsuario(nome);
+  } catch (e) {
+    erro.textContent = e.tomado ? e.message : mensagemDeErro(e);
+    $("familia-recuperar").hidden = !e.tomado;
+    return;
+  }
+  if (!await prepararTabela()) { erro.textContent = ""; return; }
 
   erro.textContent = tipo === "criar" ? "Criando a sala…" : "Entrando na sala…";
   document.querySelectorAll("#janela-familia button").forEach(b => { b.disabled = true; });
@@ -375,7 +470,11 @@ async function acaoJanela(tipo = modoJanela) {
     definirNome(nome); // só depois de entrar (nome aceito na sala)
     fecharJanela();
     atualizarBarra();
-    if (tipo === "criar") {
+    if (registrouAgora) {
+      avisar(`"${nome}" agora é o seu nome de usuário: ninguém mais pode usar. ` +
+        `Se trocar de celular, recupere com o código ${lerUsuario().codigo}. ` +
+        "Ele fica em Mais opções e vai junto no backup.", "Guarde seu código");
+    } else if (tipo === "criar") {
       ultimoAviso = Date.now();
       mostrarLegenda(["Sala criada!", `Passe o código ${sessao.codigo} para os outros jogadores (botão Código).`]);
     }
@@ -503,6 +602,7 @@ async function jogarDeNovo() {
     if (partidaTemValores(state) && !entradaDaPartidaAtual()) salvarPartidaAtual();
     comecarNovaPartida();
     sairDoPodio();
+    await garantirUsuario(nomeJogador);
     if (convite) {
       await entrar(convite.codigo, nomeJogador);
       ultimoAviso = Date.now();
@@ -765,7 +865,7 @@ function atualizarBarraVez() {
 window.familia = {
   abrir, fecharJanela, acaoJanela, sair, confirmarSair, compartilharCodigo,
   aoTerminar, fecharEspera, fecharPodio, jogarDeNovo, limparSalasAntigas, sincronizar, registrarResultado,
-  escolherModo, podeJogar, porQueNaoPode, podeDesfazer, mesaMudou,
+  escolherModo, podeJogar, porQueNaoPode, podeDesfazer, mesaMudou, recuperar, trocarNome,
   ativa: () => !!sessao,
   revelada: () => !!(partida && (partida.revelada || partida.encerrada))
 };
