@@ -454,6 +454,47 @@ body {
 .placar.ganhando b:first-child { color: #2e7d32; }
 .placar.perdendo b:last-child { color: var(--perigo); }
 
+/* ---------- letra maior ---------- */
+
+.letra-a { font-weight: 800; color: var(--texto-suave); line-height: 1; }
+.letra-a.pequena { font-size: 13px; }
+.letra-a.grande { font-size: 20px; }
+
+:root[data-letra="grande"] body { font-size: 18px; }
+:root[data-letra="grande"] th,
+:root[data-letra="grande"] td { font-size: 20px; }
+:root[data-letra="grande"] thead th { font-size: 21px; }
+:root[data-letra="grande"] .mpb { font-size: 16px; }
+:root[data-letra="grande"] input { font-size: 21px; }
+:root[data-letra="grande"] .total-geral td { font-size: 21px; }
+:root[data-letra="grande"] .dica-bonus { font-size: 11px; }
+:root[data-letra="grande"] .total-geral td.mpb { font-size: 17px; white-space: nowrap; }
+:root[data-letra="grande"] button { font-size: 18px; }
+:root[data-letra="grande"] .dica { font-size: 15px; }
+:root[data-letra="grande"] .dados-valem { font-size: 16px; }
+:root[data-letra="grande"] .legenda { font-size: 17px; }
+:root[data-letra="grande"] .legenda strong { font-size: 18px; }
+:root[data-letra="grande"] .vez-info strong { font-size: 17px; }
+:root[data-letra="grande"] .vez-info small { font-size: 14px; }
+:root[data-letra="grande"] .barra-marcar { font-size: 16px; }
+:root[data-letra="grande"] .barra-marcar #marcar-texto { font-size: 15px; }
+:root[data-letra="grande"] .mais .linha-mais { font-size: 18px; }
+:root[data-letra="grande"] .item-historico { font-size: 18px; }
+:root[data-letra="grande"] .sala-info { font-size: 14.5px; }
+:root[data-letra="grande"] .destaques strong { font-size: 17px; }
+:root[data-letra="grande"] .destaques small,
+:root[data-letra="grande"] .confronto-info small { font-size: 15px; }
+:root[data-letra="grande"] .familia-info strong { font-size: 16px; }
+:root[data-letra="grande"] .familia-info small { font-size: 13.5px; }
+:root[data-letra="grande"] .privacidade { font-size: 16px; }
+:root[data-letra="grande"] .regras .nota { font-size: 16px; }
+:root[data-letra="grande"] .bv-slide p { font-size: 19px; }
+/* o topo do jogo continua do mesmo tamanho: senão não cabe em celular estreito */
+:root[data-letra="grande"] .cabecalho-jogo button { font-size: 14px; }
+:root[data-letra="grande"] .barra-vez button,
+:root[data-letra="grande"] .barra-marcar button,
+:root[data-letra="grande"] .familia-barra button { font-size: 15px; }
+
 .versao {
   margin: 4px 0 8px;
   text-align: center;
@@ -676,6 +717,7 @@ tr.fim-secao td {
 }
 
 .total-geral td {
+  box-shadow: 0 8px 0 var(--destaque); /* cobre a sobrinha de 1px embaixo (iPhone) */
   height: calc(var(--linha, 30px) + 14px);
   background: var(--destaque);
   color: var(--destaque-texto);
@@ -1752,9 +1794,27 @@ button:disabled {
 .vez-info strong { font-size: 15px; }
 .vez-info small { font-size: 12px; color: var(--texto-suave); }
 
-.vez-dados { flex-shrink: 0; white-space: nowrap; }
+/* dados de quem está jogando: numa linha só deles, grandes */
+.barra-vez { flex-wrap: wrap; }
+
+.vez-dados {
+  order: 3;
+  display: flex;
+  flex: 1 0 100%;
+  justify-content: center;
+  gap: 8px;
+  padding: 2px 0 4px;
+}
+
 .vez-dados:empty { display: none; }
-.vez-dados .dado-mini { width: 17px; height: 17px; }
+
+.vez-dados .dado-mini {
+  width: 34px;
+  height: 34px;
+  margin: 0;
+}
+
+.vez-dados .dado-mini.segurado { transform: translateY(-3px); }
 
 .barra-vez button {
   flex-shrink: 0;

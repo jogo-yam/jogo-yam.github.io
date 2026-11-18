@@ -32,6 +32,7 @@
     try {
       const tema = localStorage.getItem("yam-tema");
       if (tema === "light" || tema === "dark") document.documentElement.dataset.theme = tema;
+      if (localStorage.getItem("yam-letra") === "grande") document.documentElement.dataset.letra = "grande";
     } catch {}
   </script>
 </head>
@@ -250,6 +251,15 @@
         </button>
       </div>
       <div class="linha-tema">
+        <span>Letra maior</span>
+        <button id="botao-letra" class="tema" role="switch" aria-checked="false"
+                aria-label="Letra maior" onclick="alternarLetra()">
+          <span class="letra-a pequena" aria-hidden="true">A</span>
+          <span class="trilho"><span class="bolinha"></span></span>
+          <span class="letra-a grande" aria-hidden="true">A</span>
+        </button>
+      </div>
+      <div class="linha-tema">
         <span>Sons</span>
         <button id="botao-som" class="tema" role="switch" aria-checked="true"
                 aria-label="Sons" onclick="alternarSom()">
@@ -459,7 +469,6 @@
       <button id="dados-marcar" onclick="marcarPelosDados()" hidden><svg class="icone" aria-hidden="true"><use href="#i-lapis"/></svg>Marcar</button>
     </div>
     <div class="links-dados">
-      <button id="dados-nova-vez" class="link" onclick="novaVez()">Nova vez</button>
       <button class="link" onclick="fecharDados()">Fechar</button>
     </div>
   </div>

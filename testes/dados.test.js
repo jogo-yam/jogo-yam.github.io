@@ -6,12 +6,13 @@ const { carregarApp, igual } = require("./carregar-app.js");
 const { app, rodar } = carregarApp();
 // mesa na jogada pedida (1ª por padrão) e tabela (state) do jeito pedido
 const naTabela = (valores = {}, jogada = 1) => rodar(`mesa.jogada = ${jogada}; state = ${JSON.stringify(valores)}`);
-// combinações da 1ª linha (a última linha é sempre a soma)
-const itens = dados => app.oQueValem(dados).split("\n").slice(0, -1).join(" · ").split(" · ").filter(Boolean);
+// combinações da 1ª linha, sem a coluna sugerida (a última linha é sempre a soma)
+const itens = dados => app.oQueValem(dados).split("\n").slice(0, -1).join(" · ").split(" · ").filter(Boolean)
+  .map(item => item.split(",")[0]);
 
 test("cinco 6: YAM 80 e a soma (não é Quadra nem Full)", () => {
   naTabela();
-  igual(app.oQueValem([6, 6, 6, 6, 6]), "YAM 80\nSoma dos dados: 30");
+  igual(app.oQueValem([6, 6, 6, 6, 6]), "YAM 80, na coluna S\nSoma dos dados: 30");
 });
 
 test("quatro iguais: Quadra", () => {
@@ -35,7 +36,7 @@ test("sequências, em qualquer ordem", () => {
 // ---------- sem combinação para marcar: sugestão de número ----------
 
 test("sem combinação: sugere o número com menor risco para o bônus", () => {
-  naTabela();
+  naTabela({}, 2);
   // um 1 fica só 1 abaixo da referência (2); os outros ficam bem mais
   igual(app.oQueValem([1, 2, 3, 4, 6]), "Um 1 → 1, na descida (↓)\nSoma dos dados: 16");
   // três 6 = a referência (18); a descida está no 1, então vai na D
@@ -47,15 +48,24 @@ test("sugestão que garante o bônus avisa", () => {
   igual(app.oQueValem([6, 6, 6, 1, 3]), "Três 6 → 18, na coluna D (garante o bônus)\nSoma dos dados: 22");
 });
 
-test("coluna com bônus garantido recebe o número ruim (nada a perder)", () => {
-  // D: 75, bônus garantido, só o 6 livre. Um 1 na descida deixaria a descida
-  // 1 abaixo da referência; um 6 na D não arrisca nada.
-  naTabela({ "0-2": "5", "1-2": "10", "2-2": "15", "3-2": "20", "4-2": "25" });
-  igual(app.oQueValem([6, 1, 2, 3, 4]), "Um 6 → 6, na coluna D\nSoma dos dados: 16");
+test("prioridade das colunas: Seca na 1ª jogada, depois descida e subida, por último a Desordem", () => {
+  naTabela({}, 1);
+  igual(app.oQueValem([3, 3, 5, 3, 5]), "F 49, na coluna S\nSoma dos dados: 19");
+  igual(app.oQueValem([1, 2, 3, 4, 6]), "Um 1 → 1, na coluna S\nSoma dos dados: 16");
+  naTabela({}, 2);
+  igual(app.oQueValem([3, 3, 5, 3, 5]), "F 49, na coluna D\nSoma dos dados: 19", "descida ainda no 1: só na D");
+  // descida chegou no F: vai na descida, não na D
+  const ateOF = {};
+  for (const l of [0, 1, 2, 3, 4, 5, 9]) ateOF[`${l}-0`] = "0";
+  naTabela(ateOF, 2);
+  igual(app.oQueValem([3, 3, 5, 3, 5]), "F 49, na descida (↓)\nSoma dos dados: 19");
+  // D com bônus garantido e a descida no 1: o 1 vai na descida, não na D
+  naTabela({ "0-2": "5", "1-2": "10", "2-2": "15", "3-2": "20", "4-2": "25" }, 2);
+  igual(app.oQueValem([6, 1, 2, 3, 4]), "Um 1 → 1, na descida (↓)\nSoma dos dados: 16");
 });
 
 test("combinação sem casa livre não aparece; vira sugestão de número", () => {
-  naTabela({ "10-0": "49", "10-1": "49", "10-2": "49", "10-3": "49" }); // Full todo preenchido
+  naTabela({ "10-0": "49", "10-1": "49", "10-2": "49", "10-3": "49" }, 2); // Full todo preenchido
   igual(app.oQueValem([3, 3, 3, 5, 5]), "Três 3 → 9, na coluna D\nSoma dos dados: 19");
 });
 
@@ -94,8 +104,9 @@ test("o que os dados mostram sempre pode ser marcado na tabela", () => {
         assert.ok(livres(face - 1, valor).includes(col), `${dados}: ${linhas[0]}`);
       } else {
         for (const item of linhas[0].split(" · ")) {
-          const [nome, valor] = item.split(" ");
-          assert.ok(livres(linhaDa[nome], Number(valor)).length > 0, `${dados}: ${item}`);
+          const [, nome, valor, coluna] = item.match(/^(\S+) (\d+), na (.+)$/);
+          const col = app.NOMES_COLUNAS.indexOf(coluna);
+          assert.ok(livres(linhaDa[nome], Number(valor)).includes(col), `${dados}: ${item}`);
         }
       }
     }
@@ -244,4 +255,23 @@ test("comemora YAM e o bônus garantido, uma vez só", () => {
   assert.equal(festas().length, 1, "YAM riscado não comemora");
   app.marcarCasa("15-0", 80);
   assert.equal(festas()[1], "YAM! +80 Na descida (↓).");
+});
+
+test("sem rolar de novo antes de anotar: a mesa fica guardada", async () => {
+  const { app, rodar, armazenado } = carregarApp();
+  rodar("state = {}; mesa.jogada = 0; dadosParaNovaVez = false");
+  app.rolarDados();
+  const guardada = JSON.parse(armazenado.get("yam-mesa"));
+  assert.equal(guardada.jogada, 1, "a jogada fica guardada já no começo da rolagem");
+  await new Promise(r => setTimeout(r, 700));
+  assert.deepEqual(JSON.parse(armazenado.get("yam-mesa")).valores, guardada.valores, "o resultado é o guardado");
+  // reabrir o app: os mesmos dados, na mesma jogada
+  const reaberto = carregarApp({ armazenado: { "yam-mesa": armazenado.get("yam-mesa") } });
+  assert.equal(reaberto.rodar("mesa.jogada"), 1);
+  igual(reaberto.rodar("mesa.valores"), guardada.valores);
+  // anotar libera uma vez nova; desfazer a anotação devolve os mesmos dados
+  app.marcarCasa("9-3", 0);
+  assert.equal(rodar("dadosParaNovaVez"), true);
+  app.desfazer();
+  assert.equal(rodar("dadosParaNovaVez"), false, "desfez: não dá para rolar de novo");
 });

@@ -8,7 +8,7 @@ const rows = [
 const COLUNAS = 4;
 
 // Versão do app: igual ao número do CACHE_NAME do service-worker.js (um teste confere).
-const VERSAO = 48;
+const VERSAO = 49;
 
 // Ícone desenhado (o mesmo em todo celular, ao contrário dos emojis).
 function icone(nome, classe = "") {
@@ -1654,6 +1654,7 @@ let jogadas = ler(CHAVE_JOGADAS, []);  // [{ key, antes }], a última no fim
 function registrarJogada(key, antes, depois = "") {
   if ((antes ?? "") === (depois ?? "")) return;
   dadosParaNovaVez = true; // anotou na tabela: os dados começam uma vez nova
+  guardarMesa();
   jogadas.push({ key, antes: antes ?? "" });
   if (jogadas.length > MAX_JOGADAS) jogadas.shift();
   localStorage.setItem(CHAVE_JOGADAS, JSON.stringify(jogadas));
@@ -1681,6 +1682,10 @@ function desfazer() {
   const jogada = jogadas.pop();
   if (!jogada) return;
   localStorage.setItem(CHAVE_JOGADAS, JSON.stringify(jogadas));
+  if (dadosParaNovaVez) {
+    dadosParaNovaVez = false; // os dados daquela vez voltam (não dá para rolar de novo)
+    guardarMesa();
+  }
 
   const desfeito = state[jogada.key] ?? "";
   if (jogada.antes === "") delete state[jogada.key];
@@ -2001,6 +2006,27 @@ setTimeout(verificarLinkConvite, 0);
 
 const mesa = { valores: [1, 2, 3, 4, 5], segurados: [false, false, false, false, false], jogada: 0 };
 let dadosParaNovaVez = false;
+
+// A mesa fica guardada: fechar os dados, recarregar ou fechar o app não dá
+// dados novos. Uma vez nova só começa depois de anotar na tabela.
+const CHAVE_MESA = "yam-mesa";
+
+function guardarMesa() {
+  try {
+    localStorage.setItem(CHAVE_MESA, JSON.stringify({ ...mesa, novaVez: dadosParaNovaVez }));
+  } catch {}
+}
+
+(() => {
+  const salva = ler(CHAVE_MESA, null);
+  if (!salva || !Array.isArray(salva.valores) || salva.valores.length !== 5) return;
+  if (!salva.valores.every(f => Number.isInteger(f) && f >= 1 && f <= 6)) return;
+  mesa.valores = salva.valores;
+  mesa.segurados = Array.isArray(salva.segurados) && salva.segurados.length === 5
+    ? salva.segurados.map(Boolean) : [false, false, false, false, false];
+  mesa.jogada = Math.min(3, Math.max(0, Number(salva.jogada) || 0));
+  dadosParaNovaVez = salva.novaVez === true;
+})();
 let rolandoDados = false;
 const PONTOS_DO_DADO = { 1: [4], 2: [0, 8], 3: [0, 4, 8], 4: [0, 2, 6, 8], 5: [0, 2, 4, 6, 8], 6: [0, 2, 3, 5, 6, 8] };
 
@@ -2026,6 +2052,7 @@ function novaVez() {
   mesa.jogada = 0;
   mesa.segurados = [false, false, false, false, false];
   dadosParaNovaVez = false;
+  guardarMesa();
   desenharDados();
   avisarMesa();
 }
@@ -2033,6 +2060,7 @@ function novaVez() {
 function segurarDado(i) {
   if (rolandoDados || mesa.jogada === 0 || mesa.jogada >= 3) return;
   mesa.segurados[i] = !mesa.segurados[i];
+  guardarMesa();
   desenharDados();
   avisarMesa();
 }
@@ -2049,6 +2077,11 @@ function rolarDados() {
   rolandoDados = true;
   dadosParaNovaVez = false;
   mesa.jogada++;
+  // o resultado sai já no começo e fica guardado (recarregar no meio não rola de novo)
+  const resultado = mesa.valores.map((f, i) => (soltos.includes(i) ? sortearFace() : f));
+  try {
+    localStorage.setItem(CHAVE_MESA, JSON.stringify({ ...mesa, valores: resultado, novaVez: false }));
+  } catch {}
   soltos.forEach(i => { mesa.valores[i] = sortearFace(); });
   desenharDados(soltos); // começa a animação (giro e pulo de cada dado)
   vibrar([12, 50, 12, 50, 12]);
@@ -2060,6 +2093,8 @@ function rolarDados() {
     if (++passos >= 8) {
       clearInterval(animar);
       rolandoDados = false;
+      mesa.valores = resultado;
+      guardarMesa();
       desenharDados([], soltos);
       vibrar(30);
       avisarMesa();
@@ -2121,7 +2156,7 @@ function oQueValem(v) {
   const linhas = [];
   const marcaveis = combinacoesMarcaveis(v);
   if (marcaveis.length) {
-    linhas.push(marcaveis.map(([nome, , valor]) => `${nome} ${valor}`).join(" · "));
+    linhas.push(marcaveis.map(([nome, , valor, col]) => `${nome} ${valor}, na ${NOMES_COLUNAS[col]}`).join(" · "));
   } else {
     const s = sugestaoDeNumero(qtd);
     if (s) {
@@ -2133,12 +2168,26 @@ function oQueValem(v) {
   return linhas.join("\n");
 }
 
-// Combinações do 2º total que estes dados fazem e têm casa livre: [nome, linha, valor].
-// Com os 5 iguais vale YAM, número ou MIN/MAX (não Quadra).
+// Ordem de preferência das colunas nas sugestões: primeiro a Seca (só vale na
+// 1ª jogada), depois descida e subida, e por último a Desordem (que aceita
+// qualquer ordem e por isso fica para quando nada mais servir).
+const PRIORIDADE_COLUNA = [1, 1, 2, 0]; // ↓ ↑ D S
+
+function melhorColuna(linha, valor) {
+  return colunasLivres(linha, valor)
+    .sort((a, b) => PRIORIDADE_COLUNA[a] - PRIORIDADE_COLUNA[b] || a - b)[0];
+}
+
+// Combinações do 2º total que estes dados fazem e têm casa livre:
+// [nome, linha, valor, coluna sugerida]. Com os 5 iguais vale YAM, número ou MIN/MAX (não Quadra).
 function combinacoesMarcaveis(dados) {
   return [["YAM", 15], ["Q", 9], ["F", 10], ["S-", 11], ["S+", 12]]
-    .map(([nome, linha]) => [nome, linha, valorDaJogada(linha, dados)])
-    .filter(([, linha, valor]) => valor !== null && colunasLivres(linha, valor).length > 0);
+    .map(([nome, linha]) => {
+      const valor = valorDaJogada(linha, dados);
+      return [nome, linha, valor, valor === null ? undefined : melhorColuna(linha, valor)];
+    })
+    .filter(([, , valor, col]) => valor !== null && col !== undefined)
+    .sort((a, b) => PRIORIDADE_COLUNA[a[3]] - PRIORIDADE_COLUNA[b[3]]);
 }
 
 // ---------- marcar pelos dados ----------
@@ -2171,7 +2220,10 @@ function marcarPelosDados(riscar = false) {
 
   // sem combinação para marcar: a casa sugerida (menor risco para o bônus) fica mais forte
   let sugerida = null;
-  if (!riscar && !combinacoesMarcaveis(mesa.valores).length) {
+  const combinacoes = riscar ? [] : combinacoesMarcaveis(mesa.valores);
+  if (combinacoes.length) {
+    sugerida = `${combinacoes[0][1]}-${combinacoes[0][3]}`;
+  } else if (!riscar) {
     const qtd = [0, 0, 0, 0, 0, 0, 0];
     mesa.valores.forEach(f => qtd[f]++);
     const s = sugestaoDeNumero(qtd);
@@ -2268,8 +2320,10 @@ function riscoParaOBonus(linha, col, valor) {
   return { nivel: folga >= 0 ? 1 : 2, folga };
 }
 
-// Melhor lugar para os números desta jogada: menor risco para o bônus; no
-// empate, o que fica mais perto da referência da linha, e depois mais pontos.
+// Melhor lugar para os números desta jogada: nunca onde perde o bônus; se
+// alguma casa garante o bônus, ela; senão a coluna preferida (Seca, descida
+// e subida, Desordem); depois o menor risco para o bônus, o que fica mais
+// perto da referência da linha e mais pontos.
 function sugestaoDeNumero(qtd) {
   let melhor = null;
   for (let face = 1; face <= 6; face++) {
@@ -2278,7 +2332,8 @@ function sugestaoDeNumero(qtd) {
     const valor = face * qtd[face];
     for (const col of colunasLivres(linha, valor)) {
       const { nivel, folga } = riscoParaOBonus(linha, col, valor);
-      const nota = [nivel, -folga, REFERENCIA_BONUS[linha] - valor, -valor]; // menor é melhor
+      const nota = [nivel === 3 ? 1 : 0, nivel === -1 ? 0 : 1, PRIORIDADE_COLUNA[col], // menor é melhor
+        nivel, -folga, REFERENCIA_BONUS[linha] - valor, -valor];
       const menor = melhor && nota.findIndex((n, i) => n !== melhor.nota[i]);
       if (!melhor || (menor >= 0 && nota[menor] < melhor.nota[menor])) {
         melhor = { face, valor, col, nota, garante: nivel === -1 };
@@ -2332,7 +2387,6 @@ function desenharDados(rolando = [], assentaram = []) {
     valem.textContent = rolando.length ? "" : oQueValem(mesa.valores);
   }
   botao.disabled = mesa.jogada >= 3 || rolandoDados || mesa.segurados.every(Boolean);
-  document.getElementById("dados-nova-vez").hidden = mesa.jogada === 0;
 
   // Marcar: depois de rolar (se a jogada não cabe em lugar nenhum, vira
   // "— Riscar"); vira o botão principal quando não dá mais para rolar (3ª jogada)
@@ -2540,6 +2594,23 @@ function tocar(nome) {
   try { SONS[nome](ctx); } catch {}
 }
 
+// ---------- letra maior ----------
+
+const CHAVE_LETRA = "yam-letra";
+
+function atualizarBotaoLetra() {
+  document.getElementById("botao-letra")
+    .setAttribute("aria-checked", document.documentElement.dataset.letra === "grande");
+}
+
+function alternarLetra() {
+  const grande = document.documentElement.dataset.letra !== "grande";
+  if (grande) document.documentElement.dataset.letra = "grande";
+  else delete document.documentElement.dataset.letra;
+  try { localStorage.setItem(CHAVE_LETRA, grande ? "grande" : "normal"); } catch {}
+  atualizarBotaoLetra();
+}
+
 function atualizarBotaoSom() {
   document.getElementById("botao-som").setAttribute("aria-checked", somLigado);
 }
@@ -2552,6 +2623,7 @@ function alternarSom() {
 }
 
 atualizarBotaoSom();
+atualizarBotaoLetra();
 mostrarUsuario();
 
 // ---------- a tabela cabe na tela ----------
