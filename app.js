@@ -8,7 +8,7 @@ const rows = [
 const COLUNAS = 4;
 
 // Versão do app: igual ao número do CACHE_NAME do service-worker.js (um teste confere).
-const VERSAO = 51;
+const VERSAO = 52;
 
 // Ícone desenhado (o mesmo em todo celular, ao contrário dos emojis).
 function icone(nome, classe = "") {
@@ -75,7 +75,7 @@ const LEGENDA_COLUNAS = {
   "↓": ["↓ – Descida", "Preencha de cima para baixo, na ordem. A casa da vez fica destacada. Para riscar, digite 0 (aparece —): pode em qualquer casa; nas casas fora da vez, use o botão “Riscar esta casa”."],
   "↑": ["↑ – Subida", "Começa depois de terminar a descida, de baixo para cima, na ordem. Para riscar, digite 0 (aparece —): pode em qualquer casa."],
   "D": ["D – Desordem", "Preencha em qualquer ordem."],
-  "S": ["S – Seca", "Vale só o que sair na primeira jogada dos dados."]
+  "S": ["S – Seco", "Vale só o que sair na primeira jogada dos dados."]
 };
 
 let timerLegenda = null;
@@ -1497,7 +1497,7 @@ function abrirEstatisticas() {
   const porColuna = bloco("Média por coluna");
   const mediasCol = [0, 1, 2, 3].map(col =>
     Math.round(completas.reduce((s, p) => s + calcularTotais(p.valores).calculados[`17-${col}`], 0) / completas.length));
-  porColuna.appendChild(barras(["↓ Descida", "↑ Subida", "D Desordem", "S Seca"], mediasCol));
+  porColuna.appendChild(barras(["↓ Descida", "↑ Subida", "D Desordem", "S Seco"], mediasCol));
   area.appendChild(porColuna);
 
   // destaques
@@ -2168,7 +2168,7 @@ function oQueValem(v) {
   return linhas.join("\n");
 }
 
-// Ordem de preferência das colunas nas sugestões: primeiro a Seca (só vale na
+// Ordem de preferência das colunas nas sugestões: primeiro o Seco (só vale na
 // 1ª jogada), depois descida e subida, e por último a Desordem (que aceita
 // qualquer ordem e por isso fica para quando nada mais servir).
 const PRIORIDADE_COLUNA = [1, 1, 2, 0]; // ↓ ↑ D S
@@ -2293,7 +2293,7 @@ body.addEventListener("click", evento => {
 });
 
 // Colunas onde dá para marcar `valor` na linha agora: casa vazia, na ordem da
-// descida/subida, MIN < MAX, e a Seca (S) só na 1ª jogada.
+// descida/subida, MIN < MAX, e o Seco (S) só na 1ª jogada.
 function colunasLivres(linha, valor) {
   return [0, 1, 2, 3].filter(col =>
     !preenchida(linha, col) &&
@@ -2321,7 +2321,7 @@ function riscoParaOBonus(linha, col, valor) {
 }
 
 // Melhor lugar para os números desta jogada: nunca onde perde o bônus; se
-// alguma casa garante o bônus, ela; senão a coluna preferida (Seca, descida
+// alguma casa garante o bônus, ela; senão a coluna preferida (Seco, descida
 // e subida, Desordem); depois o menor risco para o bônus, o que fica mais
 // perto da referência da linha e mais pontos.
 function sugestaoDeNumero(qtd) {
@@ -2378,7 +2378,7 @@ function desenharDados(rolando = [], assentaram = []) {
     valem.textContent = "";
   } else {
     status.textContent = mesa.jogada === 1
-      ? "1ª jogada (vale para a S – Seca). Toque nos dados que quer segurar."
+      ? "1ª jogada (vale para a coluna S – Seco). Toque nos dados que quer segurar."
       : mesa.jogada < 3
         ? `${mesa.jogada}ª jogada de 3. Toque nos dados que quer segurar.`
         : "3ª jogada: agora é anotar na tabela.";

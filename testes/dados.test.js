@@ -48,7 +48,7 @@ test("sugestão que garante o bônus avisa", () => {
   igual(app.oQueValem([6, 6, 6, 1, 3]), "Três 6 → 18, na coluna D (garante o bônus)\nSoma dos dados: 22");
 });
 
-test("prioridade das colunas: Seca na 1ª jogada, depois descida e subida, por último a Desordem", () => {
+test("prioridade das colunas: Seco na 1ª jogada, depois descida e subida, por último a Desordem", () => {
   naTabela({}, 1);
   igual(app.oQueValem([3, 3, 5, 3, 5]), "F 49, na coluna S\nSoma dos dados: 19");
   igual(app.oQueValem([1, 2, 3, 4, 6]), "Um 1 → 1, na coluna S\nSoma dos dados: 16");
@@ -69,7 +69,7 @@ test("combinação sem casa livre não aparece; vira sugestão de número", () =
   igual(app.oQueValem([3, 3, 3, 5, 5]), "Três 3 → 9, na coluna D\nSoma dos dados: 19");
 });
 
-test("a coluna S (Seca) só vale na 1ª jogada", () => {
+test("a coluna S (Seco) só vale na 1ª jogada", () => {
   const soSobraS = {};
   for (const col of [0, 1, 2]) for (let l = 0; l <= 5; l++) soSobraS[`${l}-${col}`] = "0";
   naTabela(soSobraS, 1);
