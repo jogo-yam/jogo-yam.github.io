@@ -8,7 +8,7 @@ const rows = [
 const COLUNAS = 4;
 
 // Versão do app: igual ao número do CACHE_NAME do service-worker.js (um teste confere).
-const VERSAO = 58;
+const VERSAO = 59;
 
 // Avisos da vez com o app fechado: servidor na Cloudflare (worker/avisos.mjs).
 // Sem o endereço, a opção "Avisar a minha vez" não aparece.
@@ -1306,6 +1306,7 @@ function voltarDasRegras() {
 // Tela "Mais": nome, tema, como jogar, convidar e backup.
 function abrirMais() {
   mostrarUltimoBackup();
+  conferirVersaoNova(); // quem abre o Mais costuma estar olhando a versão
   mostrarTela("tela-mais");
   document.querySelector("#tela-mais .mais").scrollTop = 0;
 }
@@ -2491,7 +2492,11 @@ document.addEventListener("visibilitychange", () => {
 });
 window.addEventListener("pageshow", evento => { if (evento.persisted) conferirAoVoltar(); });
 window.addEventListener("online", conferirVersaoNova);
-const timerVersao = setInterval(conferirVersaoNova, 10 * 60 * 1000);
+window.addEventListener("focus", conferirVersaoNova);
+// com o app aberto na tela, confere a cada 2 min (o arquivo é pequeno)
+const timerVersao = setInterval(() => {
+  if (document.visibilityState !== "hidden") conferirVersaoNova();
+}, 2 * 60 * 1000);
 
 // "Atualizar": busca a versão nova do service worker e abre o app num endereço
 // novo. Os arquivos têm a versão no endereço (app.js?v=57), então a página nova
