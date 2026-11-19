@@ -244,8 +244,9 @@ async function sair() {
 // ---------- nome de usuário ----------
 // usuarios/<chave do nome> = { dono, segredo, nome }. As regras deixam gravar
 // um nome livre, regravar o próprio e "pegar" um nome de outro celular só com
-// o mesmo segredo (o resumo SHA-256 do código de recuperação). Ninguém lê essa
-// lista: um nome tomado aparece como "permissão negada" ao tentar gravar.
+// o mesmo segredo (o resumo SHA-256 do código de recuperação). Da lista só dá
+// para ler o campo "nome" (para conferir se existe); o segredo e o dono, não.
+// Um nome tomado aparece como "permissão negada" ao tentar gravar.
 
 const formatarCodigo = digitos => `${digitos.slice(0, 4)}-${digitos.slice(4, 8)}`;
 
@@ -275,7 +276,7 @@ async function gravarNome(nome, codigo) {
 
 function nomeTomado(nome) {
   const erro = new Error(`Já existe alguém com o nome "${nome}". Escolha outro nome ` +
-    "(pode ser com sobrenome ou apelido). Se é você em outro celular, recupere com o código.");
+    "(pode ser com sobrenome ou apelido). Se é você em outro aparelho, recupere com o código.");
   erro.tomado = true;
   return erro;
 }
@@ -294,8 +295,21 @@ async function garantirUsuario(nome) {
   }
 }
 
-// Outro celular: o nome volta com o código certo.
+// Outro aparelho: o nome volta com o código certo. Antes confere se o nome
+// existe (senão um erro de digitação criaria um nome novo). As regras deixam ler
+// só o campo "nome" de cada usuário; com as regras antigas a leitura é negada e
+// segue como antes.
 async function recuperar(nome, codigo) {
+  await usuario();
+  let existe = true;
+  try {
+    existe = (await comLimite(lerDoBanco(`usuarios/${chaveDoNome(nome)}/nome`))).exists();
+  } catch (e) {
+    if (!negado(e)) throw new Error(mensagemDeErro(e));
+  }
+  if (!existe) {
+    throw new Error(`Não existe o nome de usuário "${nome}". Confira como ele está escrito em Mais, no outro aparelho.`);
+  }
   try {
     guardarUsuario(await gravarNome(nome, codigo));
   } catch (e) {
@@ -538,7 +552,7 @@ async function acaoJanela(tipo = modoJanela) {
     atualizarBarra();
     if (registrouAgora) {
       avisar(`"${nome}" agora é o seu nome de usuário: ninguém mais pode usar. ` +
-        `Se trocar de celular, recupere com o código ${lerUsuario().codigo}. ` +
+        `Se trocar de aparelho, recupere com o código ${lerUsuario().codigo}. ` +
         "Ele fica em Mais opções e vai junto no backup.", "Guarde seu código");
     } else if (tipo === "criar") {
       ultimoAviso = Date.now();

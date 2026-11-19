@@ -2171,14 +2171,7 @@ button.podio-nome {
 /* ---------- como instalar (iPhone ou Android) ---------- */
 
 .janela-instalar {
-  align-items: center;
   padding: calc(20px + env(safe-area-inset-top)) 20px calc(20px + env(safe-area-inset-bottom));
-}
-
-.caixa-instalar {
-  max-height: 100%;
-  overflow-y: auto;
-  overscroll-behavior: contain;
 }
 
 .instalar-figura {
@@ -2209,12 +2202,13 @@ button.podio-nome {
 
 .instalar-sistema {
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 8px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
 }
 
 .instalar-sistema button {
-  padding: 10px 8px;
+  padding: 10px 2px;
+  font-size: 15px;
   font-weight: 700;
   border-color: var(--borda);
 }
@@ -2275,3 +2269,47 @@ button.podio-nome {
 
 :root[data-letra="grande"] .passos { font-size: 18px; }
 :root[data-letra="grande"] .instalar-fim { font-size: 16px; }
+
+/* ---------- computador e telas baixas ---------- */
+
+/* janelas mais altas que a tela rolam (nada fica cortado). As margens automáticas
+   centralizam quando cabe e não cortam o topo quando não cabe. */
+.janela,
+.fim-de-jogo,
+.boas-vindas {
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.fim-de-jogo { align-items: flex-start; }
+.fim-de-jogo > .fim-caixa { margin-block: auto; }
+
+.janela.janela-baixo { align-items: flex-start; }
+.janela.janela-baixo > .janela-caixa { margin-top: auto; }
+
+.janela-instalar > .caixa-instalar { margin-block: auto; }
+
+@media (max-height: 640px) {
+  .janela { padding-top: calc(20px + env(safe-area-inset-top)); }
+}
+
+/* mouse: realce ao passar por cima; os dados ficam no meio da tela, não embaixo */
+@media (hover: hover) and (pointer: fine) {
+  button:not(:disabled):hover { filter: brightness(0.95); }
+  :root[data-theme="dark"] button:not(:disabled):hover { filter: brightness(1.2); }
+  button.link:not(:disabled):hover { color: var(--texto); filter: none; }
+  .janela.janela-baixo > .janela-caixa { margin-block: auto; }
+}
+
+@media (hover: hover) and (pointer: fine) and (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) button:not(:disabled):hover { filter: brightness(1.2); }
+}
+
+/* boas-vindas: "já tem nome de usuário?" e a janela de recuperar por cima delas */
+.bv-recuperar {
+  margin-top: 8px;
+  padding: 8px;
+  font-size: 14px;
+}
+
+.janela.por-cima { z-index: 45; }

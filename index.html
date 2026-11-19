@@ -26,7 +26,7 @@
 
   <link rel="preload" href="fontes/nunito.woff2" as="font" type="font/woff2" crossorigin>
   <!-- ?v= é a versão do app (igual ao VERSAO do app.js; um teste confere): versão nova, endereço novo -->
-  <link rel="stylesheet" href="style.css?v=60">
+  <link rel="stylesheet" href="style.css?v=61">
 
   <!-- Aplica o tema escolhido antes de desenhar a página, para não piscar. -->
   <script>
@@ -242,7 +242,7 @@
         <button onclick="copiarCodigo()">Copiar</button>
       </div>
       <p id="explica-codigo" class="dica dica-codigo" hidden>Seu nome de usuário é só seu. Guarde o código: com ele você
-        recupera o nome em outro celular. Ele também vai junto no backup.</p>
+        recupera o nome em outro aparelho (celular ou computador). Ele também vai junto no backup.</p>
       <button id="link-recuperar" class="link link-recuperar" onclick="abrirRecuperar()">Já tem nome de usuário? Recuperar com o código</button>
       <div class="linha-tema">
         <span>Modo escuro</span>
@@ -294,7 +294,7 @@
 
     <div class="bloco">
       <h2>Backup</h2>
-      <p class="dica">As partidas ficam guardadas só neste celular. Exporte um arquivo de vez em quando
+      <p class="dica">As partidas ficam guardadas só neste aparelho. Exporte um arquivo de vez em quando
         (e mande para você mesmo no WhatsApp ou e-mail) para não perder o histórico se trocar de aparelho.</p>
       <div class="acoes">
         <button onclick="exportarHistorico()">Exportar</button>
@@ -308,7 +308,7 @@
     <div class="bloco">
       <h2><svg class="icone" aria-hidden="true"><use href="#i-cadeado"/></svg>Sobre e privacidade</h2>
       <ul class="privacidade">
-        <li>Suas partidas, seu nome e o histórico ficam guardados neste celular.</li>
+        <li>Suas partidas, seu nome e o histórico ficam guardados neste aparelho.</li>
         <li>Sem cadastro, sem e-mail, sem anúncios. O app não coleta dados de uso.</li>
       </ul>
     </div>
@@ -375,7 +375,7 @@
   <form class="janela-caixa" onsubmit="recuperarNome(event)">
     <h2>Recuperar nome</h2>
     <p class="dica">Digite seu nome de usuário e o código de recuperação. O código fica em Mais opções no
-      celular antigo e no arquivo de backup.</p>
+      aparelho antigo e no arquivo de backup.</p>
     <label class="rotulo-campo" for="recuperar-nome">Nome de usuário</label>
     <input id="recuperar-nome" type="text" maxlength="20" autocomplete="off" autocapitalize="words" placeholder="Ex.: Maria">
     <label class="rotulo-campo" for="recuperar-codigo">Código de recuperação</label>
@@ -537,6 +537,7 @@
     </div>
     <div id="bv-pontos" class="bv-pontos" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
     <button id="bv-proximo" class="principal largo" onclick="proximaBoasVindas()">Próximo</button>
+    <button id="bv-recuperar" class="link bv-recuperar" onclick="recuperarNasBoasVindas()">Já tem nome de usuário? Entrar com o código</button>
   </div>
 </div>
 
@@ -544,12 +545,13 @@
 <div id="janela-instalar" class="janela janela-instalar" hidden onclick="if (event.target === this) fecharInstalar()">
   <div class="janela-caixa caixa-instalar" role="dialog" aria-modal="true" aria-labelledby="instalar-titulo">
     <div class="instalar-figura"><svg class="icone" aria-hidden="true"><use href="#i-celular"/></svg></div>
-    <h2 id="instalar-titulo">Instale o YAM no celular</h2>
-    <p id="instalar-dica" class="dica">Ele ganha um ícone na tela inicial, abre em tela cheia e funciona até sem internet.</p>
-    <p class="instalar-pergunta">Qual é o seu celular?</p>
-    <div id="instalar-sistema" class="instalar-sistema" role="radiogroup" aria-label="Qual é o seu celular">
+    <h2 id="instalar-titulo">Instale o YAM</h2>
+    <p id="instalar-dica" class="dica">Ele ganha um ícone próprio, abre como um app e funciona até sem internet.</p>
+    <p class="instalar-pergunta">Onde você vai instalar?</p>
+    <div id="instalar-sistema" class="instalar-sistema" role="radiogroup" aria-label="Onde você vai instalar">
       <button type="button" role="radio" aria-checked="false" data-sistema="ios" onclick="escolherSistema('ios')">iPhone</button>
       <button type="button" role="radio" aria-checked="false" data-sistema="android" onclick="escolherSistema('android')">Android</button>
+      <button type="button" role="radio" aria-checked="false" data-sistema="computador" onclick="escolherSistema('computador')">Computador</button>
     </div>
     <ol id="passos-ios" class="passos" hidden>
       <li>Abra este site no <strong>Safari</strong>.</li>
@@ -564,7 +566,13 @@
       <li>Toque em <strong>Adicionar à tela inicial</strong> (em alguns celulares, <strong>Instalar app</strong>).</li>
       <li>Confirme em <strong>Instalar</strong>.</li>
     </ol>
-    <p id="instalar-fim" class="instalar-fim" hidden>Pronto! Agora é só abrir o YAM pelo ícone na tela inicial.</p>
+    <ol id="passos-computador" class="passos" hidden>
+      <li>Abra este site no <strong>Chrome</strong> ou no <strong>Edge</strong>.</li>
+      <li>Clique no ícone de instalar <svg class="icone icone-texto" aria-hidden="true"><use href="#i-instalar"/></svg>, no fim da barra de endereço.
+        Se não aparecer, abra o menu do navegador (<strong>⋮</strong> ou <strong>···</strong>) e procure <strong>Instalar</strong>.</li>
+      <li>Confirme em <strong>Instalar</strong>.</li>
+    </ol>
+    <p id="instalar-fim" class="instalar-fim" hidden></p>
     <button id="instalar-agora" class="principal largo" hidden onclick="instalarApp()"><svg class="icone" aria-hidden="true"><use href="#i-instalar"/></svg>Instalar agora</button>
     <button id="instalar-fechar" class="largo instalar-fechar" onclick="fecharInstalar()">Agora não</button>
   </div>
@@ -589,7 +597,7 @@
   </div>
 </div>
 
-<script src="app.js?v=60"></script>
+<script src="app.js?v=61"></script>
 <script>
   // Rede de segurança: se o app.js não carregou (ex.: troca de versão no meio
   // do caminho), recarrega sozinho uma vez, em vez de ficar com a tabela vazia.
@@ -603,7 +611,7 @@
     setTimeout(function () { location.replace(location.pathname + "?atualizado=" + Date.now()); }, 1500);
   })();
 </script>
-<script type="module" src="familia.js?v=60"></script>
+<script type="module" src="familia.js?v=61"></script>
 
 <!-- Service Worker -->
 <script>

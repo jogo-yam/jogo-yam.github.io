@@ -8,7 +8,7 @@ const rows = [
 const COLUNAS = 4;
 
 // Versão do app: igual ao número do CACHE_NAME do service-worker.js (um teste confere).
-const VERSAO = 60;
+const VERSAO = 61;
 
 // Avisos da vez com o app fechado: servidor na Cloudflare (worker/avisos.mjs).
 // Sem o endereço, a opção "Avisar a minha vez" não aparece.
@@ -1855,7 +1855,15 @@ function abrirRecuperar(nome = "") {
 }
 
 function fecharRecuperar() {
-  document.getElementById("janela-recuperar").hidden = true;
+  const janela = document.getElementById("janela-recuperar");
+  janela.hidden = true;
+  janela.classList.remove("por-cima");
+}
+
+// Boas-vindas: quem já tem nome de usuário (de outro aparelho) entra com o código
+function recuperarNasBoasVindas() {
+  abrirRecuperar(document.getElementById("bv-nome").value);
+  document.getElementById("janela-recuperar").classList.add("por-cima");
 }
 
 async function recuperarNome(evento) {
@@ -1871,8 +1879,16 @@ async function recuperarNome(evento) {
   botao.disabled = true;
   try {
     await familia.recuperar(nome, codigo);
+    const nasBoasVindas = !document.getElementById("boas-vindas").hidden;
     fecharRecuperar();
-    avisar(`Agora você é ${lerUsuario().nome} neste celular.`, "Nome recuperado!");
+    if (!nasBoasVindas) {
+      avisar(`Agora você é ${lerUsuario().nome} neste aparelho.`, "Nome recuperado!");
+      return;
+    }
+    fecharBoasVindas(false);
+    await avisar(`Agora você é ${lerUsuario().nome} neste aparelho. As partidas antigas ficam no outro: ` +
+      "para trazer, exporte o backup lá e importe aqui em Mais → Backup.", `Que bom te ver de novo, ${lerUsuario().nome}!`);
+    if (deveMostrarGuiaInstalar()) abrirInstalar(true);
   } catch (e) {
     erro.textContent = e.message;
   } finally {
@@ -2008,7 +2024,7 @@ async function importarHistorico(campo) {
   const quando = dados.exportadoEm ? ` de ${formatarData(dados.exportadoEm)}` : "";
 
   if (novas.length === 0) {
-    avisar(`Todas as ${lista.length} partidas desse backup${quando} já estão neste celular.`, "Nada novo para importar");
+    avisar(`Todas as ${lista.length} partidas desse backup${quando} já estão neste aparelho.`, "Nada novo para importar");
     return;
   }
   if (!await confirmar("Importar backup?",
@@ -2562,7 +2578,7 @@ function ehAndroid() {
 function mostrarBotaoInstalar() {
   const sistema = document.querySelector("#instalar-sistema [aria-checked='true']");
   document.getElementById("instalar-agora").hidden =
-    !pedidoDeInstalar || appInstalado() || !sistema || sistema.dataset.sistema !== "android";
+    !pedidoDeInstalar || appInstalado() || !sistema || sistema.dataset.sistema === "ios";
 }
 
 window.addEventListener("beforeinstallprompt", evento => {
@@ -2603,17 +2619,20 @@ const CHAVE_GUIA_INSTALAR = "yam-guia-instalar";
 function escolherSistema(sistema) {
   document.querySelectorAll("#instalar-sistema button").forEach(b =>
     b.setAttribute("aria-checked", String(b.dataset.sistema === sistema)));
-  document.getElementById("passos-ios").hidden = sistema !== "ios";
-  document.getElementById("passos-android").hidden = sistema !== "android";
-  document.getElementById("instalar-fim").hidden = sistema !== "ios" && sistema !== "android";
+  for (const s of ["ios", "android", "computador"]) document.getElementById(`passos-${s}`).hidden = sistema !== s;
+  const fim = document.getElementById("instalar-fim");
+  fim.hidden = !sistema;
+  fim.textContent = sistema === "computador"
+    ? "Pronto! O YAM abre numa janela própria, com ícone na área de trabalho."
+    : "Pronto! Agora é só abrir o YAM pelo ícone na tela inicial.";
   mostrarBotaoInstalar();
 }
 
 function abrirInstalar(primeiraVez = false) {
-  escolherSistema(ehIphone() ? "ios" : ehAndroid() ? "android" : null);
+  escolherSistema(ehIphone() ? "ios" : ehAndroid() ? "android" : "computador");
   document.getElementById("instalar-dica").textContent = appInstalado()
-    ? "O YAM já está instalado neste celular. Se alguém precisar de ajuda, o passo a passo está aqui."
-    : "Ele ganha um ícone na tela inicial, abre em tela cheia e funciona até sem internet.";
+    ? "O YAM já está instalado aqui. Se alguém precisar de ajuda, o passo a passo está aqui."
+    : "Ele ganha um ícone próprio, abre como um app e funciona até sem internet.";
   document.getElementById("instalar-fechar").textContent = primeiraVez ? "Agora não" : "Fechar";
   document.getElementById("janela-instalar").hidden = false;
 }
@@ -2797,6 +2816,7 @@ function mostrarSlide(n) {
 
 function abrirBoasVindas() {
   document.getElementById("bv-nome").value = nomeJogador || "";
+  document.getElementById("bv-recuperar").hidden = !!lerUsuario();
   mostrarSlide(0);
   document.getElementById("boas-vindas").hidden = false;
 }
@@ -2811,11 +2831,11 @@ function proximaBoasVindas() {
   fecharBoasVindas();
 }
 
-function fecharBoasVindas() {
+function fecharBoasVindas(comGuia = true) {
   try { localStorage.setItem(CHAVE_BOAS_VINDAS, "1"); } catch {}
   document.getElementById("bv-nome").blur();
   document.getElementById("boas-vindas").hidden = true;
-  if (deveMostrarGuiaInstalar()) setTimeout(() => abrirInstalar(true), 300);
+  if (comGuia && deveMostrarGuiaInstalar()) setTimeout(() => abrirInstalar(true), 300);
 }
 
 // arrastar para o lado troca de tela; Enter no nome começa
@@ -2940,7 +2960,7 @@ function blocoConfrontos(partidas) {
   if (!lista.length) return null;
   const caixa = elemento("div", "bloco confrontos"); // div: "section" no app é uma tela inteira
   caixa.appendChild(elemento("h2", "", "Você contra cada um"));
-  caixa.appendChild(elemento("p", "subtitulo", "Nas partidas em sala deste celular. Placar: você × a pessoa."));
+  caixa.appendChild(elemento("p", "subtitulo", "Nas partidas em sala deste aparelho. Placar: você × a pessoa."));
   const ul = elemento("ul", "lista-confrontos");
   for (const c of lista) {
     const li = elemento("li");
@@ -2981,7 +3001,7 @@ const timerBackup = setTimeout(() => {
     localStorage.setItem(CHAVE_LEMBRETE_BACKUP, JSON.stringify(new Date().toISOString()));
     ultimoAviso = Date.now();
     mostrarLegenda(["Que tal um backup?",
-      "Suas partidas ficam só neste celular. Um arquivo de backup evita perder o histórico se trocar de aparelho."],
+      "Suas partidas ficam só neste aparelho. Um arquivo de backup evita perder o histórico se trocar de aparelho."],
       "", { texto: "Fazer backup", fazer: exportarHistorico });
   } catch {}
 }, 4000);
@@ -3042,7 +3062,7 @@ function atualizarBotaoAvisos() {
     !suportado ? (ehIphone() && !appInstalado()
       ? "No iPhone, os avisos só funcionam com o app instalado na tela inicial (Mais opções → Como instalar o app)."
       : "Este navegador não recebe avisos.")
-    : permissao === "denied" ? "Os avisos estão bloqueados nos ajustes do celular para este app."
+    : permissao === "denied" ? "Os avisos estão bloqueados nos ajustes do celular (ou do navegador) para este app."
     : "Na sala \u201ccada um na sua vez\u201d, chega uma notificação quando for a sua vez, mesmo com o app fechado.";
 }
 
@@ -3054,7 +3074,7 @@ async function ligarAvisos() {
     localStorage.setItem(CHAVE_AVISOS, "0");
     atualizarBotaoAvisos();
     ultimoAviso = Date.now();
-    mostrarLegenda(["Avisos desligados", "Sem permissão para notificações. Dá para liberar nos ajustes do celular."]);
+    mostrarLegenda(["Avisos desligados", "Sem permissão para notificações. Dá para liberar nos ajustes do celular ou do navegador."]);
     return false;
   }
   try {
@@ -3125,6 +3145,32 @@ try {
   else if (atalho === "historico") abrirHistorico();
   if (atalho) history.replaceState(null, "", location.pathname);
 } catch {}
+
+// ---------- teclado (computador) ----------
+// Esc fecha a janela que estiver aberta por cima (a de cima primeiro).
+const FECHAR_COM_ESC = [
+  ["janela-pergunta", () => responder(false)],
+  ["janela-recuperar", () => fecharRecuperar()],
+  ["janela-nome", () => fecharJanelaNome()],
+  ["janela-instalar", () => fecharInstalar()],
+  ["janela-familia", () => window.familia && familia.fecharJanela()],
+  ["janela-sala", () => fecharEscolhaSala()],
+  ["janela-dados", () => fecharDados()],
+  ["podio", () => fecharPodioDaTela()],
+  ["familia-espera", () => window.familia && familia.fecharEspera()],
+  ["fim-de-jogo", () => fecharFimDeJogo()]
+];
+
+document.addEventListener("keydown", evento => {
+  if (evento.key !== "Escape" || evento.defaultPrevented) return;
+  const aberta = FECHAR_COM_ESC.find(([id]) => {
+    const el = document.getElementById(id);
+    return el && !el.hidden;
+  });
+  if (!aberta) return;
+  evento.preventDefault();
+  aberta[1]();
+});
 
 // chegou até aqui: o app carregou inteiro (o index.html confere)
 window.yamCarregado = true;
