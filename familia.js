@@ -33,6 +33,7 @@ let podioMostrado = false;
 let resultadoSala = null;              // colocação deste jogador no último pódio
 const CHAVE_MODO = "yam-modo-sala";    // última escolha ao criar: "livre" ou "vez"
 let modoEscolhido = localStorage.getItem(CHAVE_MODO) === "vez" ? "vez" : "livre";
+const CHAVE_SO_DADOS = "yam-so-dados"; // última escolha de "só os dados do app" ("0" = desmarcado)
 
 // ---------- utilidades ----------
 
@@ -121,7 +122,7 @@ const $ = id => document.getElementById(id);
 
 // ---------- criar / entrar / sair ----------
 
-async function entrar(codigo, nome, modo = null) {
+async function entrar(codigo, nome, modo = null, soDados = null) {
   const user = await usuario();
   const raiz = `partidas/${codigo}`;
   const snap = await lerDoBanco(raiz);
@@ -142,6 +143,7 @@ async function entrar(codigo, nome, modo = null) {
   // sala com vez: o modo vem de quem criou; quem entra no meio começa na rodada atual
   const sala = snap.val();
   const modoDaSalaAgora = modo || modoDaSala(sala);
+  const soDadosAgora = soDados === null ? soDadosDaSala(sala) : soDados;
   const outros = jogadoresDe(sala).filter(j => j.uid !== user.uid && !j.terminou);
   const pulos = pulosDe(sala);
   const base = outros.length
@@ -151,7 +153,8 @@ async function entrar(codigo, nome, modo = null) {
 
   await update(ref(db, `${raiz}/jogadores/${user.uid}`), {
     nome, chave, terminou: false, total: null, colunas: null, valores: null,
-    modo: modoDaSalaAgora, casas: casasMarcadas(), base: jaEstava ? (sala.jogadores[user.uid].base || 0) : base,
+    modo: modoDaSalaAgora, soDados: soDadosAgora,
+    casas: casasMarcadas(), base: jaEstava ? (sala.jogadores[user.uid].base || 0) : base,
     ...(jaEstava ? {} : { entrouEm: serverTimestamp() }) // a ordem da vez não muda se entrar de novo
   });
   guardarSessao({ codigo, chave });
@@ -198,7 +201,7 @@ async function limparSalasAntigas() {
   return apagadas;
 }
 
-async function criar(nome, modo = "livre") {
+async function criar(nome, modo = "livre", soDados = false) {
   const user = await usuario();
   for (let tentativa = 0; tentativa < 6; tentativa++) {
     const codigo = String(Math.floor(10000 + Math.random() * 90000));
@@ -206,7 +209,7 @@ async function criar(nome, modo = "livre") {
       atual => atual === null ? user.uid : undefined);
     if (r.committed) {
       await update(ref(db, `partidas/${codigo}`), { criadaEm: serverTimestamp() });
-      await entrar(codigo, nome, modo);
+      await entrar(codigo, nome, modo, soDados);
       guardarSalaCriada(codigo);
       limparSalasAntigas(); // em segundo plano
       return codigo;
@@ -389,6 +392,8 @@ function atualizarBarra(erro) {
   // fora de sala: só o botão "Jogar em sala" no topo, ao lado do YAM
   $("botao-sala").hidden = !!sessao;
   barra.hidden = !sessao;
+  atualizarBotaoNovoJogo();
+  atualizarBotaoDesfazer();
   if (!sessao) return;
 
   const info = document.createElement("div");
@@ -402,7 +407,7 @@ function atualizarBarra(erro) {
     const jogadores = jogadoresDe(partida);
     const terminaram = jogadores.filter(j => j.terminou).length;
     status.textContent = `${jogadores.length} jogador${jogadores.length === 1 ? "" : "es"} · ${terminaram} ${terminaram === 1 ? "terminou" : "terminaram"}` +
-      (modoDaSala() === "vez" ? " · um de cada vez" : "");
+      (modoDaSala() === "vez" ? " · um de cada vez" : "") + (soDadosDaSala() ? " · só dados do app" : "");
   } else {
     status.textContent = "Conectando…";
   }
@@ -430,11 +435,14 @@ function atualizarBarra(erro) {
 }
 
 async function compartilharCodigo() {
-  const texto = `Entre na minha sala de YAM com o código ${sessao.codigo}`;
+  const codigo = sessao.codigo;
+  const texto = `Vem jogar YAM comigo! Código da sala: ${codigo}\n` +
+    "No app: Jogar em sala → Entrar em sala.\n" +
+    `Ou toque no link: ${ENDERECO_APP}?sala=${codigo}`;
   try {
-    if (navigator.share) { await navigator.share({ text: `${texto}: ${ENDERECO_APP}` }); return; }
+    if (navigator.share) { await navigator.share({ text: texto }); return; }
   } catch (e) { if (e && e.name === "AbortError") return; }
-  avisar(`Passe este código para os outros jogadores: ${sessao.codigo}`, "Código da sala");
+  avisar(`Passe este código para os outros jogadores: ${codigo}`, "Código da sala");
 }
 
 async function encerrarPartida() {
@@ -464,6 +472,8 @@ function abrir(modo = "criar") {
     : "Cada um joga no próprio celular. Os pontos de todos aparecem juntos, num pódio, quando o último terminar.";
   $("familia-campo-codigo").hidden = !entrar;
   $("familia-modo").hidden = entrar;
+  $("familia-so-dados").hidden = entrar;
+  $("familia-so-dados-campo").checked = localStorage.getItem(CHAVE_SO_DADOS) !== "0";
   escolherModo(modoEscolhido);
   $("familia-confirmar").textContent = entrar ? "Entrar na sala" : "Criar sala";
   const registrado = lerUsuario();
@@ -519,7 +529,9 @@ async function acaoJanela(tipo = modoJanela) {
   erro.textContent = tipo === "criar" ? "Criando a sala…" : "Entrando na sala…";
   document.querySelectorAll("#janela-familia button").forEach(b => { b.disabled = true; });
   try {
-    if (tipo === "criar") await criar(nome, modoEscolhido);
+    const soDados = $("familia-so-dados-campo").checked;
+    if (tipo === "criar") localStorage.setItem(CHAVE_SO_DADOS, soDados ? "1" : "0");
+    if (tipo === "criar") await criar(nome, modoEscolhido, soDados);
     else await entrar(codigo, nome);
     definirNome(nome); // só depois de entrar (nome aceito na sala)
     fecharJanela();
@@ -573,6 +585,13 @@ function mostrarPodio() {
 
   const uid = auth.currentUser && auth.currentUser.uid;
   const jogadores = jogadoresDe(partida);
+  // anti-trapaça: o total é refeito a partir da tabela que cada um enviou; quem
+  // mandou tabela incompleta ou com valores impossíveis fica fora do pódio
+  for (const j of jogadores) {
+    const tabelaOk = j.valores && typeof j.valores === "object" &&
+      partidaEstaCompleta(j.valores) && tabelaValida(j.valores);
+    j.total = j.terminou && tabelaOk ? calcularTotais(j.valores).geral : null;
+  }
   const terminaram = jogadores.filter(j => j.terminou && typeof j.total === "number")
     .sort((a, b) => b.total - a.total);
   const naoTerminaram = jogadores.filter(j => !(j.terminou && typeof j.total === "number"));
@@ -648,6 +667,7 @@ async function jogarDeNovo() {
   const convite = revancheDeOutro();
   const antigo = sessao && sessao.codigo;
   const modo = modoDaSala();
+  const soDados = soDadosDaSala(partida);
   const uid = auth.currentUser && auth.currentUser.uid;
   botao.disabled = true;
   botao.textContent = convite ? "Entrando…" : "Criando sala…";
@@ -662,7 +682,7 @@ async function jogarDeNovo() {
       ultimoAviso = Date.now();
       mostrarLegenda(["Revanche!", `Você entrou na sala ${convite.codigo}. Boa sorte!`]);
     } else {
-      const codigo = await criar(nomeJogador, modo);
+      const codigo = await criar(nomeJogador, modo, soDados);
       // avisa quem ainda está no pódio da sala antiga
       if (antigo && uid) update(ref(db, `partidas/${antigo}/jogadores/${uid}`), { revanche: codigo }).catch(() => {});
       ultimoAviso = Date.now();
@@ -730,6 +750,14 @@ function modoDaSala(p = partida) {
   const criador = p.jogadores[p.criador];
   if (criador && criador.modo) return criador.modo;
   return jogadoresDe(p).some(j => j.modo === "vez") ? "vez" : "livre";
+}
+
+// "Só os dados do app": vem de quem criou a sala (cada um copia ao entrar).
+function soDadosDaSala(p = partida) {
+  if (!p || !p.jogadores) return false;
+  const criador = p.jogadores[p.criador];
+  if (criador && typeof criador.soDados === "boolean") return criador.soDados;
+  return jogadoresDe(p).some(j => j.soDados === true);
 }
 
 function pulosDe(p) {
@@ -943,6 +971,7 @@ function avisarDaVez() {
 
 // Faixa acima da tabela: de quem é a vez, os dados dela e a última jogada.
 function atualizarBarraVez() {
+  atualizarBotaoDesfazer(); // o Desfazer depende de a vez ter passado ou não
   const barra = $("barra-vez");
   if (!barra) return;
   if (!comVez()) { barra.hidden = true; return; }
@@ -995,6 +1024,7 @@ window.familia = {
   abrir, fecharJanela, acaoJanela, sair, confirmarSair, compartilharCodigo,
   aoTerminar, fecharEspera, fecharPodio, jogarDeNovo, limparSalasAntigas, sincronizar, registrarResultado,
   escolherModo, podeJogar, porQueNaoPode, podeDesfazer, mesaMudou, recuperar, trocarNome, avisosMudaram,
+  soDadosDoApp: () => !!(sessao && partida && !partida.revelada && !partida.encerrada && soDadosDaSala()),
   ativa: () => !!sessao,
   revelada: () => !!(partida && (partida.revelada || partida.encerrada))
 };

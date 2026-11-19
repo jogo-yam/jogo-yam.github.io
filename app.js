@@ -8,7 +8,7 @@ const rows = [
 const COLUNAS = 4;
 
 // Versão do app: igual ao número do CACHE_NAME do service-worker.js (um teste confere).
-const VERSAO = 54;
+const VERSAO = 55;
 
 // Avisos da vez com o app fechado: servidor na Cloudflare (worker/avisos.mjs).
 // Sem o endereço, a opção "Avisar a minha vez" não aparece.
@@ -419,7 +419,7 @@ function montarTabela(tbody, valores, editavel) {
 
         input.addEventListener("focus", () => {
           antes = state[key] ?? "";
-          liberado = podeJogarAgora();
+          liberado = podeJogarAgora() && podeDigitarNaCasa(antes);
           if (!liberado) { input.blur(); return; }
           input.select();
           const [linha, col] = key.split("-").map(Number);
@@ -448,7 +448,7 @@ function montarTabela(tbody, valores, editavel) {
         input.addEventListener("blur", () => { liberado = false; });
 
         input.addEventListener("input", () => {
-          if (!liberado && !(liberado = podeJogarAgora())) {
+          if (!liberado && !(liberado = podeJogarAgora() && podeDigitarNaCasa(state[key] ?? ""))) {
             input.value = exibir(state[key] ?? "");
             input.blur();
             return;
@@ -577,6 +577,7 @@ function buildTable() {
 function calcular() {
   atualizarTotais(body, totalGeral, state);
   marcarProximas();
+  atualizarBotaoNovoJogo();
 }
 
 // Toda a tabela tem só valores possíveis? (usado antes de avisar a sala)
@@ -1185,6 +1186,7 @@ function comecarNovaPartida() {
   salvar();
   limparJogadas();
   guardarPartidaSalvaId(null);
+  novaVez(); // dados de uma partida não passam para a outra
   buildTable();
   fecharFimDeJogo();
 }
@@ -1245,23 +1247,41 @@ function festa(titulo, texto) {
   tocar("festa");
 }
 
+// Botão de baixo, conforme a situação: numa sala "Sair da sala"; com a partida
+// em andamento "Encerrar"; com a tabela vazia ou terminada "Novo jogo".
+function situacaoDoJogo() {
+  if (window.familia && familia.ativa() && !familia.revelada()) return "sala";
+  if (partidaTemValores(state) && !partidaCompleta()) return "andamento";
+  return partidaTemValores(state) ? "terminada" : "vazia";
+}
+
+function atualizarBotaoNovoJogo() {
+  const botao = document.getElementById("botao-novo-jogo");
+  const situacao = situacaoDoJogo();
+  botao.textContent = { sala: "Sair da sala", andamento: "Encerrar", terminada: "Novo jogo", vazia: "Novo jogo" }[situacao];
+  botao.disabled = situacao === "vazia";
+}
+
 async function novoJogo() {
   const jaSalva = entradaDaPartidaAtual() !== null;
   const temValores = partidaTemValores(state);
+  const situacao = situacaoDoJogo();
 
-  if (window.familia && familia.ativa() && !familia.revelada()) {
+  if (situacao === "sala") {
     if (!await confirmar("Sair da sala?",
-      "Você está numa sala. Para começar um novo jogo, você sai dela." +
-      (temValores && !jaSalva ? " Esta partida vai para o histórico." : ""), "Sair e começar")) return;
+      "Você sai da sala e fica fora do resultado dela." +
+      (temValores && !jaSalva ? " Sua partida vai para o histórico como está e a tabela fica zerada." : ""), "Sair")) return;
     familia.sair();
-  } else if (!await confirmar("Novo jogo",
-    jaSalva || !temValores
-      ? "Começar um novo jogo?"
-      : "Esta partida vai para o histórico e a tabela fica zerada.", "Começar")) {
-    return;
+  } else if (situacao === "andamento") {
+    if (!await confirmar("Encerrar a partida?",
+      "Ela vai para o histórico como está (incompleta) e a tabela fica zerada.", "Encerrar")) return;
+  } else if (situacao === "terminada") {
+    if (!await confirmar("Novo jogo", "Começar um novo jogo com a tabela zerada?", "Começar")) return;
+  } else {
+    return; // tabela vazia: nada para encerrar
   }
 
-  if (temValores) salvarPartidaAtual();
+  if (temValores) salvarPartidaAtual(); // se já estava salva, só atualiza
   comecarNovaPartida();
 }
 
@@ -1660,6 +1680,7 @@ function registrarJogada(key, antes, depois = "") {
   if ((antes ?? "") === (depois ?? "")) return;
   dadosParaNovaVez = true; // anotou na tabela: os dados começam uma vez nova
   guardarMesa();
+  atualizarBotaoDesfazer();
   jogadas.push({ key, antes: antes ?? "" });
   if (jogadas.length > MAX_JOGADAS) jogadas.shift();
   localStorage.setItem(CHAVE_JOGADAS, JSON.stringify(jogadas));
@@ -1673,15 +1694,19 @@ function limparJogadas() {
 }
 
 function atualizarBotaoDesfazer() {
-  document.getElementById("botao-desfazer").disabled = jogadas.length === 0;
+  let bloqueado = false;
+  try { bloqueado = !podeDesfazerNaSala(); } catch {} // no começo do app a sala ainda não carregou
+  document.getElementById("botao-desfazer").disabled = jogadas.length === 0 || bloqueado;
 }
 
 const NOMES_COLUNAS = ["descida (↓)", "subida (↑)", "coluna D", "coluna S"];
 
 function desfazer() {
-  if (window.familia && familia.ativa() && !familia.podeDesfazer()) {
+  if (!podeDesfazerNaSala()) {
     ultimoAviso = Date.now();
-    mostrarLegenda(["Não dá para desfazer", "A vez já passou para o próximo jogador."]);
+    mostrarLegenda(["Não dá para desfazer", familia.podeDesfazer() && !dadosParaNovaVez
+      ? "Na sala, só dá para desfazer a última jogada, antes de rolar os dados de novo."
+      : "A vez já passou para o próximo jogador."]);
     return;
   }
   const jogada = jogadas.pop();
@@ -2058,6 +2083,7 @@ function novaVez() {
   mesa.segurados = [false, false, false, false, false];
   dadosParaNovaVez = false;
   guardarMesa();
+  atualizarBotaoDesfazer();
   desenharDados();
   avisarMesa();
 }
@@ -2756,6 +2782,29 @@ function textoDaJogada(nome, key, valor) {
     : `${nome} marcou ${valor} no ${casa} na ${NOMES_COLUNAS[col]}`;
 }
 
+// Anti-trapaça na sala: com "só os dados do app" ninguém digita pontos; e uma
+// casa já marcada não muda (errou agora? Desfazer, só a última jogada).
+function podeDigitarNaCasa(valorAtual) {
+  if (!window.familia || !familia.ativa() || familia.revelada()) return true;
+  ultimoAviso = Date.now();
+  if (familia.soDadosDoApp()) {
+    mostrarLegenda(["Nesta sala, só pelos dados do app",
+      "Toque no dado lá embaixo, role e use Marcar (ou Riscar)."]);
+    return false;
+  }
+  if (valorAtual !== "") {
+    mostrarLegenda(["Casa já marcada", "Na sala, uma casa marcada não muda. Errou agora? Use Desfazer."]);
+    return false;
+  }
+  return true;
+}
+
+// Desfazer na sala: só a última jogada e antes de rolar os dados de novo.
+function podeDesfazerNaSala() {
+  if (!window.familia || !familia.ativa() || familia.revelada()) return true;
+  return dadosParaNovaVez && familia.podeDesfazer();
+}
+
 // Tabela e dados só na sua vez (fora de sala, ou sala livre, sempre pode).
 function podeJogarAgora() {
   if (!window.familia || !familia.ativa() || familia.podeJogar()) return true;
@@ -2945,6 +2994,39 @@ async function alternarAvisos() {
 }
 
 atualizarBotaoAvisos();
+
+// ---------- link de convite para a sala (?sala=12345) ----------
+// Abre "Entrar em sala" já com o código. No iPhone, um link sempre abre no
+// navegador (nunca no app da tela inicial), onde o nome e as partidas da pessoa
+// não estão: aí o app avisa que dá para abrir o app instalado e usar o código.
+
+function abrirEntrarNaSala(codigo, tentativas = 0) {
+  if (!window.familia) {
+    if (tentativas < 40) setTimeout(() => abrirEntrarNaSala(codigo, tentativas + 1), 250);
+    return;
+  }
+  if (familia.ativa()) return; // já está numa sala
+  familia.abrir("entrar");
+  document.getElementById("familia-codigo").value = codigo;
+}
+
+async function verificarLinkDaSala() {
+  let codigo = null;
+  try { codigo = new URLSearchParams(location.search).get("sala"); } catch {}
+  if (!codigo || !/^\d{5}$/.test(codigo)) return;
+  history.replaceState(null, "", location.pathname);
+  document.getElementById("boas-vindas").hidden = true; // quem veio pelo link vai direto para a sala
+  if (appInstalado()) { abrirEntrarNaSala(codigo); return; }
+  const aqui = await perguntar({
+    titulo: `Convite para a sala ${codigo}`,
+    texto: `Já tem o YAM instalado na tela inicial? Abra o app e toque em Jogar em sala → Entrar em sala, ` +
+      `com o código ${codigo}: lá estão seu nome e suas partidas. Se não tem, dá para jogar aqui no navegador.`,
+    sim: "Jogar aqui no navegador", nao: "Vou abrir o app"
+  });
+  if (aqui) abrirEntrarNaSala(codigo);
+}
+
+setTimeout(verificarLinkDaSala, 0);
 
 // Atalhos do ícone (segurar o ícone do app): ?abrir=dados ou ?abrir=historico
 try {

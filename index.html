@@ -125,7 +125,7 @@
   </div>
 
   <div class="acoes acoes-jogo">
-    <button onclick="novoJogo()">Novo Jogo</button>
+    <button id="botao-novo-jogo" onclick="novoJogo()">Novo jogo</button>
     <button id="botao-desfazer" onclick="desfazer()" aria-label="Desfazer a última jogada"><svg class="icone" aria-hidden="true"><use href="#i-desfazer"/></svg>Desfazer</button>
     <button class="botao-dados principal" onclick="abrirDados()" aria-label="Dados" title="Dados"><svg class="icone" aria-hidden="true"><use href="#i-dado"/></svg></button>
     <button onclick="abrirHistorico()">Histórico</button>
@@ -400,6 +400,11 @@
       <button type="button" data-modo="vez" role="radio" aria-checked="false" onclick="familia.escolherModo('vez')">
         <strong>Cada um na sua vez</strong><small>Como nos dados de verdade, um de cada vez</small></button>
     </div>
+    <label id="familia-so-dados" class="familia-so-dados">
+      <input id="familia-so-dados-campo" type="checkbox" checked>
+      <span><strong>Só os dados do app</strong>
+        <small>Ninguém digita pontos: todo mundo rola aqui e marca pelos dados. Evita trapaça.</small></span>
+    </label>
     <div id="familia-campo-codigo" hidden>
       <label class="rotulo-campo" for="familia-codigo">Código da sala</label>
       <input id="familia-codigo" type="text" inputmode="numeric" maxlength="5" autocomplete="off"
