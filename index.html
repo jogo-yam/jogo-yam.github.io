@@ -26,7 +26,7 @@
 
   <link rel="preload" href="fontes/nunito.woff2" as="font" type="font/woff2" crossorigin>
   <!-- ?v= é a versão do app (igual ao VERSAO do app.js; um teste confere): versão nova, endereço novo -->
-  <link rel="stylesheet" href="style.css?v=57">
+  <link rel="stylesheet" href="style.css?v=58">
 
   <!-- Aplica o tema escolhido antes de desenhar a página, para não piscar. -->
   <script>
@@ -289,7 +289,7 @@
       <h2>Jogo</h2>
       <button class="linha-mais" onclick="abrirRegras()"><svg class="icone" aria-hidden="true"><use href="#i-ajuda"/></svg>Como jogar</button>
       <button class="linha-mais" onclick="convidarJogadores()"><svg class="icone" aria-hidden="true"><use href="#i-enviar"/></svg>Convidar jogadores</button>
-      <button id="botao-instalar" class="linha-mais" onclick="instalarApp()" hidden><svg class="icone" aria-hidden="true"><use href="#i-instalar"/></svg>Instalar o app no celular</button>
+      <button id="botao-instalar" class="linha-mais" onclick="abrirInstalar()"><svg class="icone" aria-hidden="true"><use href="#i-instalar"/></svg>Como instalar o app</button>
     </div>
 
     <div class="bloco">
@@ -540,6 +540,36 @@
   </div>
 </div>
 
+<!-- Como instalar: no primeiro uso (depois das boas-vindas) e em Mais -->
+<div id="janela-instalar" class="janela janela-instalar" hidden onclick="if (event.target === this) fecharInstalar()">
+  <div class="janela-caixa caixa-instalar" role="dialog" aria-modal="true" aria-labelledby="instalar-titulo">
+    <div class="instalar-figura"><svg class="icone" aria-hidden="true"><use href="#i-celular"/></svg></div>
+    <h2 id="instalar-titulo">Instale o YAM no celular</h2>
+    <p id="instalar-dica" class="dica">Ele ganha um ícone na tela inicial, abre em tela cheia e funciona até sem internet.</p>
+    <p class="instalar-pergunta">Qual é o seu celular?</p>
+    <div id="instalar-sistema" class="instalar-sistema" role="radiogroup" aria-label="Qual é o seu celular">
+      <button type="button" role="radio" aria-checked="false" data-sistema="ios" onclick="escolherSistema('ios')">iPhone</button>
+      <button type="button" role="radio" aria-checked="false" data-sistema="android" onclick="escolherSistema('android')">Android</button>
+    </div>
+    <ol id="passos-ios" class="passos" hidden>
+      <li>Abra este site no <strong>Safari</strong>.</li>
+      <li>Toque em <strong>Compartilhar</strong> <svg class="icone icone-texto" aria-label="(o quadrado com a seta para cima)" role="img"><use href="#i-compartilhar"/></svg>.
+        Se não estiver aparecendo, toque antes em <strong>···</strong>, ao lado do endereço.</li>
+      <li>Role a lista e toque em <strong>Adicionar à Tela de Início</strong>.</li>
+      <li>Se aparecer a opção de abrir como app, deixe ligada. Depois toque em <strong>Adicionar</strong>.</li>
+    </ol>
+    <ol id="passos-android" class="passos" hidden>
+      <li>Abra este site no <strong>Chrome</strong>.</li>
+      <li>Toque nos três pontinhos <strong>⋮</strong>, no canto de cima.</li>
+      <li>Toque em <strong>Adicionar à tela inicial</strong> (em alguns celulares, <strong>Instalar app</strong>).</li>
+      <li>Confirme em <strong>Instalar</strong>.</li>
+    </ol>
+    <p id="instalar-fim" class="instalar-fim" hidden>Pronto! Agora é só abrir o YAM pelo ícone na tela inicial.</p>
+    <button id="instalar-agora" class="principal largo" hidden onclick="instalarApp()"><svg class="icone" aria-hidden="true"><use href="#i-instalar"/></svg>Instalar agora</button>
+    <button id="instalar-fechar" class="largo instalar-fechar" onclick="fecharInstalar()">Agora não</button>
+  </div>
+</div>
+
 <!-- Versão nova publicada enquanto o app estava aberto -->
 <div id="aviso-versao" class="aviso-versao" role="status" hidden>
   <span>Tem versão nova do app</span>
@@ -559,8 +589,8 @@
   </div>
 </div>
 
-<script src="app.js?v=57"></script>
-<script type="module" src="familia.js?v=57"></script>
+<script src="app.js?v=58"></script>
+<script type="module" src="familia.js?v=58"></script>
 
 <!-- Service Worker -->
 <script>

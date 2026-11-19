@@ -2167,3 +2167,111 @@ button.podio-nome {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
+/* ---------- como instalar (iPhone ou Android) ---------- */
+
+.janela-instalar {
+  align-items: center;
+  padding: calc(20px + env(safe-area-inset-top)) 20px calc(20px + env(safe-area-inset-bottom));
+}
+
+.caixa-instalar {
+  max-height: 100%;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.instalar-figura {
+  display: grid;
+  place-items: center;
+  width: 64px;
+  height: 64px;
+  margin: 0 auto 10px;
+  border-radius: 18px;
+  background: color-mix(in srgb, var(--destaque) 14%, var(--superficie));
+  color: var(--destaque);
+}
+
+
+.instalar-figura .icone {
+  width: 34px;
+  height: 34px;
+  margin: 0;
+  stroke-width: 1.8;
+}
+
+.caixa-instalar .dica { margin: 6px 0 0; }
+
+.instalar-pergunta {
+  margin: 16px 0 8px;
+  font-weight: 700;
+}
+
+.instalar-sistema {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.instalar-sistema button {
+  padding: 10px 8px;
+  font-weight: 700;
+  border-color: var(--borda);
+}
+
+.instalar-sistema button[aria-checked="true"] {
+  border-color: var(--destaque);
+  background: color-mix(in srgb, var(--destaque) 12%, var(--superficie));
+}
+
+.passos {
+  margin: 16px 0 0;
+  padding: 0;
+  list-style: none;
+  counter-reset: passo;
+  text-align: left;
+  line-height: 1.4;
+}
+
+.passos li {
+  position: relative;
+  min-height: 28px;
+  margin-bottom: 12px;
+  padding-left: 40px;
+  counter-increment: passo;
+}
+
+.passos li::before {
+  content: counter(passo);
+  position: absolute;
+  left: 0;
+  top: -2px;
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--destaque);
+  color: var(--destaque-texto);
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.passos .icone-texto {
+  margin: 0 0 0 1px;
+  color: var(--destaque);
+}
+
+
+.instalar-fim {
+  margin: 4px 0 14px;
+  font-size: 14px;
+  color: var(--texto-suave);
+}
+
+.caixa-instalar .instalar-fechar { margin-top: 8px; }
+.caixa-instalar #instalar-agora + .instalar-fechar,
+.caixa-instalar .instalar-fim[hidden] ~ .instalar-fechar { margin-top: 16px; }
+
+:root[data-letra="grande"] .passos { font-size: 18px; }
+:root[data-letra="grande"] .instalar-fim { font-size: 16px; }

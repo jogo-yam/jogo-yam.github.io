@@ -8,7 +8,7 @@ const rows = [
 const COLUNAS = 4;
 
 // Versão do app: igual ao número do CACHE_NAME do service-worker.js (um teste confere).
-const VERSAO = 57;
+const VERSAO = 58;
 
 // Avisos da vez com o app fechado: servidor na Cloudflare (worker/avisos.mjs).
 // Sem o endereço, a opção "Avisar a minha vez" não aparece.
@@ -2533,18 +2533,27 @@ function ehIphone() {
   } catch { return false; }
 }
 
+function ehAndroid() {
+  try { return /android/i.test(String(navigator.userAgent || "")); } catch { return false; }
+}
+
+// "Instalar agora" (só Android/Chrome, quando o navegador oferece)
 function mostrarBotaoInstalar() {
-  document.getElementById("botao-instalar").hidden = appInstalado() || !(pedidoDeInstalar || ehIphone());
+  const sistema = document.querySelector("#instalar-sistema [aria-checked='true']");
+  document.getElementById("instalar-agora").hidden =
+    !pedidoDeInstalar || appInstalado() || !sistema || sistema.dataset.sistema !== "android";
 }
 
 window.addEventListener("beforeinstallprompt", evento => {
   evento.preventDefault();
   pedidoDeInstalar = evento;
   mostrarBotaoInstalar();
-  // sugere uma vez só (depois fica no Mais)
+  // sugere uma vez só (depois fica no Mais). No primeiro uso quem explica é o
+  // passo a passo, que vem depois das boas-vindas.
   try {
     if (localStorage.getItem("yam-sugeriu-instalar")) return;
     localStorage.setItem("yam-sugeriu-instalar", "1");
+    if (!localStorage.getItem(CHAVE_GUIA_INSTALAR) || !document.getElementById("janela-instalar").hidden) return;
   } catch { return; }
   mostrarLegenda(["Instale o YAM", "Fica com ícone na tela inicial e abre como app, até sem internet."], "",
     { texto: "Instalar", fazer: instalarApp });
@@ -2556,19 +2565,50 @@ window.addEventListener("appinstalled", () => {
 });
 
 async function instalarApp() {
-  if (pedidoDeInstalar) {
-    const pedido = pedidoDeInstalar;
-    pedidoDeInstalar = null;
-    pedido.prompt();
-    try { await pedido.userChoice; } catch {}
-    mostrarBotaoInstalar();
-    return;
-  }
-  avisar("No Safari, toque em Compartilhar (o quadrado com a seta para cima) e depois em " +
-    "\"Adicionar à Tela de Início\".", "Instalar no iPhone");
+  if (!pedidoDeInstalar) { abrirInstalar(); return; }
+  const pedido = pedidoDeInstalar;
+  pedidoDeInstalar = null;
+  pedido.prompt();
+  try { await pedido.userChoice; } catch {}
+  mostrarBotaoInstalar();
 }
 
-mostrarBotaoInstalar();
+// ---------- como instalar (passo a passo para iPhone ou Android) ----------
+// Aparece sozinho uma vez, no primeiro uso, logo depois das boas-vindas (se o
+// app ainda não estiver instalado). Depois fica em Mais → Como instalar o app.
+
+const CHAVE_GUIA_INSTALAR = "yam-guia-instalar";
+
+function escolherSistema(sistema) {
+  document.querySelectorAll("#instalar-sistema button").forEach(b =>
+    b.setAttribute("aria-checked", String(b.dataset.sistema === sistema)));
+  document.getElementById("passos-ios").hidden = sistema !== "ios";
+  document.getElementById("passos-android").hidden = sistema !== "android";
+  document.getElementById("instalar-fim").hidden = sistema !== "ios" && sistema !== "android";
+  mostrarBotaoInstalar();
+}
+
+function abrirInstalar(primeiraVez = false) {
+  escolherSistema(ehIphone() ? "ios" : ehAndroid() ? "android" : null);
+  document.getElementById("instalar-dica").textContent = appInstalado()
+    ? "O YAM já está instalado neste celular. Se alguém precisar de ajuda, o passo a passo está aqui."
+    : "Ele ganha um ícone na tela inicial, abre em tela cheia e funciona até sem internet.";
+  document.getElementById("instalar-fechar").textContent = primeiraVez ? "Agora não" : "Fechar";
+  document.getElementById("janela-instalar").hidden = false;
+}
+
+function fecharInstalar() {
+  document.getElementById("janela-instalar").hidden = true;
+}
+
+// primeiro uso: depois das boas-vindas, uma vez só
+function deveMostrarGuiaInstalar() {
+  try {
+    if (localStorage.getItem(CHAVE_GUIA_INSTALAR)) return false;
+    localStorage.setItem(CHAVE_GUIA_INSTALAR, "1");
+  } catch { return false; }
+  return !appInstalado();
+}
 
 // ---------- sons ----------
 // Feitos na hora (sem arquivos de áudio). No iPhone respeitam a chave do
@@ -2754,6 +2794,7 @@ function fecharBoasVindas() {
   try { localStorage.setItem(CHAVE_BOAS_VINDAS, "1"); } catch {}
   document.getElementById("bv-nome").blur();
   document.getElementById("boas-vindas").hidden = true;
+  if (deveMostrarGuiaInstalar()) setTimeout(() => abrirInstalar(true), 300);
 }
 
 // arrastar para o lado troca de tela; Enter no nome começa
@@ -2978,7 +3019,7 @@ function atualizarBotaoAvisos() {
   try { permissao = Notification.permission; } catch {}
   document.getElementById("avisos-dica").textContent =
     !suportado ? (ehIphone() && !appInstalado()
-      ? "No iPhone, os avisos só funcionam com o app instalado na tela inicial (Mais opções → Instalar)."
+      ? "No iPhone, os avisos só funcionam com o app instalado na tela inicial (Mais opções → Como instalar o app)."
       : "Este navegador não recebe avisos.")
     : permissao === "denied" ? "Os avisos estão bloqueados nos ajustes do celular para este app."
     : "Na sala \u201ccada um na sua vez\u201d, chega uma notificação quando for a sua vez, mesmo com o app fechado.";

@@ -26,3 +26,15 @@ test("o link de convite abre nas boas-vindas", () => {
   const { rodar } = carregarApp();
   assert.match(rodar("LINK_CONVITE"), /#bem-vindo$/);
 });
+
+test("como instalar: aparece uma vez só, no primeiro uso, se o app não estiver instalado", () => {
+  const { app, armazenado } = carregarApp();
+  assert.equal(app.deveMostrarGuiaInstalar(), true, "primeira vez, no navegador");
+  assert.equal(armazenado.get("yam-guia-instalar"), "1");
+  assert.equal(app.deveMostrarGuiaInstalar(), false, "não aparece de novo");
+  assert.equal(carregarApp({ armazenado: { "yam-guia-instalar": "1" } }).app.deveMostrarGuiaInstalar(), false, "já viu");
+
+  const instalado = carregarApp();
+  instalado.rodar("navigator.standalone = true");
+  assert.equal(instalado.app.deveMostrarGuiaInstalar(), false, "já abriu pelo ícone");
+});
