@@ -126,19 +126,38 @@ function uidDoToken(token) {
   } catch { return null; }
 }
 
-export async function tratarVez(pedido, env, agora = Date.now(), buscar = fetch) {
+export async function tratarVez(pedido, env, agora = Date.now(), buscar = fetch, esperar = ms => new Promise(r => setTimeout(r, ms))) {
   const { codigo, token, texto } = pedido || {};
   if (!/^\d{5}$/.test(String(codigo)) || typeof token !== "string") return { status: 400, motivo: "pedido inválido" };
-
-  // ler a sala com o token de quem chamou: se o token não vale, o Firebase recusa
-  const resposta = await buscar(`${env.FIREBASE_DB}/partidas/${codigo}.json?auth=${encodeURIComponent(token)}`);
-  if (!resposta.ok) return { status: 403, motivo: "sem acesso à sala" };
-  const sala = await resposta.json();
   const quemChamou = uidDoToken(token);
-  if (!sala || !sala.jogadores || !sala.jogadores[quemChamou]) return { status: 403, motivo: "não está na sala" };
-  if (sala.revelada || sala.encerrada || modoDaSala(sala) !== "vez") return { status: 204, motivo: "sala sem vez" };
 
-  const vez = vezDaSala(sala);
+  // o app foi minimizado: grava a vez de quem chamou (com o token dele; as
+  // regras do banco só deixam gravar no próprio jogador)
+  const g = pedido.gravar;
+  if (g && quemChamou && Number.isInteger(g.casas) && g.casas >= 0 && g.casas <= 52) {
+    const ultima = g.ultima && /^\d{1,2}-[0-3]$/.test(String(g.ultima.key)) && Number.isInteger(g.ultima.valor)
+      ? { key: g.ultima.key, valor: g.ultima.valor, n: g.casas, em: { ".sv": "timestamp" } } : null;
+    await buscar(`${env.FIREBASE_DB}/partidas/${codigo}/jogadores/${quemChamou}.json?auth=${encodeURIComponent(token)}`, {
+      method: "PATCH",
+      body: JSON.stringify({ casas: g.casas, mesa: null, ...(ultima ? { ultima } : {}) })
+    });
+  }
+
+  // ler a sala com o token de quem chamou: se o token não vale, o Firebase recusa.
+  // Com "esperar" (o app foi minimizado e a gravação da vez vai junto), se a vez
+  // ainda é de quem chamou, espera a gravação chegar e lê de novo (até 3 vezes).
+  let sala = null;
+  let vez = null;
+  for (let tentativa = 0; tentativa < 4; tentativa++) {
+    const resposta = await buscar(`${env.FIREBASE_DB}/partidas/${codigo}.json?auth=${encodeURIComponent(token)}`);
+    if (!resposta.ok) return { status: 403, motivo: "sem acesso à sala" };
+    sala = await resposta.json();
+    if (!sala || !sala.jogadores || !sala.jogadores[quemChamou]) return { status: 403, motivo: "não está na sala" };
+    if (sala.revelada || sala.encerrada || modoDaSala(sala) !== "vez") return { status: 204, motivo: "sala sem vez" };
+    vez = vezDaSala(sala);
+    if (vez !== quemChamou || !pedido.esperar || tentativa === 3) break;
+    await esperar(1500);
+  }
   if (!vez || vez === quemChamou) return { status: 204, motivo: "a vez é de quem chamou" };
   const alvo = sala.jogadores[vez];
   if (!alvo.push || !alvo.push.endpoint) return { status: 204, motivo: "não pediu avisos" };

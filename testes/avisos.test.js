@@ -144,3 +144,54 @@ test("servidor e app: mesma regra da vez e mesma chave pública", async () => {
   const doServidor = lerArquivo("worker/wrangler.toml").match(/VAPID_PUBLICA = "([^"]+)"/)[1];
   assert.equal(doApp, doServidor);
 });
+
+test("app minimizado: o servidor grava a vez de quem jogou e avisa o próximo", async () => {
+  const { tratarVez } = await carregar();
+  const { jwk, publica } = chavesVapid();
+  const cel = celular();
+  const sala = salaCom({ push: { endpoint: "https://web.push.apple.com/abc", p256dh: cel.p256dh, auth: cel.auth } });
+  sala.jogadores.davi.casas = 0; // Davi marcou, mas a gravação normal não chegou (app pausado)
+  const chamadas = [];
+  const buscar = async (url, opcoes = {}) => {
+    chamadas.push(`${opcoes.method || "GET"} ${url.split("?")[0]}`);
+    if (url.includes("firebaseio") && opcoes.method === "PATCH") {
+      Object.assign(sala.jogadores.davi, JSON.parse(opcoes.body));
+      return { ok: true };
+    }
+    if (url.includes("firebaseio")) return { ok: true, json: async () => JSON.parse(JSON.stringify(sala)) };
+    return { ok: true, status: 201 };
+  };
+  const env = { FIREBASE_DB: "https://teste.firebaseio.com", VAPID_PUBLICA: publica, VAPID_PRIVADA: JSON.stringify(jwk) };
+  const r = await tratarVez({
+    codigo: "12345", token: tokenDe("davi"), esperar: true, texto: "Davi marcou 3 no 1 na descida (↓)",
+    gravar: { casas: 1, ultima: { key: "0-0", valor: 3, n: 1 } }
+  }, env, 1000000, buscar, async () => {});
+  assert.equal(r.status, 200, r.motivo);
+  assert.deepEqual(chamadas, [
+    "PATCH https://teste.firebaseio.com/partidas/12345/jogadores/davi.json",
+    "GET https://teste.firebaseio.com/partidas/12345.json",
+    "POST https://web.push.apple.com/abc"
+  ]);
+  assert.equal(sala.jogadores.davi.casas, 1);
+  assert.deepEqual(sala.jogadores.davi.ultima.em, { ".sv": "timestamp" });
+});
+
+test("app minimizado: espera a gravação chegar antes de desistir", async () => {
+  const { tratarVez } = await carregar();
+  const { jwk, publica } = chavesVapid();
+  const cel = celular();
+  const sala = salaCom({ push: { endpoint: "https://web.push.apple.com/abc", p256dh: cel.p256dh, auth: cel.auth } });
+  sala.jogadores.davi.casas = 0;
+  let leituras = 0;
+  const buscar = async (url, opcoes = {}) => {
+    if (url.includes("firebaseio")) {
+      if (++leituras === 3) sala.jogadores.davi.casas = 1; // a gravação normal chegou depois
+      return { ok: true, json: async () => JSON.parse(JSON.stringify(sala)) };
+    }
+    return { ok: true, status: 201 };
+  };
+  const env = { FIREBASE_DB: "https://teste.firebaseio.com", VAPID_PUBLICA: publica, VAPID_PRIVADA: JSON.stringify(jwk) };
+  const r = await tratarVez({ codigo: "12345", token: tokenDe("davi"), esperar: true }, env, 1000000, buscar, async () => {});
+  assert.equal(r.status, 200, r.motivo);
+  assert.equal(leituras, 3);
+});

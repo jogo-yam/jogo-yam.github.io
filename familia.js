@@ -811,6 +811,7 @@ function acompanharVez() {
   }
   const eu = partida.jogadores[minhaUid()];
   if (casasPublicadas === null) casasPublicadas = typeof eu.casas === "number" ? eu.casas : 0;
+  guardarToken(); // para passar a vez mesmo se o app for minimizado
   const agora = casasMarcadas();
   if (agora > casasPublicadas) {
     if (!timerVez) timerVez = setTimeout(passarVez, ESPERA_PASSAR);
@@ -826,7 +827,8 @@ function acompanharVez() {
   atualizarBarraVez();
 }
 
-function passarVez() {
+// semAviso: o servidor de avisos já foi chamado (app minimizado), não pede de novo.
+function passarVez(semAviso = false) {
   timerVez = null;
   if (!comVez()) return;
   // ainda digitando o número: espera terminar
@@ -843,10 +845,54 @@ function passarVez() {
   update(ref(db, `partidas/${sessao.codigo}/jogadores/${minhaUid()}`), {
     casas: agora, mesa: null,
     ultima: ultima ? { ...ultima, n: agora, em: serverTimestamp() } : null
-  }).then(() => avisarProximo(ultima ? textoDaJogada(nomeJogador, ultima.key, ultima.valor) : `${nomeJogador} jogou.`))
+  }).then(() => {
+    if (!semAviso) avisarProximo(ultima ? textoDaJogada(nomeJogador, ultima.key, ultima.valor) : `${nomeJogador} jogou.`);
+  })
     .catch(() => { casasPublicadas = anterior; acompanharVez(); }); // sem conexão: tenta de novo
   atualizarBarraVez();
 }
+
+// Minimizou o app (ou trocou de app) com a jogada marcada: passa a vez na hora.
+// Em segundo plano o celular pausa o app e os 3 s não chegariam ao fim. Além da
+// gravação normal (que pode não dar tempo), pede ao servidor de avisos que grave
+// a vez e avise o próximo, num envio que o celular termina mesmo com o app pausado.
+let tokenGuardado = null;
+
+function guardarToken() {
+  if (auth.currentUser) auth.currentUser.getIdToken().then(t => { tokenGuardado = t; }).catch(() => {});
+}
+
+function passarVezAgora() {
+  if (!comVez() || daVez() !== minhaUid()) return;
+  // estava digitando: termina a casa (o "sair da casa" confirma o número)
+  const ativo = document.activeElement;
+  if (ativo && ativo.tagName === "INPUT" && $("tableBody").contains(ativo)) ativo.blur();
+  if (!esperandoPassar()) return;
+  clearTimeout(timerVez);
+  timerVez = null;
+  const agora = casasMarcadas();
+  const ultima = ultimaJogadaFeita();
+  const peloServidor = !!(tokenGuardado && sessao && AVISOS_URL);
+  passarVez(peloServidor); // gravação normal (sem pedir aviso de novo se o servidor já vai avisar)
+  if (!peloServidor) return;
+  try {
+    fetch(`${AVISOS_URL}/vez`, {
+      method: "POST",
+      headers: { "Content-Type": "text/plain" },
+      body: JSON.stringify({
+        codigo: sessao.codigo, token: tokenGuardado, esperar: true,
+        gravar: { casas: agora, ultima: ultima ? { key: ultima.key, valor: ultima.valor, n: agora } : null },
+        texto: ultima ? textoDaJogada(nomeJogador, ultima.key, ultima.valor) : `${nomeJogador} jogou.`
+      }),
+      keepalive: true
+    }).catch(() => {});
+  } catch { /* sem envio extra: a gravação normal passa a vez ao voltar */ }
+}
+
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "hidden") passarVezAgora();
+});
+window.addEventListener("pagehide", passarVezAgora);
 
 // ---------- avisos com o app fechado ----------
 
