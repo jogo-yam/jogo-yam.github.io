@@ -26,7 +26,7 @@
 
   <link rel="preload" href="fontes/nunito.woff2" as="font" type="font/woff2" crossorigin>
   <!-- ?v= é a versão do app (igual ao VERSAO do app.js; um teste confere): versão nova, endereço novo -->
-  <link rel="stylesheet" href="style.css?v=59">
+  <link rel="stylesheet" href="style.css?v=60">
 
   <!-- Aplica o tema escolhido antes de desenhar a página, para não piscar. -->
   <script>
@@ -589,8 +589,21 @@
   </div>
 </div>
 
-<script src="app.js?v=59"></script>
-<script type="module" src="familia.js?v=59"></script>
+<script src="app.js?v=60"></script>
+<script>
+  // Rede de segurança: se o app.js não carregou (ex.: troca de versão no meio
+  // do caminho), recarrega sozinho uma vez, em vez de ficar com a tabela vazia.
+  (function () {
+    if (window.yamCarregado) return;
+    try {
+      var ultima = Number(sessionStorage.getItem("yam-recarga") || 0);
+      if (Date.now() - ultima < 30000) return; // já tentou agora há pouco: não fica em loop
+      sessionStorage.setItem("yam-recarga", String(Date.now()));
+    } catch (e) { return; }
+    setTimeout(function () { location.replace(location.pathname + "?atualizado=" + Date.now()); }, 1500);
+  })();
+</script>
+<script type="module" src="familia.js?v=60"></script>
 
 <!-- Service Worker -->
 <script>

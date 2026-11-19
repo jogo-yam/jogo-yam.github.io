@@ -1,5 +1,5 @@
 // Ao publicar mudanças, aumente a versão para limpar o cache antigo.
-const CACHE_NAME = "yam-cache-v59";
+const CACHE_NAME = "yam-cache-v60";
 const FILES_TO_CACHE = [
   "./",
   "./index.html",
@@ -75,7 +75,9 @@ self.addEventListener("fetch", event => {
       })
       .catch(() =>
         caches.match(event.request, { ignoreSearch: true })
-          .then(cached => cached || caches.match("./index.html"))
+          // sem internet e sem cópia: página -> o app guardado; arquivo -> erro
+          // (nunca entregar o index.html no lugar de um .js ou .css)
+          .then(cached => cached || (event.request.mode === "navigate" ? caches.match("./index.html") : Response.error()))
       )
   );
 });

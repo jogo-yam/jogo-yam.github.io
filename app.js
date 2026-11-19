@@ -8,7 +8,7 @@ const rows = [
 const COLUNAS = 4;
 
 // Versão do app: igual ao número do CACHE_NAME do service-worker.js (um teste confere).
-const VERSAO = 59;
+const VERSAO = 60;
 
 // Avisos da vez com o app fechado: servidor na Cloudflare (worker/avisos.mjs).
 // Sem o endereço, a opção "Avisar a minha vez" não aparece.
@@ -2500,16 +2500,32 @@ const timerVersao = setInterval(() => {
 
 // "Atualizar": busca a versão nova do service worker e abre o app num endereço
 // novo. Os arquivos têm a versão no endereço (app.js?v=57), então a página nova
-// nunca usa uma cópia velha guardada no celular.
+// nunca usa uma cópia velha guardada no celular. Antes de recarregar, espera a
+// versão nova terminar de se instalar: recarregar no meio da troca deixava o
+// iPhone sem o app.js (tela com a tabela vazia).
 async function atualizarApp() {
   const botao = document.getElementById("botao-atualizar");
   botao.disabled = true;
   rotular(botao, "atualizar", "Atualizando…");
+  const ate = ms => new Promise(r => setTimeout(r, ms));
   try {
     const registro = navigator.serviceWorker && await navigator.serviceWorker.getRegistration();
-    if (registro) await Promise.race([registro.update(), new Promise(r => setTimeout(r, 4000))]);
+    if (registro) {
+      await Promise.race([registro.update(), ate(4000)]);
+      await Promise.race([versaoNovaInstalada(registro), ate(10000)]);
+    }
   } catch {}
   location.replace(`${location.pathname}?atualizado=${Date.now()}`);
+}
+
+function versaoNovaInstalada(registro) {
+  const nova = registro.installing || registro.waiting;
+  if (!nova) return Promise.resolve();
+  return new Promise(pronto => {
+    const ver = () => { if (nova.state === "activated" || nova.state === "redundant") pronto(); };
+    nova.addEventListener("statechange", ver);
+    ver();
+  });
 }
 
 // voltou de "Atualizar": limpa o endereço
@@ -3109,3 +3125,6 @@ try {
   else if (atalho === "historico") abrirHistorico();
   if (atalho) history.replaceState(null, "", location.pathname);
 } catch {}
+
+// chegou até aqui: o app carregou inteiro (o index.html confere)
+window.yamCarregado = true;

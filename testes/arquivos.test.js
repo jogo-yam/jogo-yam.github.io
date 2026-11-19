@@ -112,3 +112,13 @@ test("regras do Firebase: JSON válido, nomes únicos e sala só com o próprio 
   assert.ok(regras.usuarios.$chave[".write"].includes("segredo"), "pegar um nome só com o mesmo segredo");
   assert.match(regras.partidas.$codigo.nomes.$chave[".write"], /usuarios/, "na sala, só o nome que é seu");
 });
+
+test("app.js carrega até o fim e o index.html recarrega se ele não carregar", () => {
+  assert.equal(rodar("window.yamCarregado"), true, "alguma coisa travou o app.js no meio");
+  const depoisDoApp = html.slice(html.indexOf("app.js?v="));
+  assert.ok(/<script>[\s\S]*?window\.yamCarregado[\s\S]*?location\.replace/.test(depoisDoApp),
+    "rede de segurança logo depois do app.js");
+  const sw = lerArquivo("service-worker.js");
+  assert.match(sw, /request\.mode === "navigate" \? caches\.match\("\.\/index\.html"\)/,
+    "o index.html só substitui páginas, nunca um .js");
+});
