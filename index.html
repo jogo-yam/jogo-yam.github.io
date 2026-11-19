@@ -25,7 +25,8 @@
   <link rel="apple-touch-icon" href="apple-touch-icon.png">
 
   <link rel="preload" href="fontes/nunito.woff2" as="font" type="font/woff2" crossorigin>
-  <link rel="stylesheet" href="style.css">
+  <!-- ?v= é a versão do app (igual ao VERSAO do app.js; um teste confere): versão nova, endereço novo -->
+  <link rel="stylesheet" href="style.css?v=57">
 
   <!-- Aplica o tema escolhido antes de desenhar a página, para não piscar. -->
   <script>
@@ -542,7 +543,7 @@
 <!-- Versão nova publicada enquanto o app estava aberto -->
 <div id="aviso-versao" class="aviso-versao" role="status" hidden>
   <span>Tem versão nova do app</span>
-  <button class="principal" onclick="location.reload()"><svg class="icone" aria-hidden="true"><use href="#i-atualizar"/></svg>Atualizar</button>
+  <button id="botao-atualizar" class="principal" onclick="atualizarApp()"><svg class="icone" aria-hidden="true"><use href="#i-atualizar"/></svg>Atualizar</button>
   <button class="aviso-fechar" onclick="this.parentElement.hidden = true" aria-label="Agora não" title="Agora não"><svg class="icone" aria-hidden="true"><use href="#i-fechar"/></svg></button>
 </div>
 
@@ -558,8 +559,8 @@
   </div>
 </div>
 
-<script src="app.js"></script>
-<script type="module" src="familia.js"></script>
+<script src="app.js?v=57"></script>
+<script type="module" src="familia.js?v=57"></script>
 
 <!-- Service Worker -->
 <script>

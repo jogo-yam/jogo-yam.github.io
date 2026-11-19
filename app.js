@@ -8,7 +8,7 @@ const rows = [
 const COLUNAS = 4;
 
 // Versão do app: igual ao número do CACHE_NAME do service-worker.js (um teste confere).
-const VERSAO = 56;
+const VERSAO = 57;
 
 // Avisos da vez com o app fechado: servidor na Cloudflare (worker/avisos.mjs).
 // Sem o endereço, a opção "Avisar a minha vez" não aparece.
@@ -2479,10 +2479,38 @@ async function conferirVersaoNova() {
   } catch {}
 }
 
+// Ao voltar para o app, confere na hora e de novo uns segundos depois (logo ao
+// voltar, a internet do celular às vezes ainda não está pronta).
+function conferirAoVoltar() {
+  conferirVersaoNova();
+  setTimeout(conferirVersaoNova, 5000);
+}
+
 document.addEventListener("visibilitychange", () => {
-  if (document.visibilityState === "visible") conferirVersaoNova();
+  if (document.visibilityState === "visible") conferirAoVoltar();
 });
-const timerVersao = setInterval(conferirVersaoNova, 30 * 60 * 1000);
+window.addEventListener("pageshow", evento => { if (evento.persisted) conferirAoVoltar(); });
+window.addEventListener("online", conferirVersaoNova);
+const timerVersao = setInterval(conferirVersaoNova, 10 * 60 * 1000);
+
+// "Atualizar": busca a versão nova do service worker e abre o app num endereço
+// novo. Os arquivos têm a versão no endereço (app.js?v=57), então a página nova
+// nunca usa uma cópia velha guardada no celular.
+async function atualizarApp() {
+  const botao = document.getElementById("botao-atualizar");
+  botao.disabled = true;
+  rotular(botao, "atualizar", "Atualizando…");
+  try {
+    const registro = navigator.serviceWorker && await navigator.serviceWorker.getRegistration();
+    if (registro) await Promise.race([registro.update(), new Promise(r => setTimeout(r, 4000))]);
+  } catch {}
+  location.replace(`${location.pathname}?atualizado=${Date.now()}`);
+}
+
+// voltou de "Atualizar": limpa o endereço
+try {
+  if (new URLSearchParams(location.search).has("atualizado")) history.replaceState(null, "", location.pathname);
+} catch {}
 if (timerVersao && timerVersao.unref) timerVersao.unref();
 document.getElementById("versao-app").textContent = VERSAO;
 

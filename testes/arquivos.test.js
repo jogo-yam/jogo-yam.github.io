@@ -85,10 +85,13 @@ test("manifest.json é válido", () => {
   }
 });
 
-test("a versão do app é a mesma do cache offline", () => {
+test("a versão do app é a mesma do cache offline e dos endereços dos arquivos", () => {
   const sw = lerArquivo("service-worker.js");
   const doCache = Number(sw.match(/yam-cache-v(\d+)/)[1]);
   assert.equal(rodar("VERSAO"), doCache, "mude o VERSAO do app.js junto com o CACHE_NAME");
+  for (const arquivo of ["app.js", "familia.js", "style.css"]) {
+    assert.ok(html.includes(`"${arquivo}?v=${doCache}"`), `index.html deve carregar ${arquivo}?v=${doCache}`);
+  }
 });
 
 test("todo ícone usado existe na página", () => {
