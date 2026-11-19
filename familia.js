@@ -288,6 +288,7 @@ async function garantirUsuario(nome) {
   try {
     const u = await gravarNome(nome, mesmo ? local.codigo : gerarCodigo());
     guardarUsuario(u);
+    if (!mesmo) historicoMudou(); // nome novo: o histórico daqui sobe para a nuvem
     return !mesmo;
   } catch (e) {
     if (negado(e)) throw nomeTomado(nome);
@@ -316,6 +317,7 @@ async function recuperar(nome, codigo) {
     if (negado(e)) throw new Error("Nome ou código não confere. Confira e tente de novo.");
     throw new Error(mensagemDeErro(e));
   }
+  return sincronizarHistorico(); // as partidas da nuvem voltam (devolve quantas)
 }
 
 // Trocar o nome de usuário: registra o novo (mesmo código) e libera o antigo.
@@ -329,8 +331,92 @@ async function trocarNome(novo) {
     throw new Error(mensagemDeErro(e));
   }
   if (antigo.chave !== u.chave) await remove(ref(db, `usuarios/${antigo.chave}`)).catch(() => {});
+  await sincronizarHistorico(); // traz tudo do cofre do nome antigo antes de trocar
   guardarUsuario(u);
+  historicoMudou(); // e manda tudo para o cofre do nome novo
 }
+
+// ---------- histórico na nuvem ----------
+// historicos/<cofre>/<id> = a partida (ou {excluida: true}). O cofre é o resumo
+// SHA-256 de "yam-historico:<nome>:<código>": só quem sabe o nome e o código
+// acha o histórico, em qualquer aparelho. A conta de juntar está no app.js
+// (mesclarHistorico). Sem internet ou com as regras antigas, fica para depois.
+
+async function cofreDoHistorico() {
+  const u = lerUsuario();
+  if (!u || !u.chave || !u.codigo) return null;
+  const digitos = String(u.codigo).replace(/\D/g, "");
+  const bytes = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(`yam-historico:${u.chave}:${digitos}`));
+  return [...new Uint8Array(bytes)].map(b => b.toString(16).padStart(2, "0")).join("");
+}
+
+let sincronizacao = null;
+let sincronizarDeNovo = false;
+
+// Devolve quantas partidas chegaram da nuvem (ou null se não deu para falar com ela).
+async function sincronizarHistorico() {
+  if (sincronizacao) { sincronizarDeNovo = true; return sincronizacao; }
+  sincronizacao = (async () => {
+    const cofre = await cofreDoHistorico();
+    if (!cofre || navigator.onLine === false) return null;
+    try {
+      await usuario();
+      const snap = await comLimite(lerDoBanco(`historicos/${cofre}`));
+      const r = mesclarHistorico(historico, snap.val() || {}, lerExcluidas());
+      if (Object.keys(r.enviar).length) await comLimite(update(ref(db, `historicos/${cofre}`), r.enviar));
+      return aplicarHistoricoDaNuvem(r);
+    } catch {
+      return null; // sem internet, ou o banco ainda não tem as regras do histórico
+    }
+  })();
+  try {
+    return await sincronizacao;
+  } finally {
+    sincronizacao = null;
+    if (sincronizarDeNovo) { sincronizarDeNovo = false; historicoMudou(); }
+  }
+}
+
+let timerHistorico = null;
+function historicoMudou() {
+  clearTimeout(timerHistorico);
+  timerHistorico = setTimeout(sincronizarHistorico, 1500);
+}
+
+// Quem tem só o nome (nunca jogou em sala) ganha um nome de usuário, com
+// código, para o histórico ir para a nuvem. Se o nome já é de outra pessoa,
+// avisa uma vez e segue só neste aparelho.
+async function registrarNomeSePrecisar() {
+  if (lerUsuario() || !nomeJogador || navigator.onLine === false) return;
+  try {
+    await usuario();
+    // só registra nome que ainda não existe: um nome que já existe é de outra
+    // pessoa ou é seu com o código guardado em outro aparelho (nunca troca o código)
+    const existe = (await comLimite(lerDoBanco(`usuarios/${chaveDoNome(nomeJogador)}/nome`))).exists();
+    if (existe) throw nomeTomado(nomeJogador);
+    await garantirUsuario(nomeJogador);
+    historicoMudou();
+  } catch (e) {
+    if (!e.tomado) return; // sem internet: tenta na próxima vez
+    const chave = chaveDoNome(nomeJogador);
+    try {
+      if (localStorage.getItem("yam-nome-tomado") === chave) return;
+      localStorage.setItem("yam-nome-tomado", chave);
+    } catch { return; }
+    ultimoAviso = Date.now();
+    mostrarLegenda([`O nome ${nomeJogador} já é de outra pessoa`,
+      "Se é você em outro aparelho, entre com o código em Mais. Senão, troque o nome (pode ser com sobrenome) " +
+      "para guardar suas partidas na nuvem."]);
+  }
+}
+
+let ultimaSincronizacao = 0;
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState !== "visible" || Date.now() - ultimaSincronizacao < 60000) return;
+  ultimaSincronizacao = Date.now();
+  if (lerUsuario()) sincronizarHistorico(); else registrarNomeSePrecisar();
+});
+window.addEventListener("online", () => { if (lerUsuario()) historicoMudou(); });
 
 // ---------- acompanhar a partida ----------
 
@@ -1084,6 +1170,7 @@ window.familia = {
   abrir, fecharJanela, acaoJanela, sair, confirmarSair, compartilharCodigo,
   aoTerminar, fecharEspera, fecharPodio, jogarDeNovo, limparSalasAntigas, sincronizar, registrarResultado,
   escolherModo, podeJogar, porQueNaoPode, podeDesfazer, mesaMudou, recuperar, trocarNome, avisosMudaram,
+  historicoMudou, sincronizarHistorico, registrarNomeSePrecisar,
   soDadosDoApp: () => !!(sessao && partida && !partida.revelada && !partida.encerrada && soDadosDaSala()),
   ativa: () => !!sessao,
   revelada: () => !!(partida && (partida.revelada || partida.encerrada))
@@ -1091,4 +1178,10 @@ window.familia = {
 
 atualizarBarra();
 setTimeout(limparSalasAntigas, 3000); // depois que o app abriu, sem atrapalhar
+// histórico na nuvem: confere ao abrir (quem só tem nome ganha o nome de usuário)
+setTimeout(() => {
+  ultimaSincronizacao = Date.now();
+  if (lerUsuario()) sincronizarHistorico();
+  else if (document.getElementById("boas-vindas").hidden) registrarNomeSePrecisar();
+}, 2500);
 if (sessao) usuario().then(escutar).catch(e => atualizarBarra(mensagemDeErro(e)));

@@ -8,7 +8,7 @@ const rows = [
 const COLUNAS = 4;
 
 // Versão do app: igual ao número do CACHE_NAME do service-worker.js (um teste confere).
-const VERSAO = 61;
+const VERSAO = 62;
 
 // Avisos da vez com o app fechado: servidor na Cloudflare (worker/avisos.mjs).
 // Sem o endereço, a opção "Avisar a minha vez" não aparece.
@@ -332,8 +332,102 @@ function salvar() {
   localStorage.setItem(CHAVE_JOGO, JSON.stringify(state));
 }
 
+// Cada mudança no histórico também vai para a nuvem (familia.js), se a pessoa
+// tem nome de usuário.
 function salvarHistorico() {
   localStorage.setItem(CHAVE_HISTORICO, JSON.stringify(historico));
+  if (window.familia && familia.historicoMudou) familia.historicoMudou();
+}
+
+// ---------- histórico na nuvem ----------
+// Fica no Firebase em historicos/<cofre>/<id da partida>, e o cofre só se acha
+// com o nome de usuário + código. Partida excluída vira {excluida: true} lá,
+// para sumir também dos outros aparelhos. Aqui fica só a conta de juntar (o
+// envio e a leitura estão no familia.js).
+
+const CHAVE_EXCLUIDAS = "yam-historico-excluidas";
+const lerExcluidas = () => ler(CHAVE_EXCLUIDAS, []);
+
+// Como a partida vai para a nuvem: sem campos vazios (o Firebase não guarda
+// undefined) e com as chaves sempre na mesma ordem (para comparar).
+function partidaParaNuvem(p) {
+  const limpar = v => {
+    if (Array.isArray(v)) return v.map(limpar);
+    if (v && typeof v === "object") {
+      const saida = {};
+      for (const k of Object.keys(v).sort()) {
+        const x = limpar(v[k]);
+        if (x !== undefined && x !== null && x !== "") saida[k] = x;
+      }
+      return Object.keys(saida).length ? saida : undefined; // o Firebase não guarda {} vazio
+    }
+    return v;
+  };
+  return limpar(p);
+}
+
+const mesmaPartida = (a, b) => JSON.stringify(partidaParaNuvem(a)) === JSON.stringify(partidaParaNuvem(b));
+
+// local: o histórico deste aparelho; remoto: { id: partida | {excluida: true} }.
+// Devolve o que mudar aqui e o que enviar para a nuvem.
+function mesclarHistorico(local, remoto, excluidasLocais) {
+  const aqui = new Map(local.map(p => [String(p.id), p]));
+  const excluidas = new Set(excluidasLocais.map(String));
+  const resultado = { adicionar: [], atualizar: [], remover: [], enviar: {}, excluidas: [...excluidas] };
+
+  for (const [id, r] of Object.entries(remoto || {})) {
+    if (!r || typeof r !== "object") continue;
+    const p = aqui.get(id);
+    if (r.excluida === true) {
+      if (p) resultado.remover.push(id);
+      if (!excluidas.has(id)) { excluidas.add(id); resultado.excluidas.push(id); }
+      continue;
+    }
+    if (excluidas.has(id)) { resultado.enviar[id] = { excluida: true }; continue; }
+    const daNuvem = { ...r, id: Number(id) };
+    if (!partidaValida(daNuvem)) continue;
+    if (!p) { resultado.adicionar.push(daNuvem); continue; }
+    if (mesmaPartida(p, daNuvem)) continue;
+    // a mesma partida mudou nos dois lados (ex.: o resultado da sala chegou
+    // depois): fica com tudo, e o que está aqui vale mais
+    const junta = { ...daNuvem, ...p, sala: p.sala || daNuvem.sala };
+    if (!mesmaPartida(junta, p)) resultado.atualizar.push(junta);
+    if (!mesmaPartida(junta, daNuvem)) resultado.enviar[id] = partidaParaNuvem(junta);
+  }
+
+  for (const [id, p] of aqui) {
+    if (!(remoto && remoto[id]) && !excluidas.has(id)) resultado.enviar[id] = partidaParaNuvem(p);
+  }
+  for (const id of excluidas) {
+    if (!(remoto && remoto[id] && remoto[id].excluida === true)) resultado.enviar[id] = { excluida: true };
+  }
+  return resultado;
+}
+
+// Aplica no histórico de agora (que pode ter mudado enquanto a nuvem respondia).
+function aplicarHistoricoDaNuvem({ adicionar, atualizar, remover, excluidas }) {
+  const ids = new Set(historico.map(p => String(p.id)));
+  const fora = new Set(remover);
+  let mudou = remover.length > 0;
+  historico = historico.filter(p => !fora.has(String(p.id)));
+  for (const p of atualizar) {
+    const i = historico.findIndex(h => String(h.id) === String(p.id));
+    if (i >= 0) { historico[i] = p; mudou = true; }
+  }
+  for (const p of adicionar) {
+    if (!ids.has(String(p.id))) { historico.push(p); mudou = true; }
+  }
+  try { localStorage.setItem(CHAVE_EXCLUIDAS, JSON.stringify(excluidas)); } catch {}
+  if (!mudou) return 0;
+  historico.sort((a, b) => b.data.localeCompare(a.data));
+  recalcularTotaisHistorico(false);
+  localStorage.setItem(CHAVE_HISTORICO, JSON.stringify(historico)); // sem avisar a nuvem de novo
+  // se a pessoa está olhando o histórico ou as estatísticas, atualiza a tela
+  try {
+    if (!document.getElementById("tela-historico").hidden) abrirHistorico();
+    else if (!document.getElementById("tela-estatisticas").hidden) abrirEstatisticas();
+  } catch {}
+  return adicionar.length;
 }
 
 // ---------- cálculo ----------
@@ -1427,6 +1521,8 @@ async function excluirPartida() {
   if (!await confirmar("Excluir partida?", "Ela sai do histórico e não dá para desfazer.", "Excluir", true)) return;
 
   historico = historico.filter(p => p.id !== partidaAberta.id);
+  // lembra que foi excluída: some também da nuvem e dos outros aparelhos
+  try { localStorage.setItem(CHAVE_EXCLUIDAS, JSON.stringify([...new Set([...lerExcluidas(), String(partidaAberta.id)])])); } catch {}
   salvarHistorico();
   partidaAberta = null;
   abrirHistorico();
@@ -1804,6 +1900,7 @@ async function salvarNome(evento) {
   else localStorage.removeItem(CHAVE_NOME);
   mostrarNome();
   fecharJanelaNome();
+  if (nomeJogador && window.familia) familia.registrarNomeSePrecisar();
 }
 
 // ---------- nome de usuário ----------
@@ -1878,16 +1975,19 @@ async function recuperarNome(evento) {
   const botao = document.getElementById("recuperar-confirmar");
   botao.disabled = true;
   try {
-    await familia.recuperar(nome, codigo);
+    const chegaram = await familia.recuperar(nome, codigo);
     const nasBoasVindas = !document.getElementById("boas-vindas").hidden;
     fecharRecuperar();
+    const texto = `Agora você é ${lerUsuario().nome} neste aparelho. ` + (
+      chegaram > 0 ? `${chegaram} partida${chegaram === 1 ? "" : "s"} do seu histórico ${chegaram === 1 ? "voltou" : "voltaram"}.`
+      : chegaram === 0 ? "Daqui para a frente, suas partidas ficam guardadas com seu nome."
+      : "Suas partidas chegam assim que a internet ajudar.");
     if (!nasBoasVindas) {
-      avisar(`Agora você é ${lerUsuario().nome} neste aparelho.`, "Nome recuperado!");
+      avisar(texto, "Nome recuperado!");
       return;
     }
     fecharBoasVindas(false);
-    await avisar(`Agora você é ${lerUsuario().nome} neste aparelho. As partidas antigas ficam no outro: ` +
-      "para trazer, exporte o backup lá e importe aqui em Mais → Backup.", `Que bom te ver de novo, ${lerUsuario().nome}!`);
+    await avisar(texto, `Que bom te ver de novo, ${lerUsuario().nome}!`);
     if (deveMostrarGuiaInstalar()) abrirInstalar(true);
   } catch (e) {
     erro.textContent = e.message;
@@ -1928,13 +2028,13 @@ mostrarNome();
 
 // O total guardado de cada partida é sempre refeito a partir da tabela dela,
 // para nunca ficar diferente do TOTAL GERAL mostrado ao abrir a partida.
-function recalcularTotaisHistorico() {
+function recalcularTotaisHistorico(salvarDepois = true) {
   let mudou = false;
   for (const p of historico) {
     const total = calcularTotais(p.valores || {}).geral;
     if (p.total !== total) { p.total = total; mudou = true; }
   }
-  if (mudou) salvarHistorico();
+  if (mudou && salvarDepois) salvarHistorico();
 }
 recalcularTotaisHistorico();
 
@@ -1943,6 +2043,11 @@ recalcularTotaisHistorico();
 const CHAVE_ULTIMO_BACKUP = "yam-ultimo-backup";
 
 function mostrarUltimoBackup() {
+  document.getElementById("dica-backup").textContent = lerUsuario()
+    ? "Suas partidas ficam guardadas na nuvem, com seu nome de usuário: em outro aparelho, é só entrar com o " +
+      "nome e o código. O arquivo de backup continua aqui, como garantia extra."
+    : "As partidas ficam guardadas só neste aparelho. Exporte um arquivo de vez em quando (e mande para você " +
+      "mesmo no WhatsApp ou e-mail) para não perder o histórico se trocar de aparelho.";
   const quando = ler(CHAVE_ULTIMO_BACKUP, null);
   document.getElementById("ultimo-backup").textContent =
     quando ? `Último backup exportado: ${formatarData(quando)}` : "Nenhum backup exportado ainda.";
@@ -2829,6 +2934,8 @@ function proximaBoasVindas() {
   const nome = document.getElementById("bv-nome").value.trim().replace(/\s+/g, " ").slice(0, TAMANHO_MAX_NOME);
   if (nome) definirNome(nome);
   fecharBoasVindas();
+  // ganha o nome de usuário (e o código) para o histórico ir para a nuvem
+  if (nome) setTimeout(() => { if (window.familia) familia.registrarNomeSePrecisar(); }, 1000);
 }
 
 function fecharBoasVindas(comGuia = true) {
@@ -2990,7 +3097,7 @@ function blocoConfrontos(partidas) {
 const CHAVE_LEMBRETE_BACKUP = "yam-lembrete-backup";
 
 function precisaLembrarBackup(agora = Date.now()) {
-  if (historico.length < 3) return false;
+  if (historico.length < 3 || lerUsuario()) return false; // com nome de usuário, já está na nuvem
   const dias = iso => (iso ? (agora - new Date(iso).getTime()) / (24 * 60 * 60 * 1000) : Infinity);
   return dias(ler(CHAVE_ULTIMO_BACKUP, null)) > 30 && dias(ler(CHAVE_LEMBRETE_BACKUP, null)) > 14;
 }

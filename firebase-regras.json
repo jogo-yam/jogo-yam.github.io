@@ -7,6 +7,15 @@
         ".validate": "newData.hasChildren(['dono', 'segredo', 'nome']) && newData.child('segredo').isString() && newData.child('segredo').val().length === 64 && newData.child('nome').isString() && newData.child('nome').val().length > 0 && newData.child('nome').val().length <= 20"
       }
     },
+    "historicos": {
+      "$cofre": {
+        ".read": "auth != null && $cofre.matches(/^[0-9a-f]{64}$/)",
+        "$id": {
+          ".write": "auth != null && $cofre.matches(/^[0-9a-f]{64}$/) && $id.matches(/^[0-9]{1,16}$/)",
+          ".validate": "newData.child('excluida').val() === true || (newData.hasChildren(['id', 'data', 'total']) && newData.child('data').isString() && newData.child('total').isNumber())"
+        }
+      }
+    },
     "partidas": {
       ".indexOn": ["criadaEm"],
       ".read": "auth != null && query.orderByChild == 'criadaEm' && query.endAt <= now - 259200000 && query.limitToFirst <= 20",

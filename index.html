@@ -26,7 +26,7 @@
 
   <link rel="preload" href="fontes/nunito.woff2" as="font" type="font/woff2" crossorigin>
   <!-- ?v= é a versão do app (igual ao VERSAO do app.js; um teste confere): versão nova, endereço novo -->
-  <link rel="stylesheet" href="style.css?v=61">
+  <link rel="stylesheet" href="style.css?v=62">
 
   <!-- Aplica o tema escolhido antes de desenhar a página, para não piscar. -->
   <script>
@@ -242,7 +242,7 @@
         <button onclick="copiarCodigo()">Copiar</button>
       </div>
       <p id="explica-codigo" class="dica dica-codigo" hidden>Seu nome de usuário é só seu. Guarde o código: com ele você
-        recupera o nome em outro aparelho (celular ou computador). Ele também vai junto no backup.</p>
+        entra em outro aparelho (celular ou computador) com seu nome e todo o seu histórico.</p>
       <button id="link-recuperar" class="link link-recuperar" onclick="abrirRecuperar()">Já tem nome de usuário? Recuperar com o código</button>
       <div class="linha-tema">
         <span>Modo escuro</span>
@@ -294,7 +294,7 @@
 
     <div class="bloco">
       <h2>Backup</h2>
-      <p class="dica">As partidas ficam guardadas só neste aparelho. Exporte um arquivo de vez em quando
+      <p id="dica-backup" class="dica">As partidas ficam guardadas só neste aparelho. Exporte um arquivo de vez em quando
         (e mande para você mesmo no WhatsApp ou e-mail) para não perder o histórico se trocar de aparelho.</p>
       <div class="acoes">
         <button onclick="exportarHistorico()">Exportar</button>
@@ -308,7 +308,8 @@
     <div class="bloco">
       <h2><svg class="icone" aria-hidden="true"><use href="#i-cadeado"/></svg>Sobre e privacidade</h2>
       <ul class="privacidade">
-        <li>Suas partidas, seu nome e o histórico ficam guardados neste aparelho.</li>
+        <li>Suas partidas, seu nome e o histórico ficam guardados neste aparelho. Com nome de usuário, o histórico
+          também fica na nuvem (Firebase), num lugar que só abre com o seu nome e o seu código.</li>
         <li>Sem cadastro, sem e-mail, sem anúncios. O app não coleta dados de uso.</li>
       </ul>
     </div>
@@ -597,7 +598,7 @@
   </div>
 </div>
 
-<script src="app.js?v=61"></script>
+<script src="app.js?v=62"></script>
 <script>
   // Rede de segurança: se o app.js não carregou (ex.: troca de versão no meio
   // do caminho), recarrega sozinho uma vez, em vez de ficar com a tabela vazia.
@@ -611,7 +612,7 @@
     setTimeout(function () { location.replace(location.pathname + "?atualizado=" + Date.now()); }, 1500);
   })();
 </script>
-<script type="module" src="familia.js?v=61"></script>
+<script type="module" src="familia.js?v=62"></script>
 
 <!-- Service Worker -->
 <script>
