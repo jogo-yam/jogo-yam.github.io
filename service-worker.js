@@ -1,5 +1,5 @@
 // Ao publicar mudanças, aumente a versão para limpar o cache antigo.
-const CACHE_NAME = "yam-cache-v63";
+const CACHE_NAME = "yam-cache-v64";
 const FILES_TO_CACHE = [
   "./",
   "./index.html",
@@ -7,11 +7,11 @@ const FILES_TO_CACHE = [
   "./app.js",
   "./familia.js",
   "./manifest.json",
-  "./icon-192.png",
-  "./icon-512.png",
+  "./icone-dado-192.png",
+  "./icone-dado-512.png",
   "./icon-maskable-512.png",
   "./apple-touch-icon.png",
-  "./favicon-32.png",
+  "./icone-dado-32.png",
   "./fontes/nunito.woff2"
 ];
 
@@ -39,7 +39,7 @@ self.addEventListener("push", event => {
   try { dados = event.data ? event.data.json() : {}; } catch {}
   event.waitUntil(self.registration.showNotification(dados.titulo || "Sua vez no YAM!", {
     body: dados.texto ? `${dados.texto}\nAgora é a sua vez.` : "Toque para jogar.",
-    icon: "icon-192.png",
+    icon: "icone-dado-192.png",
     tag: `vez-${dados.codigo || ""}`, // um aviso por sala: o novo substitui o antigo
     renotify: true,
     data: { url: "./" }

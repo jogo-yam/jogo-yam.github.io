@@ -13,13 +13,13 @@
   "theme_color": "#1f3a5f",
   "icons": [
     {
-      "src": "icon-192.png",
+      "src": "icone-dado-192.png",
       "sizes": "192x192",
       "type": "image/png",
       "purpose": "any"
     },
     {
-      "src": "icon-512.png",
+      "src": "icone-dado-512.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any"
@@ -52,13 +52,13 @@
       "name": "Rolar os dados",
       "short_name": "Dados",
       "url": "./?abrir=dados",
-      "icons": [{ "src": "icon-192.png", "sizes": "192x192", "type": "image/png" }]
+      "icons": [{ "src": "icone-dado-192.png", "sizes": "192x192", "type": "image/png" }]
     },
     {
       "name": "Histórico de partidas",
       "short_name": "Histórico",
       "url": "./?abrir=historico",
-      "icons": [{ "src": "icon-192.png", "sizes": "192x192", "type": "image/png" }]
+      "icons": [{ "src": "icone-dado-192.png", "sizes": "192x192", "type": "image/png" }]
     }
   ]
 }
