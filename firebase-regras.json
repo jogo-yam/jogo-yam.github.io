@@ -21,6 +21,14 @@
         }
       }
     },
+    "identidades": {
+      ".read": "auth != null",
+      "$id": {
+        ".write": "auth != null && newData.exists() && newData.child('chave').isString() && root.child('usuarios').child(newData.child('chave').val()).child('dono').val() === auth.uid && root.child('usuarios').child(newData.child('chave').val()).child('id').val() === $id",
+        ".validate": "newData.hasChildren(['nome', 'chave']) && newData.child('chave').val().length <= 40 && newData.child('nome').val() === root.child('usuarios').child(newData.child('chave').val()).child('nome').val()",
+        "antigos": { "$chave": { ".validate": "newData.val() === true" } }
+      }
+    },
     "ranking": {
       ".read": "auth != null",
       "$chave": {

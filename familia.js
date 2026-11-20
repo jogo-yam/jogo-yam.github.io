@@ -363,6 +363,10 @@ async function trocarNome(novo) {
   if (antigo.chave !== u.chave) {
     const cofre = await cofreDe(id, u.codigo);
     await comLimite(update(ref(db, `historicos/${cofre}`), { perfil: { nome: u.nome, chave: u.chave } })).catch(() => {});
+    // a lista pública de nomes: o de agora e os que a pessoa já usou
+    await comLimite(update(ref(db, `identidades/${id}`), {
+      nome: u.nome, chave: u.chave, [`antigos/${antigo.chave}`]: true
+    })).catch(() => {});
     // só o aparelho dono do nome pode apagá-lo: com o código, o nome antigo volta para cá antes
     await gravarNome(antigo.nome, antigo.codigo, id).catch(() => {});
     await remove(ref(db, `ranking/${antigo.chave}`)).catch(() => {}); // o recorde volta no nome novo
@@ -441,7 +445,31 @@ async function sincronizarCofre(cofre, u) {
   const enviar = { ...r.enviar };
   if (u && (!perfil || perfil.nome !== u.nome || perfil.chave !== u.chave)) enviar.perfil = { nome: u.nome, chave: u.chave };
   if (Object.keys(enviar).length) await comLimite(update(ref(db, `historicos/${cofre}`), enviar));
+  if (u) publicarIdentidade(u).catch(() => {});
   return aplicarHistoricoDaNuvem(r);
+}
+
+// ---------- nomes de agora ----------
+// identidades/<id> = { nome, chave, antigos: { <chave>: true } }: todos leem, e
+// só o dono do nome grava (com o nome igual ao registrado). O app de cada um
+// usa a lista para mostrar o nome atual de quem trocou (app.js: nomeAtual).
+
+async function publicarIdentidade(u) {
+  const atual = (await comLimite(lerDoBanco(`identidades/${u.id}`))).val();
+  if (atual && atual.nome === u.nome && atual.chave === u.chave) return;
+  await comLimite(update(ref(db, `identidades/${u.id}`), { nome: u.nome, chave: u.chave }));
+}
+
+let nomesLidosEm = 0;
+async function atualizarNomes() {
+  if (navigator.onLine === false || Date.now() - nomesLidosEm < 5 * 60 * 1000) return;
+  nomesLidosEm = Date.now();
+  try {
+    await usuario();
+    guardarNomesAtuais((await comLimite(lerDoBanco("identidades"))).val() || {});
+  } catch {
+    nomesLidosEm = 0; // tenta de novo na próxima
+  }
 }
 
 async function sincronizarAgora() {
@@ -470,6 +498,7 @@ async function sincronizarHistorico() {
   } finally {
     sincronizacao = null;
     publicarRecorde(resultado !== null).catch(() => {});
+    atualizarNomes();
     if (sincronizarDeNovo) { sincronizarDeNovo = false; historicoMudou(); }
   }
 }
@@ -842,7 +871,7 @@ function mostrarPodio() {
       nome: j.nome, total: j.total, posicao: posicao(j), ...euSou(j), ...(typeof j.id === "string" ? { id: j.id } : {}),
       ...(j.valores && typeof j.valores === "object" ? { valores: j.valores } : {})
     })),
-    naoTerminaram: naoTerminaram.map(j => ({ nome: j.nome, ...euSou(j) }))
+    naoTerminaram: naoTerminaram.map(j => ({ nome: j.nome, ...euSou(j), ...(typeof j.id === "string" ? { id: j.id } : {}) }))
   };
 
   // tocar no nome abre a tabela daquela pessoa
@@ -1436,6 +1465,7 @@ setTimeout(limparSalasAntigas, 3000); // depois que o app abriu, sem atrapalhar
 // histórico na nuvem: confere ao abrir (quem só tem nome ganha o nome de usuário)
 setTimeout(() => {
   ultimaSincronizacao = Date.now();
+  atualizarNomes();
   if (lerUsuario()) sincronizarHistorico();
   else if (document.getElementById("boas-vindas").hidden) registrarNomeSePrecisar();
 }, 2500);

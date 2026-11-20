@@ -102,3 +102,33 @@ test("você contra cada um: quem trocou de nome continua sendo a mesma pessoa", 
   assert.equal(maria.nome, "Maria Silva", "aparece o nome mais recente");
   assert.deepEqual([maria.vitorias, maria.derrotas], [2, 1]);
 });
+
+test("nomes de agora: quem trocou de nome aparece com o nome novo no histórico e nas estatísticas", () => {
+  const { app, rodar } = carregarApp({ armazenado: { "yam-nome": JSON.stringify("Davi") } });
+  rodar(`guardarNomesAtuais(${JSON.stringify({
+    jmaria: { nome: "Maria Silva", chave: "maria silva", antigos: { maria: true } },
+    jjoao: { nome: "João", chave: "joao" }
+  })})`);
+  assert.equal(app.nomeAtual("Maria", "jmaria"), "Maria Silva", "pela identidade");
+  assert.equal(app.nomeAtual("Maria"), "Maria Silva", "partida antiga, só com o nome antigo");
+  assert.equal(app.nomeAtual("Pedro"), "Pedro", "quem não está na lista fica como estava");
+
+  const podio = {
+    titulo: "Maria venceu!",
+    terminaram: [
+      { nome: "Maria", total: 400, posicao: 1, id: "jmaria" },
+      { nome: "Davi", total: 300, posicao: 2, eu: true }
+    ],
+    naoTerminaram: [{ nome: "João", id: "jjoao" }]
+  };
+  const p = JSON.parse(JSON.stringify(app.podioComNomesAtuais(podio)));
+  assert.equal(p.titulo, "Maria Silva venceu!");
+  assert.equal(p.terminaram[0].nome, "Maria Silva");
+  const sala = { posicao: 2, jogadores: 3, meuNome: "Davi", vencedores: ["Maria"], podio };
+  assert.equal(app.textoDaSala(sala), "Maria Silva venceu · você ficou em 2º");
+  const semPodio = { posicao: 2, jogadores: 2, meuNome: "Davi", vencedores: ["Maria"] };
+  assert.equal(app.textoDaSala(semPodio), "Maria Silva venceu · você ficou em 2º", "partida antiga sem pódio");
+
+  const lista = JSON.parse(JSON.stringify(app.confrontos([{ id: 1, data: "2026-11-01T10:00:00Z", total: 300, valores: {}, sala: { podio } }])));
+  assert.equal(lista[0].nome, "Maria Silva");
+});

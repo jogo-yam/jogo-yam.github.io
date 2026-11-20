@@ -8,7 +8,7 @@ const rows = [
 const COLUNAS = 4;
 
 // Versão do app: igual ao número do CACHE_NAME do service-worker.js (um teste confere).
-const VERSAO = 70;
+const VERSAO = 71;
 
 // Avisos da vez com o app fechado: servidor na Cloudflare (worker/avisos.mjs).
 // Sem o endereço, a opção "Avisar a minha vez" não aparece.
@@ -916,7 +916,7 @@ function desenharPodio(p, verTabela, partidaDoHistorico = null) {
 function abrirPodioDaPartida() {
   const partida = partidaAberta;
   if (!partida || !partida.sala || !partida.sala.podio) return;
-  desenharPodio(partida.sala.podio, j => () => {
+  desenharPodio(podioComNomesAtuais(partida.sala.podio), j => () => {
     document.getElementById("podio").hidden = true;
     abrirTabelaJogador(j.nome, j.valores, j.total, () => {
       abrirPartida(partida.id);
@@ -1069,13 +1069,68 @@ function registrarResultadoSala(sala) {
 // "Você venceu (sala de 4)" / "Maria venceu · você ficou em 2º" (com o troféu na frente)
 function textoDaSala(sala) {
   if (!sala) return "";
-  const outros = sala.vencedores.filter(n => n !== sala.meuNome);
+  // com o pódio guardado, os nomes são os de agora (quem trocou de nome aparece com o novo)
+  let vencedores = (sala.vencedores || []).map(n => (n === sala.meuNome ? n : nomeAtual(n)));
+  let eu = sala.meuNome;
+  if (sala.podio && Array.isArray(sala.podio.terminaram)) {
+    const p = podioComNomesAtuais(sala.podio);
+    vencedores = p.terminaram.filter(j => j.posicao === 1).map(j => j.nome);
+    const euNoPodio = p.terminaram.find(j => j.eu);
+    if (euNoPodio) eu = euNoPodio.nome;
+  }
+  const outros = vencedores.filter(n => n !== eu);
   if (sala.posicao === 1) {
     return outros.length
       ? `Empate em 1º com ${outros.join(" e ")}`
       : `Você venceu (sala de ${sala.jogadores})`;
   }
-  return `${sala.vencedores.join(" e ")} venceu · você ficou em ${sala.posicao}º`;
+  return `${vencedores.join(" e ")} venceu · você ficou em ${sala.posicao}º`;
+}
+
+// ---------- nomes de agora ----------
+// Quem troca de nome continua com a mesma identidade. A lista pública
+// identidades/<id> = { nome, chave, antigos } (no Firebase, lida pelo
+// familia.js) diz o nome atual de cada um; aqui o histórico e as estatísticas
+// mostram esse nome no lugar do que ficou guardado. Partidas de antes da
+// identidade só têm o nome: se ele é um nome antigo de alguém, vale o atual.
+
+const CHAVE_NOMES = "yam-nomes";
+let nomesAtuais = ler(CHAVE_NOMES, { porId: {}, antigos: {} });
+const chaveDeNome = nome => normalizarNome(nome).replace(/[.#$[\]/]/g, "_");
+
+function nomeAtual(nome, id) {
+  const porId = (nomesAtuais && nomesAtuais.porId) || {};
+  if (id) return porId[id] || nome;
+  const dono = ((nomesAtuais && nomesAtuais.antigos) || {})[chaveDeNome(nome || "")];
+  return (dono && porId[dono]) || nome;
+}
+
+function podioComNomesAtuais(p) {
+  if (!p) return p;
+  const trocar = j => ({ ...j, nome: j.eu ? (nomeJogador || j.nome) : nomeAtual(j.nome, j.id) });
+  const terminaram = (p.terminaram || []).map(trocar);
+  const naoTerminaram = (p.naoTerminaram || []).map(trocar);
+  const vencedores = terminaram.filter(j => j.posicao === 1).map(j => j.nome);
+  return { ...p, terminaram, naoTerminaram, titulo: terminaram.length ? tituloDoPodio(vencedores) : p.titulo };
+}
+
+// A lista chegou do Firebase: guarda e, se a pessoa está olhando o histórico
+// ou as estatísticas, redesenha com os nomes novos.
+function guardarNomesAtuais(todos) {
+  const porId = {}, antigos = {};
+  for (const [id, r] of Object.entries(todos || {})) {
+    if (!r || typeof r.nome !== "string") continue;
+    porId[id] = r.nome;
+    for (const chave of Object.keys(r.antigos || {})) antigos[chave] = id;
+  }
+  const novos = { porId, antigos };
+  if (JSON.stringify(novos) === JSON.stringify(nomesAtuais)) return;
+  nomesAtuais = novos;
+  try { localStorage.setItem(CHAVE_NOMES, JSON.stringify(novos)); } catch {}
+  try {
+    if (!document.getElementById("tela-historico").hidden) abrirHistorico();
+    else if (!document.getElementById("tela-estatisticas").hidden) abrirEstatisticas();
+  } catch {}
 }
 
 function mostrarTextoDaSala(el, sala) {
@@ -3081,6 +3136,7 @@ function confrontos(partidas) {
       porPessoa.set(chave, c);
     }
   }
+  for (const [chave, c] of porPessoa) c.nome = nomeAtual(c.nome, chave.startsWith("nome:") ? undefined : chave);
   return [...porPessoa.values()].sort((a, b) => b.partidas - a.partidas || a.nome.localeCompare(b.nome));
 }
 
