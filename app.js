@@ -8,7 +8,7 @@ const rows = [
 const COLUNAS = 4;
 
 // Versão do app: igual ao número do CACHE_NAME do service-worker.js (um teste confere).
-const VERSAO = 74;
+const VERSAO = 76;
 
 // Avisos da vez com o app fechado: servidor na Cloudflare (worker/avisos.mjs).
 // Sem o endereço, a opção "Avisar a minha vez" não aparece.
@@ -2921,7 +2921,93 @@ function estalo(ctx, inicio, volume) {
   fonte.start(ctx.currentTime + inicio);
 }
 
+// Som com o tom deslizando (de -> ate), com vibrato e filtro opcionais.
+function tom(ctx, { tipo = "sine", de, ate = de, inicio = 0, dur, volume = 0.14, vibrato = 0, velVibrato = 6, filtro = 0 }) {
+  const t = ctx.currentTime + inicio;
+  const osc = ctx.createOscillator();
+  osc.type = tipo;
+  osc.frequency.setValueAtTime(de, t);
+  osc.frequency.exponentialRampToValueAtTime(ate, t + dur);
+  if (vibrato) {
+    const lfo = ctx.createOscillator();
+    const fundo = ctx.createGain();
+    lfo.frequency.value = velVibrato;
+    fundo.gain.value = vibrato;
+    lfo.connect(fundo).connect(osc.frequency);
+    lfo.start(t);
+    lfo.stop(t + dur + 0.05);
+  }
+  const ganho = ctx.createGain();
+  ganho.gain.setValueAtTime(0.0001, t);
+  ganho.gain.exponentialRampToValueAtTime(volume, t + 0.02);
+  ganho.gain.setValueAtTime(volume, t + dur * 0.7);
+  ganho.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  let saida = osc;
+  if (filtro) {
+    const f = ctx.createBiquadFilter();
+    f.type = "lowpass";
+    f.frequency.value = filtro;
+    saida = osc.connect(f);
+  }
+  saida.connect(ganho).connect(ctx.destination);
+  osc.start(t);
+  osc.stop(t + dur + 0.05);
+}
+
+// Ruído curto filtrado (palma, sopro).
+function ruido(ctx, { inicio = 0, dur = 0.06, volume = 0.5, freq = 1500, q = 1, tipoFiltro = "bandpass" }) {
+  const n = Math.floor(ctx.sampleRate * dur);
+  const buffer = ctx.createBuffer(1, n, ctx.sampleRate);
+  const dados = buffer.getChannelData(0);
+  for (let i = 0; i < n; i++) dados[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / n, 2);
+  const fonte = ctx.createBufferSource();
+  fonte.buffer = buffer;
+  const filtro = ctx.createBiquadFilter();
+  filtro.type = tipoFiltro;
+  filtro.frequency.value = freq;
+  filtro.Q.value = q;
+  const ganho = ctx.createGain();
+  ganho.gain.value = volume;
+  fonte.connect(filtro).connect(ganho).connect(ctx.destination);
+  fonte.start(ctx.currentTime + inicio);
+}
+
 const SONS = {
+  // reações: cada emoji com o seu som (tudo sintetizado, sem arquivos)
+  palmas(ctx) {
+    [0, 0.11, 0.2, 0.31, 0.4, 0.5].forEach((t, i) =>
+      ruido(ctx, { inicio: t + Math.random() * 0.02, dur: 0.05, volume: 0.55 - i * 0.05, freq: 1100 + Math.random() * 600, q: 0.9 }));
+  },
+  risada(ctx) {
+    // "ha-ha-ha-ha-ha", cada sílaba um pouco mais grave
+    [0, 0.13, 0.26, 0.39, 0.52].forEach((t, i) =>
+      tom(ctx, { tipo: "sawtooth", de: 330 - i * 18, ate: 280 - i * 18, inicio: t, dur: 0.09, volume: 0.09, filtro: 1300 }));
+  },
+  bravo(ctx) {
+    // rosnado grave e tremido
+    tom(ctx, { tipo: "sawtooth", de: 95, ate: 75, dur: 0.6, volume: 0.13, vibrato: 18, velVibrato: 22, filtro: 520 });
+    tom(ctx, { tipo: "square", de: 60, ate: 50, inicio: 0.05, dur: 0.5, volume: 0.05, filtro: 300 });
+  },
+  chorando(ctx) {
+    // "buáá" duas vezes, descendo
+    tom(ctx, { tipo: "triangle", de: 620, ate: 380, dur: 0.5, volume: 0.13, vibrato: 18, velVibrato: 7 });
+    tom(ctx, { tipo: "triangle", de: 560, ate: 330, inicio: 0.55, dur: 0.55, volume: 0.12, vibrato: 20, velVibrato: 7 });
+  },
+  coco(ctx) {
+    // pum: grave, vibrando e caindo
+    tom(ctx, { tipo: "sawtooth", de: 120, ate: 55, dur: 0.55, volume: 0.16, vibrato: 14, velVibrato: 28, filtro: 380 });
+    ruido(ctx, { dur: 0.45, volume: 0.25, freq: 250, q: 0.7, tipoFiltro: "lowpass" });
+  },
+  festaReacao(ctx) {
+    ruido(ctx, { dur: 0.08, volume: 0.6, freq: 2200, q: 0.6 }); // pá!
+    tom(ctx, { tipo: "square", de: 420, ate: 880, inicio: 0.08, dur: 0.35, volume: 0.07, filtro: 2200 });
+    [523.25, 659.25, 783.99].forEach((f, i) => nota(ctx, f, 0.45 + i * 0.07, 0.18, { volume: 0.09 }));
+  },
+  surpreso(ctx) {
+    // "uuuu?" subindo, como um apito
+    tom(ctx, { tipo: "sine", de: 380, ate: 1150, dur: 0.38, volume: 0.13 });
+    tom(ctx, { tipo: "sine", de: 1150, ate: 1050, inicio: 0.38, dur: 0.15, volume: 0.09 });
+  },
   rolar(ctx) {
     for (let i = 0; i < 9; i++) estalo(ctx, i * 0.045 + Math.random() * 0.02, 0.35 + Math.random() * 0.3);
   },

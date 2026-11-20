@@ -1462,7 +1462,12 @@ function animarRolagemDoOutro(caixa, mesaDoOutro) {
 // todos da sala, com o nome de quem mandou. Vai no próprio jogador
 // (jogadores/<uid>/reacao), que cada um já pode gravar: não precisa de regra nova.
 
-const REACOES = ["👏", "😂", "😡", "😭", "💩", "🍀"];
+const REACOES = ["👏", "😂", "😡", "😭", "💩", "😮", "🎉"];
+// Quem está numa versão diferente do app pode mandar um emoji que não está na
+// lista daqui: mostra assim mesmo (qualquer emoji curto), só sem som próprio.
+const ehEmoji = e => typeof e === "string" && e.length <= 8 && /\p{Extended_Pictographic}/u.test(e);
+// cada emoji tem um som e um jeito de se mexer (style.css: .reacao-<nome>)
+const JEITO_DA_REACAO = { "👏": "palmas", "😂": "risada", "😡": "bravo", "😭": "chorando", "💩": "coco", "😮": "surpreso", "🎉": "festa" };
 let reacoesVistas = null;     // uid -> id da última reação já mostrada (null: ainda não olhou a sala)
 let ultimaReacaoEnviada = 0;
 
@@ -1505,7 +1510,7 @@ function mensagensDaSala() {
       if (!m || (typeof m.t !== "string" && typeof m.e !== "string")) continue;
       lista.push({ chave: `${j.uid}/${id}`, uid: j.uid, nome: j.nome || "Alguém",
         texto: typeof m.t === "string" ? m.t.slice(0, 200) : null,
-        emoji: typeof m.e === "string" && REACOES.includes(m.e) ? m.e : null,
+        emoji: ehEmoji(m.e) ? m.e : null,
         em: typeof m.em === "number" ? m.em : Date.now() });
     }
   }
@@ -1593,10 +1598,7 @@ function verMensagens() {
     novas.forEach(m => mensagensVistas.add(m.chave));
     const deOutros = novas.filter(m => m.uid !== minhaUid() && m.texto);
     if (deOutros.length && !chatAberto && document.visibilityState !== "hidden") {
-      const m = deOutros[deOutros.length - 1];
-      ultimoAviso = Date.now();
-      mostrarLegenda([m.nome, m.texto], "", { texto: "Responder", fazer: abrirChat });
-      tocar("reacao");
+      deOutros.slice(-3).forEach((m, i) => setTimeout(() => mostrarMensagemNaTela(m.texto, m.nome), i * 700));
     }
   }
   if (chatAberto) { desenharChat(); marcarLidas(); }
@@ -1614,7 +1616,7 @@ function verReacoes() {
     if (!r || !r.id || uid === eu || reacoesVistas[uid] === r.id) continue;
     reacoesVistas[uid] = r.id;
     const recente = typeof r.em !== "number" || Math.abs(Date.now() - r.em) < 60000;
-    if (!primeira && recente && REACOES.includes(r.e) && document.visibilityState !== "hidden") {
+    if (!primeira && recente && ehEmoji(r.e) && document.visibilityState !== "hidden") {
       mostrarReacao(r.e, j.nome || "Alguém");
     }
   }
@@ -1627,8 +1629,10 @@ function mostrarReacao(emoji, nome) {
   el.className = "reacao";
   el.style.setProperty("--x", `${Math.round((Math.random() - 0.5) * 140)}px`);
   el.style.setProperty("--deriva", `${Math.round((Math.random() - 0.5) * 60)}px`);
+  // o mesmo emoji do botão (o do celular), com animação própria e som próprio
+  const jeito = JEITO_DA_REACAO[emoji] || "";
   const simbolo = document.createElement("span");
-  simbolo.className = "reacao-emoji";
+  simbolo.className = `reacao-emoji${jeito ? ` reacao-${jeito}` : ""}`;
   simbolo.textContent = emoji;
   const quem = document.createElement("span");
   quem.className = "reacao-nome";
@@ -1636,19 +1640,29 @@ function mostrarReacao(emoji, nome) {
   el.append(simbolo, quem);
   area.appendChild(el);
   setTimeout(() => el.remove(), 2800);
-  tocar("reacao");
-  // a versão animada (Noto Emoji, do Google) entra no lugar assim que carregar;
-  // sem internet ou com "menos animação" no aparelho, fica o emoji normal
-  if (!CODIGO_ANIMADO[emoji] || matchMedia("(prefers-reduced-motion: reduce)").matches) return;
-  const animado = new Image();
-  animado.className = "reacao-emoji reacao-animada";
-  animado.alt = emoji;
-  animado.decoding = "async";
-  animado.onload = () => { if (simbolo.isConnected) simbolo.replaceWith(animado); };
-  animado.src = `https://fonts.gstatic.com/s/e/notoemoji/latest/${CODIGO_ANIMADO[emoji]}/512.webp`;
+  tocar(jeito === "festa" ? "festaReacao" : jeito || "reacao");
+  if (jeito === "festa" && !matchMedia("(prefers-reduced-motion: reduce)").matches) soltarConfete(30);
 }
 
-const CODIGO_ANIMADO = { "👏": "1f44f", "😂": "1f602", "😡": "1f621", "😭": "1f62d", "💩": "1f4a9", "🍀": "1f340" };
+// Mensagem do chat subindo na tela, como as reações (com o chat fechado).
+function mostrarMensagemNaTela(texto, nome) {
+  const area = $("reacoes-voando");
+  if (!area) return;
+  const el = document.createElement("div");
+  el.className = "reacao reacao-mensagem";
+  el.style.setProperty("--x", `${Math.round((Math.random() - 0.5) * 60)}px`);
+  el.style.setProperty("--deriva", `${Math.round((Math.random() - 0.5) * 30)}px`);
+  const balao = document.createElement("span");
+  balao.className = "reacao-texto";
+  balao.textContent = texto.length > 120 ? `${texto.slice(0, 117)}…` : texto;
+  const quem = document.createElement("span");
+  quem.className = "reacao-nome";
+  quem.textContent = nome;
+  el.append(balao, quem);
+  area.appendChild(el);
+  setTimeout(() => el.remove(), 3500);
+  tocar("reacao");
+}
 
 // ---------- ligação com o resto do app ----------
 

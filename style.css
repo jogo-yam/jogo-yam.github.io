@@ -2353,7 +2353,7 @@ button.podio-nome {
 .reacoes-voando {
   position: fixed;
   inset: 0;
-  z-index: 15;
+  z-index: 22; /* acima da sala de espera e do pódio (20), abaixo do chat e das janelas (25) */
   pointer-events: none;
   overflow: hidden;
 }
@@ -2396,7 +2396,6 @@ button.podio-nome {
   .reacao { animation: reacao-sumir 2.6s ease-out forwards; transform: translate(calc(-50% + var(--x, 0px)), -60px); }
 }
 @keyframes reacao-sumir { 0%, 75% { opacity: 1; } 100% { opacity: 0; } }
-.reacao-animada { width: 60px; height: 60px; }
 
 /* ---------- ranking geral ---------- */
 
@@ -2678,3 +2677,43 @@ button.podio-nome {
 :root[data-letra="grande"] .inicio-grande strong { font-size: 21px; }
 :root[data-letra="grande"] .inicio-grande small { font-size: 15px; }
 :root[data-letra="grande"] .inicio-grade button { font-size: 17px; }
+
+/* cada reação se mexe do seu jeito (enquanto sobe) */
+.reacao-emoji { display: inline-block; }
+.reacao-palmas   { animation: emoji-palmas 0.22s ease-in-out 6 alternate; }
+.reacao-risada   { animation: emoji-risada 0.16s ease-in-out 10 alternate; }
+.reacao-bravo    { animation: emoji-bravo 0.07s linear 14 alternate; filter: drop-shadow(0 0 8px rgba(230, 40, 20, 0.6)); }
+.reacao-chorando { animation: emoji-chorando 0.5s ease-in-out 4 alternate; }
+.reacao-coco     { animation: emoji-coco 0.35s ease-in-out 5 alternate; transform-origin: 50% 100%; }
+.reacao-surpreso { animation: emoji-surpreso 0.6s cubic-bezier(0.2, 1.6, 0.4, 1) 1 both; }
+.reacao-festa    { animation: emoji-festa 0.9s cubic-bezier(0.2, 1.4, 0.4, 1) 1 both; }
+
+@keyframes emoji-palmas   { from { transform: scale(1); } to { transform: scale(1.25) rotate(-6deg); } }
+@keyframes emoji-risada   { from { transform: rotate(-12deg); } to { transform: rotate(12deg) translateY(-3px); } }
+@keyframes emoji-bravo    { from { transform: translateX(-4px); } to { transform: translateX(4px); } }
+@keyframes emoji-chorando { from { transform: translateY(0) rotate(-4deg); } to { transform: translateY(4px) rotate(4deg); } }
+@keyframes emoji-coco     { from { transform: scale(1.12, 0.86); } to { transform: scale(0.94, 1.1) translateY(-6px); } }
+@keyframes emoji-festa    { 0% { transform: scale(0.3) rotate(-40deg); } 55% { transform: scale(1.4) rotate(15deg); } 100% { transform: scale(1.15) rotate(0deg); } }
+@keyframes emoji-surpreso { 0% { transform: scale(0.4); } 60% { transform: scale(1.45); } 100% { transform: scale(1.15); } }
+
+/* mensagem do chat subindo: balão com o texto */
+.reacao-mensagem { animation-duration: 3.4s; }
+/* a mensagem sobe solta, como um emoji: só o texto, com contorno para ler em cima da tabela */
+.reacao-texto {
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  max-width: min(260px, 80vw);
+  overflow: hidden;
+  color: var(--texto);
+  font-size: 20px;
+  font-weight: 800;
+  line-height: 1.2;
+  text-align: center;
+  overflow-wrap: anywhere;
+  text-shadow: 0 0 3px var(--fundo), 0 0 3px var(--fundo), 0 0 6px var(--fundo), 0 1px 1px var(--fundo);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .reacao-palmas, .reacao-risada, .reacao-bravo, .reacao-chorando, .reacao-coco, .reacao-surpreso, .reacao-festa { animation: none; }
+}
