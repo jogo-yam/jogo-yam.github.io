@@ -808,7 +808,7 @@ function abrir(modo = "criar") {
   $("familia-titulo").textContent = entrar ? "Entrar em sala" : "Criar sala";
   $("familia-explica").textContent = entrar
     ? "Digite o código que quem criou a sala te passou."
-    : "Cada um joga no próprio celular. Os pontos de todos aparecem juntos, num pódio, quando o último terminar.";
+    : "Cada um joga no próprio aparelho. Os pontos de todos aparecem juntos, num pódio, quando o último terminar.";
   $("familia-campo-codigo").hidden = !entrar;
   $("familia-modo").hidden = entrar;
   $("familia-so-dados").hidden = entrar;

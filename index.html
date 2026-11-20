@@ -3,13 +3,13 @@
 <head>
   <meta charset="UTF-8">
   <title>YAM - Tabela de Pontuação</title>
-  <meta name="description" content="Marque os pontos do YAM no celular: dados virtuais, regras, partidas em sala com a família e os amigos, e histórico.">
+  <meta name="description" content="Marque os pontos do YAM no celular ou no computador: dados virtuais, regras, partidas em sala com a família e os amigos, e histórico.">
 
   <!-- cartão do link (WhatsApp, Telegram, redes sociais) -->
   <meta property="og:type" content="website">
   <meta property="og:url" content="https://jogo-yam.github.io/">
   <meta property="og:title" content="YAM – Tabela de Pontuação">
-  <meta property="og:description" content="Marque os pontos do YAM no celular, jogue em sala com a família e os amigos e veja quem venceu.">
+  <meta property="og:description" content="Marque os pontos do YAM no celular ou no computador, jogue em sala com a família e os amigos e veja quem venceu.">
   <meta property="og:image" content="https://jogo-yam.github.io/og-image.png">
   <meta property="og:image:width" content="1200">
   <meta property="og:image:height" content="630">
@@ -20,13 +20,13 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="theme-color" content="#f3f3f0" media="(prefers-color-scheme: light)">
   <meta name="theme-color" content="#121212" media="(prefers-color-scheme: dark)">
-  <link rel="manifest" href="manifest.json?v=79">
+  <link rel="manifest" href="manifest.json?v=80">
   <link rel="icon" type="image/png" sizes="32x32" href="icone-dado-32.png">
   <link rel="apple-touch-icon" href="apple-touch-icon.png">
 
   <link rel="preload" href="fontes/nunito.woff2" as="font" type="font/woff2" crossorigin>
   <!-- ?v= é a versão do app (igual ao VERSAO do app.js; um teste confere): versão nova, endereço novo -->
-  <link rel="stylesheet" href="style.css?v=79">
+  <link rel="stylesheet" href="style.css?v=80">
 
   <!-- Aplica o tema escolhido antes de desenhar a página, para não piscar. -->
   <script>
@@ -93,7 +93,7 @@
     </button>
     <button id="inicio-sala" class="inicio-grande" onclick="irParaSala()">
       <svg class="icone" aria-hidden="true"><use href="#i-sala"/></svg>
-      <span><strong id="inicio-sala-titulo">Jogar em sala</strong><small id="inicio-sala-sub">Cada um no seu celular, com pódio no final</small></span>
+      <span><strong id="inicio-sala-titulo">Jogar em sala</strong><small id="inicio-sala-sub">Cada um no seu aparelho, com pódio no final</small></span>
     </button>
 
     <div class="inicio-grade">
@@ -280,7 +280,7 @@
         <li>Toque no nome de uma linha ou coluna para ver o que ela significa.</li>
         <li>O app só aceita valores possíveis e mostra qual é a próxima casa na descida e na subida.</li>
         <li>Errou? Use <strong>↶ Desfazer</strong>.</li>
-        <li>Para jogar junto, cada um no seu celular: <strong>Jogar em sala → Criar sala</strong> e passe o código.
+        <li>Para jogar junto, cada um no seu aparelho (celular ou computador): <strong>Jogar em sala → Criar sala</strong> e passe o código.
           O pódio aparece quando todos terminam.</li>
         <li>Suas partidas ficam no <strong>Histórico</strong>, com estatísticas.</li>
       </ul>
@@ -610,7 +610,7 @@
 <div id="janela-sala" class="janela" hidden onclick="if (event.target === this) fecharEscolhaSala()">
   <div class="janela-caixa" role="dialog" aria-modal="true" aria-labelledby="sala-titulo">
     <h2 id="sala-titulo">Jogar em sala</h2>
-    <p class="dica">Cada um joga no próprio celular e o pódio aparece quando todos terminam.</p>
+    <p class="dica">Cada um joga no próprio aparelho e o pódio aparece quando todos terminam.</p>
     <button class="principal largo escolha-sala" onclick="escolherSala('criar')"><svg class="icone" aria-hidden="true"><use href="#i-mais"/></svg>Criar sala
       <small>Você cria e passa o código para os outros</small></button>
     <button class="largo escolha-sala" onclick="escolherSala('entrar')"><svg class="icone" aria-hidden="true"><use href="#i-entrar"/></svg>Entrar em sala
@@ -627,7 +627,7 @@
       <div class="bv-slide">
         <div class="bv-figura"><svg class="logo-dado" viewBox="0 0 32 32" aria-hidden="true"><rect x="1" y="1" width="30" height="30" rx="8"/><circle cx="9.5" cy="9.5" r="3"/><circle cx="22.5" cy="9.5" r="3"/><circle cx="16" cy="16" r="3"/><circle cx="9.5" cy="22.5" r="3"/><circle cx="22.5" cy="22.5" r="3"/></svg></div>
         <h2>Bem-vindo ao YAM</h2>
-        <p>A tabela de pontos do jogo de dados, no seu celular. Ela soma tudo e avisa quando uma jogada não vale.</p>
+        <p>A tabela de pontos do jogo de dados, no celular ou no computador. Ela soma tudo e avisa quando uma jogada não vale.</p>
       </div>
       <div class="bv-slide">
         <div class="bv-figura"><svg class="icone" aria-hidden="true"><use href="#i-dado"/></svg></div>
@@ -637,7 +637,7 @@
       <div class="bv-slide">
         <div class="bv-figura"><svg class="icone" aria-hidden="true"><use href="#i-sala"/></svg></div>
         <h2>Jogue em sala</h2>
-        <p>Cada um no seu celular: crie uma sala, passe o código e, no fim, vejam juntos o pódio.</p>
+        <p>Cada um no seu aparelho: crie uma sala, passe o código e, no fim, vejam juntos o pódio.</p>
       </div>
       <div class="bv-slide">
         <div class="bv-figura"><svg class="icone" aria-hidden="true"><use href="#i-pessoa"/></svg></div>
@@ -709,7 +709,7 @@
   </div>
 </div>
 
-<script src="app.js?v=79"></script>
+<script src="app.js?v=80"></script>
 <script>
   // Rede de segurança: se o app.js não carregou (ex.: troca de versão no meio
   // do caminho), recarrega sozinho uma vez, em vez de ficar com a tabela vazia.
@@ -723,7 +723,7 @@
     setTimeout(function () { location.replace(location.pathname + "?atualizado=" + Date.now()); }, 1500);
   })();
 </script>
-<script type="module" src="familia.js?v=79"></script>
+<script type="module" src="familia.js?v=80"></script>
 
 <!-- Service Worker -->
 <script>

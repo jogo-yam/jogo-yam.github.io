@@ -8,7 +8,7 @@ const rows = [
 const COLUNAS = 4;
 
 // Versão do app: igual ao número do CACHE_NAME do service-worker.js (um teste confere).
-const VERSAO = 79;
+const VERSAO = 80;
 
 // Avisos da vez com o app fechado: servidor na Cloudflare (worker/avisos.mjs).
 // Sem o endereço, a opção "Avisar a minha vez" não aparece.
@@ -1502,7 +1502,7 @@ function atualizarInicio() {
   document.getElementById("inicio-sala-titulo").textContent = naSala ? `Voltar para a sala ${codigo || ""}`.trim() : "Jogar em sala";
   document.getElementById("inicio-sala-sub").textContent = naSala
     ? "A partida em sala continua de onde parou"
-    : "Cada um no seu celular, com pódio no final";
+    : "Cada um no seu aparelho, com pódio no final";
 
   // resumo das partidas terminadas
   const terminadas = historico.filter(p => partidaTerminada(p));

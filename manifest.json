@@ -2,7 +2,7 @@
   "id": "./",
   "name": "YAM - Tabela de Pontuação",
   "short_name": "YAM",
-  "description": "Marque os pontos do YAM no celular: dados virtuais, regras, partidas em sala com a família e os amigos, e histórico.",
+  "description": "Marque os pontos do YAM no celular ou no computador: dados virtuais, regras, partidas em sala com a família e os amigos, e histórico.",
   "lang": "pt-BR",
   "dir": "ltr",
   "categories": ["games", "entertainment"],
