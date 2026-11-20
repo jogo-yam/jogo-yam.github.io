@@ -330,7 +330,10 @@ async function trocarNome(novo) {
     if (negado(e)) throw nomeTomado(novo);
     throw new Error(mensagemDeErro(e));
   }
-  if (antigo.chave !== u.chave) await remove(ref(db, `usuarios/${antigo.chave}`)).catch(() => {});
+  if (antigo.chave !== u.chave) {
+    await remove(ref(db, `ranking/${antigo.chave}`)).catch(() => {}); // o recorde volta no nome novo
+    await remove(ref(db, `usuarios/${antigo.chave}`)).catch(() => {});
+  }
   await sincronizarHistorico(); // traz tudo do cofre do nome antigo antes de trocar
   guardarUsuario(u);
   historicoMudou(); // e manda tudo para o cofre do nome novo
@@ -369,12 +372,51 @@ async function sincronizarHistorico() {
       return null; // sem internet, ou o banco ainda não tem as regras do histórico
     }
   })();
+  let resultado = null;
   try {
-    return await sincronizacao;
+    resultado = await sincronizacao;
+    return resultado;
   } finally {
     sincronizacao = null;
+    publicarRecorde(resultado !== null).catch(() => {});
     if (sincronizarDeNovo) { sincronizarDeNovo = false; historicoMudou(); }
   }
+}
+
+// ---------- ranking geral ----------
+// ranking/<chave do nome> = { nome, total, data }: o recorde de cada jogador
+// (só o dono do nome grava). Publica o melhor do histórico deste aparelho; se o
+// histórico não veio inteiro da nuvem (sem internet), só sobe, nunca desce.
+
+let recordeConferido = null; // "total|data" já publicado por este aparelho
+
+async function publicarRecorde(historicoCompleto) {
+  const u = lerUsuario();
+  const melhor = melhorPartida(historico);
+  if (!u || !melhor || navigator.onLine === false) return;
+  const chave = `${u.chave}|${melhor.total}|${melhor.data}`;
+  if (recordeConferido === chave) return;
+  await usuario();
+  const atual = (await comLimite(lerDoBanco(`ranking/${u.chave}`))).val();
+  const igual = atual && atual.total === melhor.total && atual.data === melhor.data && atual.nome === u.nome;
+  const desceria = atual && typeof atual.total === "number" && atual.total > melhor.total;
+  if (!igual && !(desceria && !historicoCompleto)) {
+    // o nome precisa ser deste aparelho para gravar (com o código, ele volta para cá)
+    await garantirUsuario(u.nome);
+    await comLimite(set(ref(db, `ranking/${u.chave}`), {
+      nome: u.nome, total: melhor.total, data: melhor.data, em: serverTimestamp()
+    }));
+  }
+  recordeConferido = chave;
+}
+
+async function lerRanking() {
+  await usuario();
+  await publicarRecorde(false).catch(() => {}); // o seu recorde já entra atualizado
+  const snap = await comLimite(lerDoBanco("ranking"));
+  return Object.entries(snap.val() || {})
+    .filter(([, r]) => r && typeof r.nome === "string" && typeof r.total === "number")
+    .map(([chave, r]) => ({ chave, nome: r.nome, total: r.total, data: r.data }));
 }
 
 let timerHistorico = null;
@@ -1292,7 +1334,7 @@ window.familia = {
   abrir, fecharJanela, acaoJanela, sair, confirmarSair, compartilharCodigo,
   aoTerminar, fecharEspera, fecharPodio, jogarDeNovo, limparSalasAntigas, sincronizar, registrarResultado,
   escolherModo, podeJogar, porQueNaoPode, podeDesfazer, mesaMudou, recuperar, trocarNome, avisosMudaram,
-  historicoMudou, sincronizarHistorico, registrarNomeSePrecisar, alternarReacoes, reagir,
+  historicoMudou, sincronizarHistorico, registrarNomeSePrecisar, alternarReacoes, reagir, lerRanking,
   soDadosDoApp: () => !!(sessao && partida && !partida.revelada && !partida.encerrada && soDadosDaSala()),
   ativa: () => !!sessao,
   revelada: () => !!(partida && (partida.revelada || partida.encerrada))

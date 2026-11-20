@@ -8,7 +8,7 @@ const rows = [
 const COLUNAS = 4;
 
 // Versão do app: igual ao número do CACHE_NAME do service-worker.js (um teste confere).
-const VERSAO = 68;
+const VERSAO = 69;
 
 // Avisos da vez com o app fechado: servidor na Cloudflare (worker/avisos.mjs).
 // Sem o endereço, a opção "Avisar a minha vez" não aparece.
@@ -1388,7 +1388,7 @@ async function novoJogo() {
 
 // ---------- telas ----------
 
-const telas = ["tela-jogo", "tela-historico", "tela-partida", "tela-estatisticas", "tela-regras", "tela-mais"];
+const telas = ["tela-jogo", "tela-historico", "tela-partida", "tela-estatisticas", "tela-regras", "tela-mais", "tela-ranking"];
 
 // "Como jogar" abre do jogo ou do Mais; o Voltar leva de volta para lá.
 let voltarDasRegrasPara = "tela-jogo";
@@ -3264,6 +3264,90 @@ try {
   else if (atalho === "historico") abrirHistorico();
   if (atalho) history.replaceState(null, "", location.pathname);
 } catch {}
+
+// ---------- ranking geral ----------
+// Para todo mundo que usa o YAM: a maior pontuação de cada jogador (uma por
+// nome de usuário), de uma partida terminada. Cada aparelho publica o recorde
+// do próprio histórico (familia.js); aqui ficam a conta e a tela.
+
+const MAIOR_PONTUACAO = 1948; // a tabela inteira no máximo (o Firebase recusa mais que isso)
+
+const partidaTerminada = p => !!(p && p.valores &&
+  LINHAS_JOGO.every(l => [0, 1, 2, 3].every(c => (p.valores[`${l}-${c}`] ?? "") !== "")));
+
+// A partida que vai para o ranking: a de maior total; empate, a mais antiga.
+function melhorPartida(lista) {
+  let melhor = null;
+  for (const p of lista || []) {
+    if (!partidaTerminada(p)) continue;
+    const total = calcularTotais(p.valores).geral;
+    if (!Number.isFinite(total) || total < 0 || total > MAIOR_PONTUACAO) continue;
+    if (!melhor || total > melhor.total || (total === melhor.total && p.data < melhor.data)) {
+      melhor = { total, data: p.data };
+    }
+  }
+  return melhor;
+}
+
+// Ordem do ranking: mais pontos primeiro; empate, quem chegou antes.
+function ordenarRanking(lista) {
+  return [...lista].sort((a, b) => b.total - a.total || String(a.data).localeCompare(String(b.data)));
+}
+
+let voltarDoRankingPara = "tela-mais";
+
+async function abrirRanking(de = "tela-mais") {
+  voltarDoRankingPara = de;
+  const lista = document.getElementById("lista-ranking");
+  const meu = document.getElementById("ranking-meu");
+  const status = document.getElementById("ranking-status");
+  lista.innerHTML = "";
+  meu.hidden = true;
+  status.textContent = "Carregando o ranking…";
+  mostrarTela("tela-ranking");
+  if (!window.familia) { status.textContent = "O ranking precisa de internet. Confira a conexão e tente de novo."; return; }
+
+  let todos;
+  try {
+    todos = ordenarRanking(await familia.lerRanking());
+  } catch {
+    status.textContent = "Não deu para carregar o ranking. Confira a internet e tente de novo.";
+    return;
+  }
+  if (document.getElementById("tela-ranking").hidden) return; // saiu enquanto carregava
+
+  const u = lerUsuario();
+  const minhaPosicao = u ? todos.findIndex(r => r.chave === u.chave) : -1;
+  const MOSTRAR = 100;
+  todos.slice(0, MOSTRAR).forEach((r, i) => lista.appendChild(linhaDoRanking(r, i, i === minhaPosicao)));
+
+  if (minhaPosicao >= MOSTRAR) {
+    meu.hidden = false;
+    meu.textContent = `Você está em ${minhaPosicao + 1}º, com ${todos[minhaPosicao].total} pontos.`;
+  }
+  status.textContent = !todos.length ? "Ninguém entrou no ranking ainda. Termine uma partida para ser o primeiro!"
+    : minhaPosicao >= 0 ? ""
+    : !u ? "Para entrar no ranking, coloque seu nome em Mais e termine uma partida."
+    : melhorPartida(historico) ? "Sua pontuação entra no ranking assim que a internet ajudar."
+    : "Termine uma partida para entrar no ranking.";
+}
+
+function linhaDoRanking(r, i, eu) {
+  const li = elemento("li", `item-ranking${eu ? " eu" : ""}${i < 3 ? ` podio-${i + 1}` : ""}`);
+  li.appendChild(elemento("span", "ranking-posicao", `${i + 1}º`));
+  const info = elemento("span", "ranking-info");
+  info.appendChild(elemento("strong", "", eu ? `${r.nome} (você)` : r.nome));
+  if (r.data) info.appendChild(elemento("small", "", new Date(r.data).toLocaleDateString("pt-BR")));
+  li.appendChild(info);
+  li.appendChild(elemento("span", "ranking-pontos", String(r.total)));
+  return li;
+}
+
+function voltarDoRanking() {
+  if (voltarDoRankingPara === "tela-historico") abrirHistorico();
+  else if (voltarDoRankingPara === "tela-mais") abrirMais();
+  else mostrarTela(voltarDoRankingPara);
+}
 
 // ---------- teclado (computador) ----------
 // Esc fecha a janela que estiver aberta por cima (a de cima primeiro).

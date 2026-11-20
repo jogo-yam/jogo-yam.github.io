@@ -20,13 +20,13 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="theme-color" content="#f3f3f0" media="(prefers-color-scheme: light)">
   <meta name="theme-color" content="#121212" media="(prefers-color-scheme: dark)">
-  <link rel="manifest" href="manifest.json?v=68">
+  <link rel="manifest" href="manifest.json?v=69">
   <link rel="icon" type="image/png" sizes="32x32" href="icone-dado-32.png">
   <link rel="apple-touch-icon" href="apple-touch-icon.png">
 
   <link rel="preload" href="fontes/nunito.woff2" as="font" type="font/woff2" crossorigin>
   <!-- ?v= é a versão do app (igual ao VERSAO do app.js; um teste confere): versão nova, endereço novo -->
-  <link rel="stylesheet" href="style.css?v=68">
+  <link rel="stylesheet" href="style.css?v=69">
 
   <!-- Aplica o tema escolhido antes de desenhar a página, para não piscar. -->
   <script>
@@ -160,6 +160,8 @@
     <div><span id="media">0</span><small>média</small></div>
   </div>
 
+  <button class="linha-mais linha-ranking" onclick="abrirRanking('tela-historico')"><svg class="icone" aria-hidden="true"><use href="#i-trofeu"/></svg>Ranking geral</button>
+
   <ul id="lista-historico" class="lista-historico"></ul>
 
 </section>
@@ -171,6 +173,18 @@
     <h1>Estatísticas</h1>
   </div>
   <div id="estatisticas" class="estatisticas"></div>
+</section>
+
+<!-- Ranking geral: o recorde de cada jogador, para todo mundo que usa o YAM -->
+<section id="tela-ranking" hidden>
+  <div class="topo">
+    <button onclick="voltarDoRanking()"><svg class="icone" aria-hidden="true"><use href="#i-voltar"/></svg>Voltar</button>
+    <h1>Ranking geral</h1>
+  </div>
+  <p class="dica ranking-dica">A maior pontuação de cada jogador, entre todos que usam o YAM.</p>
+  <ol id="lista-ranking" class="lista-ranking"></ol>
+  <p id="ranking-meu" class="ranking-meu" hidden></p>
+  <p id="ranking-status" class="dica ranking-status" role="status"></p>
 </section>
 
 <!-- Como jogar -->
@@ -301,6 +315,7 @@
     <div class="bloco">
       <h2>Jogo</h2>
       <button class="linha-mais" onclick="abrirRegras()"><svg class="icone" aria-hidden="true"><use href="#i-ajuda"/></svg>Como jogar</button>
+      <button class="linha-mais" onclick="abrirRanking('tela-mais')"><svg class="icone" aria-hidden="true"><use href="#i-trofeu"/></svg>Ranking geral</button>
       <button class="linha-mais" onclick="convidarJogadores()"><svg class="icone" aria-hidden="true"><use href="#i-enviar"/></svg>Convidar jogadores</button>
       <button id="botao-instalar" class="linha-mais" onclick="abrirInstalar()"><svg class="icone" aria-hidden="true"><use href="#i-instalar"/></svg>Como instalar o app</button>
     </div>
@@ -324,6 +339,7 @@
         <li>Suas partidas, seu nome e o histórico ficam guardados neste aparelho. Com nome de usuário, o histórico
           também fica na nuvem (Firebase), num lugar que só abre com o seu nome e o seu código.</li>
         <li>Sem cadastro, sem e-mail, sem anúncios. O app não coleta dados de uso.</li>
+        <li>No ranking geral, todos que usam o YAM veem seu nome de usuário e sua maior pontuação.</li>
         <li>Os emojis animados das reações são do Noto Emoji, do Google (licença CC BY 4.0), e vêm dos servidores do Google.</li>
       </ul>
     </div>
@@ -612,7 +628,7 @@
   </div>
 </div>
 
-<script src="app.js?v=68"></script>
+<script src="app.js?v=69"></script>
 <script>
   // Rede de segurança: se o app.js não carregou (ex.: troca de versão no meio
   // do caminho), recarrega sozinho uma vez, em vez de ficar com a tabela vazia.
@@ -626,7 +642,7 @@
     setTimeout(function () { location.replace(location.pathname + "?atualizado=" + Date.now()); }, 1500);
   })();
 </script>
-<script type="module" src="familia.js?v=68"></script>
+<script type="module" src="familia.js?v=69"></script>
 
 <!-- Service Worker -->
 <script>

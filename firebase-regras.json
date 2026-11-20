@@ -16,6 +16,13 @@
         }
       }
     },
+    "ranking": {
+      ".read": "auth != null",
+      "$chave": {
+        ".write": "auth != null && root.child('usuarios').child($chave).child('dono').val() === auth.uid",
+        ".validate": "newData.hasChildren(['nome', 'total', 'data']) && newData.child('nome').isString() && newData.child('nome').val().length > 0 && newData.child('nome').val().length <= 20 && newData.child('total').isNumber() && newData.child('total').val() >= 0 && newData.child('total').val() <= 1948 && newData.child('data').isString() && newData.child('data').val().length <= 30"
+      }
+    },
     "partidas": {
       ".indexOn": ["criadaEm"],
       ".read": "auth != null && query.orderByChild == 'criadaEm' && query.endAt <= now - 259200000 && query.limitToFirst <= 20",

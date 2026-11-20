@@ -2397,3 +2397,84 @@ button.podio-nome {
 }
 @keyframes reacao-sumir { 0%, 75% { opacity: 1; } 100% { opacity: 0; } }
 .reacao-animada { width: 60px; height: 60px; }
+
+/* ---------- ranking geral ---------- */
+
+.linha-ranking {
+  display: block;
+  width: 100%;
+  max-width: 700px;
+  margin: 0 auto 12px;
+  padding: 11px 14px;
+  text-align: left;
+}
+
+.ranking-dica { margin: -4px auto 12px; max-width: 700px; }
+
+.lista-ranking {
+  flex: 0 1 auto;
+  min-height: 0;
+  overflow: auto;
+  max-width: 700px;
+  margin: 0 auto;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 6px;
+  align-content: start;
+}
+
+.item-ranking {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  border: 1px solid var(--borda);
+  border-radius: 10px;
+  background: var(--superficie);
+}
+.item-ranking.eu {
+  border: 2px solid var(--destaque);
+  background: color-mix(in srgb, var(--destaque) 10%, var(--superficie));
+}
+
+.ranking-posicao {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  min-width: 34px;
+  height: 34px;
+  padding: 0 4px;
+  border-radius: 17px;
+  background: var(--calculado);
+  font-weight: 800;
+  font-size: 14px;
+}
+.podio-1 .ranking-posicao { background: #f2c94c; color: #3d2e00; }
+.podio-2 .ranking-posicao { background: #cfd4da; color: #262a2e; }
+.podio-3 .ranking-posicao { background: #e0a46e; color: #3a2210; }
+
+.ranking-info {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+  line-height: 1.25;
+}
+.ranking-info strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 16px; }
+.ranking-info small { color: var(--texto-suave); font-size: 12px; }
+
+.ranking-pontos { flex-shrink: 0; font-size: 20px; font-weight: 800; }
+
+.ranking-meu,
+.ranking-status {
+  max-width: 700px;
+  margin: 12px auto 0;
+  text-align: center;
+}
+.ranking-meu { font-weight: 700; }
+.ranking-status:empty { display: none; }
+
+:root[data-letra="grande"] .ranking-info strong { font-size: 18px; }
+:root[data-letra="grande"] .ranking-info small { font-size: 14px; }
+:root[data-letra="grande"] .ranking-pontos { font-size: 22px; }
