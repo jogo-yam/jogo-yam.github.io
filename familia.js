@@ -1185,7 +1185,8 @@ function animarRolagemDoOutro(caixa, mesaDoOutro) {
   const segurados = mesaDoOutro.segurados || [];
   const rolaram = [...caixa.children].map((svg, i) => ({ svg, final: mesaDoOutro.valores[i] }))
     .filter((_, i) => !segurados[i]);
-  if (matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+  // com "menos animação" no sistema (comum no Windows), o CSS tira o pulo e o
+  // giro, mas as faces continuam trocando, como nos seus próprios dados
   rolaram.forEach(({ svg }) => {
     svg.style.setProperty("--giro", `${(Math.random() < 0.5 ? -1 : 1) * (Math.random() < 0.5 ? 360 : 720)}deg`);
     svg.style.animationDelay = `${Math.floor(Math.random() * 40)}ms`;
