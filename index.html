@@ -20,13 +20,13 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="theme-color" content="#f3f3f0" media="(prefers-color-scheme: light)">
   <meta name="theme-color" content="#121212" media="(prefers-color-scheme: dark)">
-  <link rel="manifest" href="manifest.json?v=78">
+  <link rel="manifest" href="manifest.json?v=79">
   <link rel="icon" type="image/png" sizes="32x32" href="icone-dado-32.png">
   <link rel="apple-touch-icon" href="apple-touch-icon.png">
 
   <link rel="preload" href="fontes/nunito.woff2" as="font" type="font/woff2" crossorigin>
   <!-- ?v= é a versão do app (igual ao VERSAO do app.js; um teste confere): versão nova, endereço novo -->
-  <link rel="stylesheet" href="style.css?v=78">
+  <link rel="stylesheet" href="style.css?v=79">
 
   <!-- Aplica o tema escolhido antes de desenhar a página, para não piscar. -->
   <script>
@@ -376,6 +376,7 @@
         <li>Suas partidas, seu nome e o histórico ficam guardados neste aparelho. Com nome de usuário, o histórico
           também fica na nuvem (Firebase), num lugar que só abre com o seu nome e o seu código.</li>
         <li>Sem cadastro, sem e-mail, sem anúncios. O app não coleta dados de uso.</li>
+        <li>Sons das reações: <a href="https://bigsoundbank.com" target="_blank" rel="noopener">BigSoundBank</a> (domínio público, CC0).</li>
         <li>No ranking geral, todos que usam o YAM veem seu nome de usuário e sua maior pontuação. Se você trocar
           de nome, quem jogou com você passa a ver o nome novo no histórico e nas estatísticas.</li>
       </ul>
@@ -708,7 +709,7 @@
   </div>
 </div>
 
-<script src="app.js?v=78"></script>
+<script src="app.js?v=79"></script>
 <script>
   // Rede de segurança: se o app.js não carregou (ex.: troca de versão no meio
   // do caminho), recarrega sozinho uma vez, em vez de ficar com a tabela vazia.
@@ -722,7 +723,7 @@
     setTimeout(function () { location.replace(location.pathname + "?atualizado=" + Date.now()); }, 1500);
   })();
 </script>
-<script type="module" src="familia.js?v=78"></script>
+<script type="module" src="familia.js?v=79"></script>
 
 <!-- Service Worker -->
 <script>

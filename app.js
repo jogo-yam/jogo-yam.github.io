@@ -8,7 +8,7 @@ const rows = [
 const COLUNAS = 4;
 
 // Versão do app: igual ao número do CACHE_NAME do service-worker.js (um teste confere).
-const VERSAO = 78;
+const VERSAO = 79;
 
 // Avisos da vez com o app fechado: servidor na Cloudflare (worker/avisos.mjs).
 // Sem o endereço, a opção "Avisar a minha vez" não aparece.
@@ -3058,9 +3058,49 @@ const SONS = {
   }
 };
 
+// Sons gravados das reações (BigSoundBank, CC0), cortados e com volume
+// igualado. Ficam no cache do app (funcionam sem internet). Enquanto o arquivo
+// não carregou (ou se não der para tocar), vai o som sintetizado de SONS.
+const SONS_GRAVADOS = {
+  palmas: "sons/palmas.mp3", risada: "sons/risada.mp3", bravo: "sons/bravo.mp3",
+  chorando: "sons/chorando.mp3", coco: "sons/coco.mp3", surpreso: "sons/surpreso.mp3",
+  festaReacao: "sons/festa.mp3"
+};
+const gravados = {}; // nome -> AudioBuffer (ou a promessa de carregar)
+
+function carregarSom(ctx, nome) {
+  if (gravados[nome]) return gravados[nome];
+  gravados[nome] = fetch(SONS_GRAVADOS[nome])
+    .then(r => (r.ok ? r.arrayBuffer() : Promise.reject(new Error(r.status))))
+    .then(dados => new Promise((ok, erro) => ctx.decodeAudioData(dados, ok, erro)))
+    .then(buffer => { gravados[nome] = buffer; return buffer; })
+    .catch(() => { gravados[nome] = null; return null; }); // fica no sintetizado
+  return gravados[nome];
+}
+
+// Carrega todos de uma vez (ao entrar numa sala), para o primeiro já sair gravado.
+function precarregarSons() {
+  const ctx = contextoDeAudio();
+  if (ctx) Object.keys(SONS_GRAVADOS).forEach(nome => { if (!(nome in gravados)) carregarSom(ctx, nome); });
+}
+
 function tocar(nome) {
   const ctx = contextoDeAudio();
-  if (!ctx || !SONS[nome]) return;
+  if (!ctx) return;
+  const gravado = SONS_GRAVADOS[nome] ? gravados[nome] : undefined;
+  if (gravado instanceof AudioBuffer) {
+    try {
+      const fonte = ctx.createBufferSource();
+      fonte.buffer = gravado;
+      const ganho = ctx.createGain();
+      ganho.gain.value = 0.8;
+      fonte.connect(ganho).connect(ctx.destination);
+      fonte.start();
+      return;
+    } catch {}
+  }
+  if (SONS_GRAVADOS[nome] && gravado === undefined) carregarSom(ctx, nome);
+  if (!SONS[nome]) return;
   try { SONS[nome](ctx); } catch {}
 }
 

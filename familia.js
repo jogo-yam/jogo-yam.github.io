@@ -1609,6 +1609,7 @@ function verMensagens() {
 // retrato (entrou na sala, abriu o app) só anota as que já estavam lá.
 function verReacoes() {
   if (!partida || !partida.jogadores) return;
+  precarregarSons(); // os sons gravados das reações (só carrega na primeira vez)
   const eu = minhaUid();
   const primeira = reacoesVistas === null;
   if (primeira) reacoesVistas = {};
