@@ -8,7 +8,7 @@ const rows = [
 const COLUNAS = 4;
 
 // Versão do app: igual ao número do CACHE_NAME do service-worker.js (um teste confere).
-const VERSAO = 77;
+const VERSAO = 78;
 
 // Avisos da vez com o app fechado: servidor na Cloudflare (worker/avisos.mjs).
 // Sem o endereço, a opção "Avisar a minha vez" não aparece.
@@ -2979,14 +2979,38 @@ const SONS = {
       ruido(ctx, { inicio: t + Math.random() * 0.02, dur: 0.05, volume: 0.55 - i * 0.05, freq: 1100 + Math.random() * 600, q: 0.9 }));
   },
   risada(ctx) {
-    // "ha-ha-ha-ha-ha", cada sílaba um pouco mais grave
-    [0, 0.13, 0.26, 0.39, 0.52].forEach((t, i) =>
-      tom(ctx, { tipo: "sawtooth", de: 330 - i * 18, ate: 280 - i * 18, inicio: t, dur: 0.09, volume: 0.09, filtro: 1300 }));
+    // "hi-hi-ha-ha-ha": agudo, rápido, descendo a cada sílaba
+    [0, 0.1, 0.2, 0.31, 0.42, 0.53].forEach((t, i) =>
+      tom(ctx, { tipo: "triangle", de: 700 - i * 45, ate: 600 - i * 45, inicio: t, dur: 0.075, volume: 0.15, filtro: 3000 }));
   },
   bravo(ctx) {
-    // rosnado grave e tremido
-    tom(ctx, { tipo: "sawtooth", de: 95, ate: 75, dur: 0.6, volume: 0.13, vibrato: 18, velVibrato: 22, filtro: 520 });
-    tom(ctx, { tipo: "square", de: 60, ate: 50, inicio: 0.05, dur: 0.5, volume: 0.05, filtro: 300 });
+    // "grr-GRRR": dois rosnados ásperos, o segundo mais forte
+    [[0, 0.22, 0.09, 150], [0.3, 0.38, 0.13, 125]].forEach(([inicio, dur, volume, freq]) => {
+      const t = ctx.currentTime + inicio;
+      const osc = ctx.createOscillator();
+      osc.type = "square";
+      osc.frequency.setValueAtTime(freq, t);
+      osc.frequency.linearRampToValueAtTime(freq * 0.8, t + dur);
+      const tremor = ctx.createGain();           // o "rrrr": volume batendo 32 vezes por segundo
+      tremor.gain.value = 0.5;
+      const lfo = ctx.createOscillator();
+      lfo.type = "square";
+      lfo.frequency.value = 32;
+      const fundo = ctx.createGain();
+      fundo.gain.value = 0.5;
+      lfo.connect(fundo).connect(tremor.gain);
+      const filtro = ctx.createBiquadFilter();
+      filtro.type = "lowpass";
+      filtro.frequency.value = 1400;
+      const ganho = ctx.createGain();
+      ganho.gain.setValueAtTime(0.0001, t);
+      ganho.gain.exponentialRampToValueAtTime(volume, t + 0.03);
+      ganho.gain.setValueAtTime(volume, t + dur * 0.75);
+      ganho.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+      osc.connect(tremor).connect(filtro).connect(ganho).connect(ctx.destination);
+      osc.start(t); lfo.start(t);
+      osc.stop(t + dur + 0.05); lfo.stop(t + dur + 0.05);
+    });
   },
   chorando(ctx) {
     // "buáá" duas vezes, descendo
@@ -2994,9 +3018,10 @@ const SONS = {
     tom(ctx, { tipo: "triangle", de: 560, ate: 330, inicio: 0.55, dur: 0.55, volume: 0.12, vibrato: 20, velVibrato: 7 });
   },
   coco(ctx) {
-    // pum: grave, vibrando e caindo
-    tom(ctx, { tipo: "sawtooth", de: 120, ate: 55, dur: 0.55, volume: 0.16, vibrato: 14, velVibrato: 28, filtro: 380 });
-    ruido(ctx, { dur: 0.45, volume: 0.25, freq: 250, q: 0.7, tipoFiltro: "lowpass" });
+    // "pffrrrt... ploc": pum tremido e, no fim, um "ploc" agudo caindo
+    tom(ctx, { tipo: "sawtooth", de: 85, ate: 60, dur: 0.42, volume: 0.15, vibrato: 30, velVibrato: 40, filtro: 450 });
+    ruido(ctx, { dur: 0.3, volume: 0.2, freq: 300, q: 0.7, tipoFiltro: "lowpass" });
+    tom(ctx, { tipo: "sine", de: 1100, ate: 180, inicio: 0.5, dur: 0.12, volume: 0.2 });
   },
   festaReacao(ctx) {
     ruido(ctx, { dur: 0.08, volume: 0.6, freq: 2200, q: 0.6 }); // pá!
