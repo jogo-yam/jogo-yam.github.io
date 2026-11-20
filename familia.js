@@ -794,6 +794,7 @@ async function encerrarPartida() {
 async function confirmarSair() {
   if (!await confirmar("Sair da sala?", "Sua tabela continua aqui, mas você sai do resultado da sala.", "Sair")) return;
   await sair();
+  mostrarTela("tela-inicio"); // fora da sala, volta para o começo
 }
 
 // ---------- janela de criar / entrar ----------
