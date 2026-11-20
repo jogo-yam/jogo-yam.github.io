@@ -210,6 +210,9 @@ async function criar(nome, modo = "livre", soDados = false) {
       atual => atual === null ? user.uid : undefined);
     if (r.committed) {
       await update(ref(db, `partidas/${codigo}`), { criadaEm: serverTimestamp() });
+      // sala de espera: só começa quando quem criou tocar em Começar (com as regras
+      // antigas a gravação é recusada e a sala começa na hora, como antes)
+      await update(ref(db, `partidas/${codigo}`), { iniciada: false }).catch(() => {});
       await entrar(codigo, nome, modo, soDados);
       guardarSalaCriada(codigo);
       limparSalasAntigas(); // em segundo plano
@@ -600,6 +603,7 @@ function escutar() {
     sincronizar();
     avisarDaVez();
     sugerirAvisos();
+    verMensagens();
     atualizarBarra();
     verReacoes();
     atualizarEspera();
@@ -677,6 +681,15 @@ function atualizarBarra(erro) {
   info.append(titulo, status);
   barra.appendChild(info);
 
+  const chat = document.createElement("button");
+  chat.className = "botao-chat";
+  chat.title = "Conversa da sala";
+  const novas = partida ? naoLidas() : 0;
+  chat.setAttribute("aria-label", novas ? `Conversa da sala, ${novas} nova${novas === 1 ? "" : "s"}` : "Conversa da sala");
+  chat.innerHTML = `${icone("chat")}<span class="chat-contador">${novas > 9 ? "9+" : novas || ""}</span>`;
+  chat.onclick = abrirChat;
+  barra.appendChild(chat);
+
   const codigo = document.createElement("button");
   rotular(codigo, "enviar", "Código");
   codigo.onclick = compartilharCodigo;
@@ -695,6 +708,65 @@ function atualizarBarra(erro) {
   botaoSair.textContent = "Sair";
   botaoSair.onclick = confirmarSair;
   barra.appendChild(botaoSair);
+  atualizarEsperaDaSala();
+}
+
+// ---------- sala de espera ----------
+// Sala nova começa com iniciada: false. Até quem criou tocar em Começar,
+// ninguém marca nem rola: todos veem quem já entrou, convidam e conversam.
+
+let estavaEsperando = false;
+
+function atualizarEsperaDaSala() {
+  const caixa = $("sala-espera");
+  if (!caixa) return;
+  const esperando = !!sessao && antesDeComecar();
+  // começou agora: quem estava esperando vê o aviso
+  if (estavaEsperando && !esperando && sessao && partida && partida.iniciada === true) {
+    ultimoAviso = Date.now();
+    mostrarLegenda(["A partida começou!", comVez() ? `Quem começa: ${daVez() === minhaUid() ? "você" : nomeDe(daVez())}.` : "Boa sorte!"]);
+    tocar("suaVez");
+  }
+  estavaEsperando = esperando;
+  caixa.hidden = !esperando;
+  if (!esperando) return;
+
+  const eu = minhaUid();
+  const souCriador = partida.criador === eu;
+  $("sala-espera-titulo").textContent = `Sala ${sessao.codigo}`;
+  $("sala-espera-modo").textContent = [comVez() ? "Cada um na sua vez" : "Todos ao mesmo tempo",
+    soDadosDaSala() ? "só os dados do app" : ""].filter(Boolean).join(" · ");
+  const jogadores = jogadoresDe(partida).sort((a, b) => (a.entrouEm || 0) - (b.entrouEm || 0));
+  const lista = $("sala-espera-jogadores");
+  lista.innerHTML = "";
+  for (const j of jogadores) {
+    const li = document.createElement("li");
+    li.appendChild(document.createTextNode(j.nome + (j.uid === eu ? " (você)" : "")));
+    if (j.uid === partida.criador) {
+      const criou = document.createElement("small");
+      criou.textContent = "criou a sala";
+      li.appendChild(criou);
+    }
+    lista.appendChild(li);
+  }
+  $("sala-espera-dica").textContent = souCriador
+    ? (jogadores.length < 2 ? `Passe o código ${sessao.codigo} (botão Convidar). Quando todos chegarem, toque em Começar.`
+      : `${jogadores.length} na sala. Toque em Começar quando todos chegarem.`)
+    : `Esperando ${nomeDe(partida.criador)} começar a partida…`;
+  $("sala-espera-comecar").hidden = !souCriador;
+  const novas = naoLidas();
+  $("sala-espera-novas").textContent = novas > 9 ? "9+" : novas || "";
+}
+
+async function comecarPartida() {
+  if (!sessao || !partida || partida.criador !== minhaUid() || !antesDeComecar()) return;
+  if (jogadoresDe(partida).length < 2 && !await confirmar("Começar só com você?",
+    "Ninguém mais entrou ainda. Quem entrar depois começa na rodada em que a partida estiver.", "Começar")) return;
+  try {
+    await comLimite(update(ref(db, `partidas/${sessao.codigo}`), { iniciada: true }));
+  } catch (e) {
+    avisar(mensagemDeErro(e), "Não deu para começar");
+  }
 }
 
 async function compartilharCodigo() {
@@ -798,12 +870,13 @@ async function acaoJanela(tipo = modoJanela) {
     else await entrar(codigo, nome);
     definirNome(nome); // só depois de entrar (nome aceito na sala)
     fecharJanela();
+    mostrarTela("tela-jogo"); // podia estar na tela inicial
     atualizarBarra();
     if (registrouAgora) {
       avisar(`"${nome}" agora é o seu nome de usuário: ninguém mais pode usar. ` +
         `Se trocar de aparelho, recupere com o código ${lerUsuario().codigo}. ` +
         "Ele fica em Mais opções e vai junto no backup.", "Guarde seu código");
-    } else if (tipo === "criar") {
+    } else if (tipo === "criar" && !antesDeComecar()) { // com sala de espera, ela mesma mostra o código
       ultimoAviso = Date.now();
       mostrarLegenda(["Sala criada!", `Passe o código ${sessao.codigo} para os outros jogadores (botão Código).`]);
     }
@@ -1044,6 +1117,8 @@ function reiniciarVez() {
   rolagemVista = null;
   reacoesVistas = null;
   alternarReacoes(false);
+  mensagensVistas = null;
+  if (chatAberto) fecharChat();
   jogadasVistas = null;
   pulosVistos = null;
   avisosPublicados = null;
@@ -1054,11 +1129,19 @@ function reiniciarVez() {
 }
 
 // O app pergunta antes de deixar mexer na tabela ou nos dados.
+const antesDeComecar = () => !!(partida && partida.iniciada === false && !partida.revelada && !partida.encerrada);
+
 function podeJogar() {
+  if (antesDeComecar()) return false;
   return !comVez() || (daVez() === minhaUid() && !esperandoPassar());
 }
 
 function porQueNaoPode() {
+  if (antesDeComecar()) {
+    return partida.criador === minhaUid()
+      ? ["A partida ainda não começou", "Toque em Começar partida quando todos estiverem na sala."]
+      : ["A partida ainda não começou", `Espere ${nomeDe(partida.criador)} tocar em Começar.`];
+  }
   if (esperandoPassar()) return ["Você já jogou", "A vez está passando para o próximo. Para trocar, use Desfazer."];
   return ["Não é a sua vez", `Agora é a vez de ${nomeDe(daVez())}. Avisamos quando chegar a sua.`];
 }
@@ -1375,7 +1458,7 @@ function animarRolagemDoOutro(caixa, mesaDoOutro) {
 // todos da sala, com o nome de quem mandou. Vai no próprio jogador
 // (jogadores/<uid>/reacao), que cada um já pode gravar: não precisa de regra nova.
 
-const REACOES = ["👏", "😂", "😮", "😭", "💩", "🍀"];
+const REACOES = ["👏", "😂", "😡", "😭", "💩", "🍀"];
 let reacoesVistas = null;     // uid -> id da última reação já mostrada (null: ainda não olhou a sala)
 let ultimaReacaoEnviada = 0;
 
@@ -1398,6 +1481,121 @@ function reagir(emoji) {
   update(ref(db, `partidas/${sessao.codigo}/jogadores/${minhaUid()}`), {
     reacao: { e: emoji, id, em: serverTimestamp() }
   }).catch(() => {});
+  gravarMensagem({ e: emoji }); // a reação também fica no chat
+}
+
+// ---------- chat da sala ----------
+// Cada um guarda as próprias mensagens no seu jogador
+// (jogadores/<uid>/mensagens/<id> = { t: texto } ou { e: emoji }, com a hora);
+// o app junta as de todos em ordem. Não precisa de regra nova: cada um já
+// grava no próprio jogador. A sala (e o chat) some depois de 3 dias.
+
+let chatAberto = false;
+let mensagensVistas = null; // mensagens já vistas neste aparelho (null: ainda não olhou a sala)
+let ultimaMensagemEnviada = 0;
+
+function mensagensDaSala() {
+  const lista = [];
+  for (const j of jogadoresDe(partida)) {
+    for (const [id, m] of Object.entries(j.mensagens || {})) {
+      if (!m || (typeof m.t !== "string" && typeof m.e !== "string")) continue;
+      lista.push({ chave: `${j.uid}/${id}`, uid: j.uid, nome: j.nome || "Alguém",
+        texto: typeof m.t === "string" ? m.t.slice(0, 200) : null,
+        emoji: typeof m.e === "string" && REACOES.includes(m.e) ? m.e : null,
+        em: typeof m.em === "number" ? m.em : Date.now() });
+    }
+  }
+  return lista.filter(m => m.texto || m.emoji).sort((a, b) => a.em - b.em || a.chave.localeCompare(b.chave));
+}
+
+const chaveChatVisto = () => `yam-chat-visto-${sessao ? sessao.codigo : ""}`;
+
+function naoLidas() {
+  const visto = Number(localStorage.getItem(chaveChatVisto()) || 0);
+  return mensagensDaSala().filter(m => m.uid !== minhaUid() && m.em > visto).length;
+}
+
+function marcarLidas() {
+  const ms = mensagensDaSala();
+  try { localStorage.setItem(chaveChatVisto(), String(ms.length ? ms[ms.length - 1].em : Date.now())); } catch {}
+}
+
+function abrirChat() {
+  if (!sessao) return;
+  chatAberto = true;
+  $("janela-chat").hidden = false;
+  desenharChat(true);
+  marcarLidas();
+  atualizarBarra();
+  atualizarEsperaDaSala();
+  if (matchMedia("(pointer: fine)").matches) $("chat-texto").focus(); // no celular, o teclado só sobe quando a pessoa toca
+}
+
+function fecharChat() {
+  chatAberto = false;
+  $("janela-chat").hidden = true;
+  $("chat-texto").blur();
+}
+
+function desenharChat(paraOFim = false) {
+  const lista = $("chat-lista");
+  const noFim = lista.scrollHeight - lista.scrollTop - lista.clientHeight < 60;
+  const ms = mensagensDaSala();
+  const eu = minhaUid();
+  lista.innerHTML = "";
+  if (!ms.length) {
+    const vazio = document.createElement("li");
+    vazio.className = "chat-vazio";
+    vazio.textContent = "Nenhuma mensagem ainda. Diga oi!";
+    lista.appendChild(vazio);
+    return;
+  }
+  for (const m of ms.slice(-150)) {
+    const li = document.createElement("li");
+    li.className = `chat-msg${m.uid === eu ? " eu" : ""}${m.emoji ? " so-emoji" : ""}`;
+    const quem = document.createElement("small");
+    quem.textContent = m.uid === eu ? "Você" : m.nome;
+    li.append(quem, document.createTextNode(m.emoji || m.texto));
+    lista.appendChild(li);
+  }
+  if (paraOFim || noFim) lista.scrollTop = lista.scrollHeight;
+}
+
+function gravarMensagem(m) {
+  if (!sessao) return;
+  const id = Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+  update(ref(db, `partidas/${sessao.codigo}/jogadores/${minhaUid()}/mensagens/${id}`), { ...m, em: serverTimestamp() })
+    .catch(() => {});
+}
+
+function enviarMensagem() {
+  const campo = $("chat-texto");
+  const texto = campo.value.trim().replace(/\s+/g, " ").slice(0, 200);
+  if (!texto || !sessao || Date.now() - ultimaMensagemEnviada < 500) return;
+  ultimaMensagemEnviada = Date.now();
+  campo.value = "";
+  gravarMensagem({ t: texto });
+}
+
+// A cada retrato da sala: chat aberto, redesenha; fechado, avisa a mensagem nova
+// (as reações já sobem na tela, não precisam de aviso).
+function verMensagens() {
+  if (!partida) return;
+  const ms = mensagensDaSala();
+  if (mensagensVistas === null) {
+    mensagensVistas = new Set(ms.map(m => m.chave));
+  } else {
+    const novas = ms.filter(m => !mensagensVistas.has(m.chave));
+    novas.forEach(m => mensagensVistas.add(m.chave));
+    const deOutros = novas.filter(m => m.uid !== minhaUid() && m.texto);
+    if (deOutros.length && !chatAberto && document.visibilityState !== "hidden") {
+      const m = deOutros[deOutros.length - 1];
+      ultimoAviso = Date.now();
+      mostrarLegenda([m.nome, m.texto], "", { texto: "Responder", fazer: abrirChat });
+      tocar("reacao");
+    }
+  }
+  if (chatAberto) { desenharChat(); marcarLidas(); }
 }
 
 // A cada retrato da sala: mostra as reações novas dos outros. No primeiro
@@ -1446,7 +1644,7 @@ function mostrarReacao(emoji, nome) {
   animado.src = `https://fonts.gstatic.com/s/e/notoemoji/latest/${CODIGO_ANIMADO[emoji]}/512.webp`;
 }
 
-const CODIGO_ANIMADO = { "👏": "1f44f", "😂": "1f602", "😮": "1f62e", "😭": "1f62d", "💩": "1f4a9", "🍀": "1f340" };
+const CODIGO_ANIMADO = { "👏": "1f44f", "😂": "1f602", "😡": "1f621", "😭": "1f62d", "💩": "1f4a9", "🍀": "1f340" };
 
 // ---------- ligação com o resto do app ----------
 
@@ -1455,6 +1653,7 @@ window.familia = {
   aoTerminar, fecharEspera, fecharPodio, jogarDeNovo, limparSalasAntigas, sincronizar, registrarResultado,
   escolherModo, podeJogar, porQueNaoPode, podeDesfazer, mesaMudou, recuperar, trocarNome, avisosMudaram,
   historicoMudou, sincronizarHistorico, registrarNomeSePrecisar, alternarReacoes, reagir, lerRanking,
+  abrirChat, fecharChat, enviarMensagem, comecarPartida,
   soDadosDoApp: () => !!(sessao && partida && !partida.revelada && !partida.encerrada && soDadosDaSala()),
   ativa: () => !!sessao,
   revelada: () => !!(partida && (partida.revelada || partida.encerrada))

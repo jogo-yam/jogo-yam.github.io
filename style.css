@@ -2478,3 +2478,203 @@ button.podio-nome {
 :root[data-letra="grande"] .ranking-info strong { font-size: 18px; }
 :root[data-letra="grande"] .ranking-info small { font-size: 14px; }
 :root[data-letra="grande"] .ranking-pontos { font-size: 22px; }
+
+/* ---------- chat da sala ---------- */
+
+.botao-chat {
+  position: relative;
+  padding: 5px 8px !important;
+}
+.botao-chat .icone { margin: 0; width: 18px; height: 18px; }
+.chat-contador {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 9px;
+  background: var(--perigo);
+  color: #ffffff;
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 18px;
+}
+.chat-contador:empty { display: none; }
+
+.caixa-chat {
+  display: flex;
+  flex-direction: column;
+  max-width: 480px;
+  height: min(560px, calc(100dvh - 60px));
+  padding: 14px 14px 12px;
+  text-align: left;
+}
+.chat-topo { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+.chat-topo h2 { margin: 0; font-size: 18px; }
+
+.chat-lista {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  margin: 0;
+  padding: 4px 2px;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.chat-vazio { margin: auto; color: var(--texto-suave); font-size: 14px; text-align: center; }
+
+.chat-msg {
+  align-self: flex-start;
+  max-width: 82%;
+  padding: 7px 11px;
+  border-radius: 14px 14px 14px 4px;
+  background: var(--calculado);
+  overflow-wrap: anywhere;
+  line-height: 1.3;
+}
+.chat-msg small { display: block; margin-bottom: 1px; color: var(--texto-suave); font-size: 11.5px; font-weight: 700; }
+.chat-msg.eu {
+  align-self: flex-end;
+  border-radius: 14px 14px 4px 14px;
+  background: var(--destaque);
+  color: var(--destaque-texto);
+}
+.chat-msg.eu small { color: rgba(255, 255, 255, 0.75); }
+.chat-msg.so-emoji { background: none; padding: 0 4px; font-size: 34px; line-height: 1.1; }
+.chat-msg.so-emoji small { font-size: 11.5px; }
+.chat-msg.eu.so-emoji small { color: var(--texto-suave); text-align: right; }
+
+.chat-reacoes { display: flex; gap: 4px; margin: 8px 0; }
+.chat-reacoes button {
+  flex: 1 1 0;
+  min-width: 0;
+  padding: 6px 0;
+  border: 1px solid var(--borda);
+  border-radius: 10px;
+  font-size: 22px;
+  line-height: 1;
+}
+.chat-escrever { display: flex; gap: 6px; }
+.chat-escrever input {
+  flex: 1;
+  min-width: 0;
+  height: 44px;
+  margin: 0;
+  padding: 0 12px;
+  border: 2px solid var(--borda);
+  border-radius: 10px;
+  background: var(--fundo);
+  color: var(--texto);
+  font: inherit;
+  font-size: 16px;
+}
+.chat-escrever input:focus { outline: none; border-color: var(--destaque); }
+.chat-escrever button { padding: 0 14px; }
+.chat-escrever button .icone { margin: 0; }
+
+/* ---------- sala de espera ---------- */
+
+.caixa-sala-espera { max-width: 380px; }
+.sala-espera-modo { margin: 2px 0 12px; color: var(--texto-suave); font-size: 14px; }
+.sala-espera-rotulo { margin: 0 0 6px; font-size: 13px; font-weight: 700; text-align: left; }
+.sala-espera-jogadores {
+  max-height: 34vh;
+  overflow-y: auto;
+  margin: 0 0 10px;
+  padding: 0;
+  list-style: none;
+  text-align: left;
+  border: 1px solid var(--borda);
+  border-radius: 10px;
+}
+.sala-espera-jogadores li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 9px 12px;
+  font-weight: 600;
+}
+.sala-espera-jogadores li + li { border-top: 1px solid var(--borda); }
+.sala-espera-jogadores small { color: var(--texto-suave); font-size: 12px; font-weight: 400; white-space: nowrap; }
+.sala-espera-dica { margin: 0 0 12px; color: var(--texto-suave); font-size: 14px; }
+.caixa-sala-espera .fim-acoes { margin-top: 10px; }
+.botao-conversa { position: relative; }
+.caixa-sala-espera .link { margin-top: 10px; }
+
+/* ---------- tela inicial ---------- */
+
+.inicio {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: 100%;
+  max-width: 520px;
+  min-height: 0;
+  margin: 0 auto;
+  overflow-y: auto;
+  padding-bottom: 8px;
+}
+
+.inicio-topo { display: flex; align-items: center; justify-content: space-between; }
+.inicio-topo .logo { margin: 0; font-size: 28px; }
+.inicio-topo .logo .logo-dado { width: 32px; height: 32px; }
+
+.inicio-ola { margin: 4px 0 6px; font-size: 22px; font-weight: 800; }
+
+.inicio-grande {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+  padding: 16px 18px;
+  border-radius: 16px;
+  text-align: left;
+}
+.inicio-grande > .icone { width: 34px; height: 34px; margin: 0; flex-shrink: 0; }
+.inicio-grande span { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.inicio-grande strong { font-size: 19px; }
+.inicio-grande small { font-size: 13.5px; font-weight: 400; opacity: 0.85; }
+
+.inicio-grade {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+.inicio-grade button {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 14px 6px;
+  border-color: var(--borda);
+  border-radius: 14px;
+  font-weight: 700;
+  font-size: 15px;
+}
+.inicio-grade .icone { width: 26px; height: 26px; margin: 0; color: var(--destaque); }
+:root[data-theme="dark"] .inicio-grade .icone { color: var(--vez); }
+
+.inicio-resumo { width: 100%; margin: 4px 0 0; }
+
+/* no jogo: o logo volta para o início */
+.logo-inicio {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 2px 6px 2px 0;
+  border: none;
+  background: none;
+  font: inherit;
+  letter-spacing: inherit;
+  color: inherit;
+}
+.logo-inicio .seta-inicio { width: 18px; height: 18px; margin: 0 -3px 0 0; color: var(--texto-suave); }
+
+:root[data-letra="grande"] .inicio-grande strong { font-size: 21px; }
+:root[data-letra="grande"] .inicio-grande small { font-size: 15px; }
+:root[data-letra="grande"] .inicio-grade button { font-size: 17px; }

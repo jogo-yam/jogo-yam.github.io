@@ -129,3 +129,8 @@ test("regras: a identidade do nome pode ser lida e o cofre guarda o nome atual",
   assert.ok(regras.usuarios.$chave.segredo === undefined, "o segredo continua sem leitura");
   assert.ok(regras.historicos.$cofre.perfil[".write"], "perfil no cofre");
 });
+
+test("regras: só quem criou a sala pode começar a partida (sala de espera)", () => {
+  const regras = JSON.parse(lerArquivo("firebase-regras.json")).rules;
+  assert.match(regras.partidas.$codigo.iniciada[".write"], /criador/);
+});

@@ -44,6 +44,7 @@
         ".write": "auth != null && !newData.exists() && data.child('criadaEm').isNumber() && data.child('criadaEm').val() < now - 259200000",
         "criador": { ".write": "auth != null && !data.exists() && newData.val() === auth.uid" },
         "criadaEm": { ".write": "auth != null && !data.exists()" },
+        "iniciada": { ".write": "auth != null && data.parent().child('criador').val() === auth.uid", ".validate": "newData.isBoolean()" },
         "revelada": { ".write": "auth != null && newData.val() === true" },
         "encerrada": { ".write": "auth != null && newData.val() === true && data.parent().child('criador').val() === auth.uid" },
         "nomes": {

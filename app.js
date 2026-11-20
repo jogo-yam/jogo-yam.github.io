@@ -8,7 +8,7 @@ const rows = [
 const COLUNAS = 4;
 
 // Versão do app: igual ao número do CACHE_NAME do service-worker.js (um teste confere).
-const VERSAO = 71;
+const VERSAO = 72;
 
 // Avisos da vez com o app fechado: servidor na Cloudflare (worker/avisos.mjs).
 // Sem o endereço, a opção "Avisar a minha vez" não aparece.
@@ -1443,14 +1443,14 @@ async function novoJogo() {
 
 // ---------- telas ----------
 
-const telas = ["tela-jogo", "tela-historico", "tela-partida", "tela-estatisticas", "tela-regras", "tela-mais", "tela-ranking"];
+const telas = ["tela-inicio", "tela-jogo", "tela-historico", "tela-partida", "tela-estatisticas", "tela-regras", "tela-mais", "tela-ranking"];
 
 // "Como jogar" abre do jogo ou do Mais; o Voltar leva de volta para lá.
 let voltarDasRegrasPara = "tela-jogo";
 
 function abrirRegras() {
   const atual = telas.find(id => !document.getElementById(id).hidden);
-  voltarDasRegrasPara = atual && atual !== "tela-regras" ? atual : "tela-jogo";
+  voltarDasRegrasPara = atual && atual !== "tela-regras" ? atual : telaPrincipal;
   mostrarTela("tela-regras");
   document.querySelector("#tela-regras .regras").scrollTop = 0;
 }
@@ -1467,10 +1467,57 @@ function abrirMais() {
   document.querySelector("#tela-mais .mais").scrollTop = 0;
 }
 
+// Início e jogo são as telas "principais": as outras voltam para a última delas.
+let telaPrincipal = "tela-inicio";
+
 function mostrarTela(id) {
   if (id !== "tela-jogo") sairDoModoMarcar();
+  if (id === "tela-inicio" || id === "tela-jogo") telaPrincipal = id;
+  if (id === "tela-inicio") atualizarInicio();
   telas.forEach(t => { document.getElementById(t).hidden = t !== id; });
   window.scrollTo(0, 0);
+}
+
+function voltarParaPrincipal() {
+  mostrarTela(telaPrincipal);
+}
+
+// ---------- tela inicial ----------
+
+function atualizarInicio() {
+  const nome = nomeJogador;
+  document.getElementById("inicio-ola").textContent = nome ? `Olá, ${nome}!` : "Bora jogar?";
+
+  // partida em andamento: continuar; senão, nova
+  const casas = LINHAS_JOGO.reduce((n, l) => n + [0, 1, 2, 3].filter(c => preenchida(l, c)).length, 0);
+  const emAndamento = casas > 0 && !partidaCompleta();
+  document.getElementById("inicio-jogar-titulo").textContent = emAndamento ? "Continuar partida" : "Nova partida";
+  document.getElementById("inicio-jogar-sub").textContent = emAndamento
+    ? `${casas} de ${LINHAS_JOGO.length * 4} casas marcadas`
+    : "Marque os pontos com os seus dados ou os do app";
+
+  // numa sala: voltar para ela
+  const naSala = window.familia && familia.ativa();
+  const codigo = naSala && (ler("yam-familia", null) || {}).codigo;
+  document.getElementById("inicio-sala-titulo").textContent = naSala ? `Voltar para a sala ${codigo || ""}`.trim() : "Jogar em sala";
+  document.getElementById("inicio-sala-sub").textContent = naSala
+    ? "A partida em sala continua de onde parou"
+    : "Cada um no seu celular, com pódio no final";
+
+  // resumo das partidas terminadas
+  const terminadas = historico.filter(p => partidaTerminada(p));
+  document.getElementById("inicio-resumo").hidden = terminadas.length === 0;
+  if (terminadas.length) {
+    const totais = terminadas.map(p => calcularTotais(p.valores).geral);
+    document.getElementById("inicio-partidas").textContent = terminadas.length;
+    document.getElementById("inicio-recorde").textContent = Math.max(...totais);
+    document.getElementById("inicio-media").textContent = Math.round(totais.reduce((a, b) => a + b, 0) / totais.length);
+  }
+}
+
+function irParaSala() {
+  if (window.familia && familia.ativa()) { mostrarTela("tela-jogo"); return; }
+  escolherSala();
 }
 
 function formatarData(iso) {
@@ -3323,10 +3370,13 @@ async function verificarLinkDaSala() {
 
 setTimeout(verificarLinkDaSala, 0);
 
+// Ao abrir: quem está numa sala volta direto para o jogo; os outros veem a tela inicial.
+try { mostrarTela(ler("yam-familia", null) ? "tela-jogo" : "tela-inicio"); } catch {}
+
 // Atalhos do ícone (segurar o ícone do app): ?abrir=dados ou ?abrir=historico
 try {
   const atalho = new URLSearchParams(location.search).get("abrir");
-  if (atalho === "dados") abrirDados();
+  if (atalho === "dados") { mostrarTela("tela-jogo"); abrirDados(); }
   else if (atalho === "historico") abrirHistorico();
   if (atalho) history.replaceState(null, "", location.pathname);
 } catch {}
@@ -3338,8 +3388,9 @@ try {
 
 const MAIOR_PONTUACAO = 1948; // a tabela inteira no máximo (o Firebase recusa mais que isso)
 
-const partidaTerminada = p => !!(p && p.valores &&
-  LINHAS_JOGO.every(l => [0, 1, 2, 3].every(c => (p.valores[`${l}-${c}`] ?? "") !== "")));
+function partidaTerminada(p) {
+  return !!(p && p.valores && LINHAS_JOGO.every(l => [0, 1, 2, 3].every(c => (p.valores[`${l}-${c}`] ?? "") !== "")));
+}
 
 // A partida que vai para o ranking: a de maior total; empate, a mais antiga.
 function melhorPartida(lista) {
@@ -3412,6 +3463,7 @@ function linhaDoRanking(r, i, eu) {
 function voltarDoRanking() {
   if (voltarDoRankingPara === "tela-historico") abrirHistorico();
   else if (voltarDoRankingPara === "tela-mais") abrirMais();
+  else if (voltarDoRankingPara === "tela-inicio") mostrarTela("tela-inicio");
   else mostrarTela(voltarDoRankingPara);
 }
 
@@ -3420,6 +3472,7 @@ function voltarDoRanking() {
 const FECHAR_COM_ESC = [
   ["janela-pergunta", () => responder(false)],
   ["vez-reacoes", () => window.familia && familia.alternarReacoes(false)],
+  ["janela-chat", () => window.familia && familia.fecharChat()],
   ["janela-recuperar", () => fecharRecuperar()],
   ["janela-nome", () => fecharJanelaNome()],
   ["janela-instalar", () => fecharInstalar()],

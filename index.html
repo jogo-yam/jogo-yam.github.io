@@ -20,13 +20,13 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="theme-color" content="#f3f3f0" media="(prefers-color-scheme: light)">
   <meta name="theme-color" content="#121212" media="(prefers-color-scheme: dark)">
-  <link rel="manifest" href="manifest.json?v=71">
+  <link rel="manifest" href="manifest.json?v=72">
   <link rel="icon" type="image/png" sizes="32x32" href="icone-dado-32.png">
   <link rel="apple-touch-icon" href="apple-touch-icon.png">
 
   <link rel="preload" href="fontes/nunito.woff2" as="font" type="font/woff2" crossorigin>
   <!-- ?v= é a versão do app (igual ao VERSAO do app.js; um teste confere): versão nova, endereço novo -->
-  <link rel="stylesheet" href="style.css?v=71">
+  <link rel="stylesheet" href="style.css?v=72">
 
   <!-- Aplica o tema escolhido antes de desenhar a página, para não piscar. -->
   <script>
@@ -42,6 +42,9 @@
 <!-- Ícones do app (desenhados: iguais em todo celular, ao contrário dos emojis) -->
 <svg class="sprite" aria-hidden="true" focusable="false">
   <symbol id="i-sala" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c0-3.6 2.9-6 6.5-6s6.5 2.4 6.5 6"/><path d="M16 4.6a3.5 3.5 0 0 1 0 6.8"/><path d="M18 14.3c2.2.7 3.5 2.7 3.5 5.7"/></symbol>
+  <symbol id="i-lista" viewBox="0 0 24 24"><path d="M9 6.5h11M9 12h11M9 17.5h11"/><path d="M4.5 6.5h.01M4.5 12h.01M4.5 17.5h.01" stroke-width="3"/></symbol>
+  <symbol id="i-chat" viewBox="0 0 24 24"><path d="M4 5.5h16a1.5 1.5 0 0 1 1.5 1.5v9a1.5 1.5 0 0 1-1.5 1.5h-9l-5 4v-4H4A1.5 1.5 0 0 1 2.5 16V7A1.5 1.5 0 0 1 4 5.5z"/></symbol>
+  <symbol id="i-casa" viewBox="0 0 24 24"><path d="M3.5 11 12 4l8.5 7"/><path d="M5.5 9.5V20h5v-5.5h3V20h5V9.5"/></symbol>
   <symbol id="i-reagir" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9.5"/><path d="M8.2 14.2a4.6 4.6 0 0 0 7.6 0"/><path d="M9 9.6h.01M15 9.6h.01" stroke-width="3"/></symbol>
   <symbol id="i-pessoa" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 3.6-7 8-7s8 3 8 7"/></symbol>
   <symbol id="i-ajuda" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9.5"/><path d="M9.2 9.3a2.9 2.9 0 0 1 5.6 1c0 2-2.8 2.4-2.8 4.2"/><path d="M12 17.6h.01" stroke-width="3"/></symbol>
@@ -75,10 +78,43 @@
   <symbol id="i-atualizar" viewBox="0 0 24 24"><path d="M20.5 12a8.5 8.5 0 1 1-2.5-6"/><path d="M20.5 3.5V9H15"/></symbol>
 </svg>
 
+<!-- Tela inicial: o que dá para fazer no app -->
+<section id="tela-inicio">
+  <div class="inicio">
+    <div class="inicio-topo">
+      <h1 class="logo"><svg class="logo-dado" viewBox="0 0 32 32" aria-hidden="true"><rect x="1" y="1" width="30" height="30" rx="8"/><circle cx="9.5" cy="9.5" r="3"/><circle cx="22.5" cy="9.5" r="3"/><circle cx="16" cy="16" r="3"/><circle cx="9.5" cy="22.5" r="3"/><circle cx="22.5" cy="22.5" r="3"/></svg>YAM</h1>
+      <button class="botao-icone" onclick="abrirMais()" aria-label="Mais opções" title="Mais opções"><svg class="icone" aria-hidden="true"><use href="#i-ajustes"/></svg></button>
+    </div>
+    <p id="inicio-ola" class="inicio-ola">Bora jogar?</p>
+
+    <button id="inicio-jogar" class="principal inicio-grande" onclick="mostrarTela('tela-jogo')">
+      <svg class="icone" aria-hidden="true"><use href="#i-dado"/></svg>
+      <span><strong id="inicio-jogar-titulo">Nova partida</strong><small id="inicio-jogar-sub">Marque os pontos com os seus dados ou os do app</small></span>
+    </button>
+    <button id="inicio-sala" class="inicio-grande" onclick="irParaSala()">
+      <svg class="icone" aria-hidden="true"><use href="#i-sala"/></svg>
+      <span><strong id="inicio-sala-titulo">Jogar em sala</strong><small id="inicio-sala-sub">Cada um no seu celular, com pódio no final</small></span>
+    </button>
+
+    <div class="inicio-grade">
+      <button onclick="abrirHistorico()"><svg class="icone" aria-hidden="true"><use href="#i-lista"/></svg>Histórico</button>
+      <button onclick="abrirRanking('tela-inicio')"><svg class="icone" aria-hidden="true"><use href="#i-trofeu"/></svg>Ranking</button>
+      <button onclick="abrirEstatisticas()"><svg class="icone" aria-hidden="true"><use href="#i-grafico"/></svg>Estatísticas</button>
+      <button onclick="abrirRegras()"><svg class="icone" aria-hidden="true"><use href="#i-ajuda"/></svg>Como jogar</button>
+    </div>
+
+    <div id="inicio-resumo" class="resumo inicio-resumo" hidden>
+      <div><span id="inicio-partidas">0</span><small>partidas</small></div>
+      <div><span id="inicio-recorde">0</span><small>recorde</small></div>
+      <div><span id="inicio-media">0</span><small>média</small></div>
+    </div>
+  </div>
+</section>
+
 <!-- Jogo atual -->
-<section id="tela-jogo">
+<section id="tela-jogo" hidden>
   <div class="cabecalho-jogo">
-    <h1 class="logo"><svg class="logo-dado" viewBox="0 0 32 32" aria-hidden="true"><rect x="1" y="1" width="30" height="30" rx="8"/><circle cx="9.5" cy="9.5" r="3"/><circle cx="22.5" cy="9.5" r="3"/><circle cx="16" cy="16" r="3"/><circle cx="9.5" cy="22.5" r="3"/><circle cx="22.5" cy="22.5" r="3"/></svg>YAM</h1>
+    <h1 class="logo"><button class="logo-inicio" onclick="mostrarTela('tela-inicio')" aria-label="Início" title="Início"><svg class="icone seta-inicio" aria-hidden="true"><use href="#i-voltar"/></svg><svg class="logo-dado" viewBox="0 0 32 32" aria-hidden="true"><rect x="1" y="1" width="30" height="30" rx="8"/><circle cx="9.5" cy="9.5" r="3"/><circle cx="22.5" cy="9.5" r="3"/><circle cx="16" cy="16" r="3"/><circle cx="9.5" cy="22.5" r="3"/><circle cx="22.5" cy="22.5" r="3"/></svg>YAM</button></h1>
     <button id="botao-sala" onclick="escolherSala()"><svg class="icone" aria-hidden="true"><use href="#i-sala"/></svg>Jogar em sala</button>
     <button class="botao-icone" onclick="abrirRegras()" aria-label="Como jogar" title="Como jogar"><svg class="icone" aria-hidden="true"><use href="#i-ajuda"/></svg></button>
     <button class="botao-icone" onclick="abrirMais()" aria-label="Mais opções" title="Mais opções"><svg class="icone" aria-hidden="true"><use href="#i-ajustes"/></svg></button>
@@ -99,7 +135,7 @@
     <div id="vez-reacoes" class="vez-reacoes" hidden>
       <button onclick="familia.reagir('👏')" aria-label="Palmas">👏</button>
       <button onclick="familia.reagir('😂')" aria-label="Risada">😂</button>
-      <button onclick="familia.reagir('😮')" aria-label="Uau">😮</button>
+      <button onclick="familia.reagir('😡')" aria-label="Bravo">😡</button>
       <button onclick="familia.reagir('😭')" aria-label="Chorando">😭</button>
       <button onclick="familia.reagir('💩')" aria-label="Cocô">💩</button>
       <button onclick="familia.reagir('🍀')" aria-label="Boa sorte">🍀</button>
@@ -149,7 +185,7 @@
 <!-- Lista de partidas salvas -->
 <section id="tela-historico" hidden>
   <div class="topo">
-    <button onclick="mostrarTela('tela-jogo')"><svg class="icone" aria-hidden="true"><use href="#i-voltar"/></svg>Voltar</button>
+    <button onclick="voltarParaPrincipal()"><svg class="icone" aria-hidden="true"><use href="#i-voltar"/></svg>Voltar</button>
     <h1>Histórico</h1>
     <button class="direita" onclick="abrirEstatisticas()"><svg class="icone" aria-hidden="true"><use href="#i-grafico"/></svg>Estatísticas</button>
   </div>
@@ -254,7 +290,7 @@
 <!-- Mais opções -->
 <section id="tela-mais" hidden>
   <div class="topo">
-    <button onclick="mostrarTela('tela-jogo')"><svg class="icone" aria-hidden="true"><use href="#i-voltar"/></svg>Voltar</button>
+    <button onclick="voltarParaPrincipal()"><svg class="icone" aria-hidden="true"><use href="#i-voltar"/></svg>Voltar</button>
     <h1>Mais</h1>
   </div>
   <div class="mais">
@@ -450,6 +486,48 @@
   </div>
 </div>
 
+<!-- Chat da sala -->
+<div id="janela-chat" class="janela janela-baixo" hidden onclick="if (event.target === this) familia.fecharChat()">
+  <div class="janela-caixa caixa-chat" role="dialog" aria-modal="true" aria-labelledby="chat-titulo">
+    <div class="chat-topo">
+      <h2 id="chat-titulo">Conversa da sala</h2>
+      <button class="aviso-fechar" onclick="familia.fecharChat()" aria-label="Fechar" title="Fechar"><svg class="icone" aria-hidden="true"><use href="#i-fechar"/></svg></button>
+    </div>
+    <ol id="chat-lista" class="chat-lista" aria-live="polite"></ol>
+    <div class="chat-reacoes">
+      <button onclick="familia.reagir('👏')" aria-label="Palmas">👏</button>
+      <button onclick="familia.reagir('😂')" aria-label="Risada">😂</button>
+      <button onclick="familia.reagir('😡')" aria-label="Bravo">😡</button>
+      <button onclick="familia.reagir('😭')" aria-label="Chorando">😭</button>
+      <button onclick="familia.reagir('💩')" aria-label="Cocô">💩</button>
+      <button onclick="familia.reagir('🍀')" aria-label="Boa sorte">🍀</button>
+    </div>
+    <form class="chat-escrever" onsubmit="event.preventDefault(); familia.enviarMensagem()">
+      <input id="chat-texto" type="text" maxlength="200" autocomplete="off" enterkeyhint="send"
+             placeholder="Escreva uma mensagem" aria-label="Mensagem">
+      <button type="submit" class="principal" aria-label="Enviar"><svg class="icone" aria-hidden="true"><use href="#i-enviar"/></svg></button>
+    </form>
+  </div>
+</div>
+
+<!-- Sala de espera: antes de começar, quem já entrou; quem criou toca em Começar -->
+<div id="sala-espera" class="fim-de-jogo" hidden>
+  <div class="fim-caixa caixa-sala-espera" role="dialog" aria-modal="true" aria-labelledby="sala-espera-titulo">
+    <div class="fim-dado fim-icone" aria-hidden="true"><svg class="icone" aria-hidden="true"><use href="#i-sala"/></svg></div>
+    <h2 id="sala-espera-titulo">Sala</h2>
+    <p id="sala-espera-modo" class="sala-espera-modo"></p>
+    <p class="sala-espera-rotulo">Quem já entrou</p>
+    <ul id="sala-espera-jogadores" class="sala-espera-jogadores"></ul>
+    <p id="sala-espera-dica" class="sala-espera-dica"></p>
+    <button id="sala-espera-comecar" class="principal largo" onclick="familia.comecarPartida()"><svg class="icone" aria-hidden="true"><use href="#i-dado"/></svg>Começar partida</button>
+    <div class="fim-acoes">
+      <button onclick="familia.compartilharCodigo()"><svg class="icone" aria-hidden="true"><use href="#i-enviar"/></svg>Convidar</button>
+      <button class="botao-conversa" onclick="familia.abrirChat()"><svg class="icone" aria-hidden="true"><use href="#i-chat"/></svg>Conversa<span id="sala-espera-novas" class="chat-contador"></span></button>
+    </div>
+    <button class="link" onclick="familia.confirmarSair()">Sair da sala</button>
+  </div>
+</div>
+
 <!-- Partida em família: esperando os outros -->
 <div id="familia-espera" class="fim-de-jogo" hidden>
   <div class="fim-caixa">
@@ -629,7 +707,7 @@
   </div>
 </div>
 
-<script src="app.js?v=71"></script>
+<script src="app.js?v=72"></script>
 <script>
   // Rede de segurança: se o app.js não carregou (ex.: troca de versão no meio
   // do caminho), recarrega sozinho uma vez, em vez de ficar com a tabela vazia.
@@ -643,7 +721,7 @@
     setTimeout(function () { location.replace(location.pathname + "?atualizado=" + Date.now()); }, 1500);
   })();
 </script>
-<script type="module" src="familia.js?v=71"></script>
+<script type="module" src="familia.js?v=72"></script>
 
 <!-- Service Worker -->
 <script>
