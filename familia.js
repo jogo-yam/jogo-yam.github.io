@@ -151,8 +151,9 @@ async function entrar(codigo, nome, modo = null, soDados = null) {
     : 0;
   const jaEstava = snap.child(`jogadores/${user.uid}/entrouEm`).exists();
 
+  const identidade = (lerUsuario() || {}).id || null; // as estatísticas dos outros acham a pessoa por ela
   await update(ref(db, `${raiz}/jogadores/${user.uid}`), {
-    nome, chave, terminou: false, total: null, colunas: null, valores: null,
+    nome, chave, id: identidade, terminou: false, total: null, colunas: null, valores: null,
     modo: modoDaSalaAgora, soDados: soDadosAgora,
     casas: casasMarcadas(), base: jaEstava ? (sala.jogadores[user.uid].base || 0) : base,
     ...(jaEstava ? {} : { entrouEm: serverTimestamp() }) // a ordem da vez não muda se entrar de novo
@@ -264,14 +265,35 @@ async function segredoDe(chave, codigo) {
 
 const negado = e => /permission/i.test(String((e && (e.code || e.message)) || e));
 
-async function gravarNome(nome, codigo) {
+// Identidade do jogador: fixa, não muda quando ele troca de nome. Fica em
+// usuarios/<chave>/id (todos podem ler) e é por ela que o histórico na nuvem e
+// as estatísticas de quem jogou contra ele acham a pessoa.
+function gerarId() {
+  const b = new Uint8Array(12);
+  crypto.getRandomValues(b);
+  return "j" + [...b].map(x => x.toString(16).padStart(2, "0")).join("");
+}
+
+// A identidade registrada para um nome: o id, null (sem identidade ainda) ou
+// undefined (o banco ainda está com as regras antigas e não deixa ler).
+async function idPublicoDe(chave) {
+  try {
+    return (await comLimite(lerDoBanco(`usuarios/${chave}/id`))).val() || null;
+  } catch (e) {
+    if (negado(e)) return undefined;
+    throw e;
+  }
+}
+
+// update (e não set): sem `id`, a identidade que já estava no nome continua lá
+async function gravarNome(nome, codigo, id) {
   const user = await usuario();
   const chave = chaveDoNome(nome);
   const cod = formatarCodigo(String(codigo).replace(/\D/g, ""));
-  await comLimite(set(ref(db, `usuarios/${chave}`), {
-    dono: user.uid, segredo: await segredoDe(chave, cod), nome, em: serverTimestamp()
+  await comLimite(update(ref(db, `usuarios/${chave}`), {
+    dono: user.uid, segredo: await segredoDe(chave, cod), nome, em: serverTimestamp(), ...(id ? { id } : {})
   }));
-  return { nome, chave, codigo: cod };
+  return { nome, chave, codigo: cod, ...(id ? { id } : {}) };
 }
 
 function nomeTomado(nome) {
@@ -286,8 +308,9 @@ async function garantirUsuario(nome) {
   const local = lerUsuario();
   const mesmo = !!local && local.chave === chaveDoNome(nome);
   try {
-    const u = await gravarNome(nome, mesmo ? local.codigo : gerarCodigo());
-    guardarUsuario(u);
+    // o mesmo nome continua com a mesma identidade; um nome novo ganha uma nova
+    const u = await gravarNome(nome, mesmo ? local.codigo : gerarCodigo(), mesmo ? local.id : gerarId());
+    guardarUsuario(mesmo ? { ...local, ...u } : u);
     if (!mesmo) historicoMudou(); // nome novo: o histórico daqui sobe para a nuvem
     return !mesmo;
   } catch (e) {
@@ -312,7 +335,9 @@ async function recuperar(nome, codigo) {
     throw new Error(`Não existe o nome de usuário "${nome}". Confira como ele está escrito em Mais, no outro aparelho.`);
   }
   try {
-    guardarUsuario(await gravarNome(nome, codigo));
+    // a identidade que já está no nome vem junto (gravarNome não mexe nela)
+    const id = await idPublicoDe(chaveDoNome(nome)).catch(() => null);
+    guardarUsuario(await gravarNome(nome, codigo, id || undefined));
   } catch (e) {
     if (negado(e)) throw new Error("Nome ou código não confere. Confira e tente de novo.");
     throw new Error(mensagemDeErro(e));
@@ -320,37 +345,115 @@ async function recuperar(nome, codigo) {
   return sincronizarHistorico(); // as partidas da nuvem voltam (devolve quantas)
 }
 
-// Trocar o nome de usuário: registra o novo (mesmo código) e libera o antigo.
+// Trocar o nome de usuário: o nome novo fica com o mesmo código e a mesma
+// identidade, então o histórico na nuvem (guardado pela identidade) não muda de
+// lugar. O cofre passa a dizer o nome novo, e os outros aparelhos da pessoa
+// trocam sozinhos (seguirTrocaDeNome). Só então o nome antigo é liberado.
 async function trocarNome(novo) {
+  await sincronizarHistorico(); // garante a identidade e o histórico em dia antes
   const antigo = lerUsuario();
+  const id = antigo.id || gerarId();
   let u;
   try {
-    u = await gravarNome(novo, antigo.codigo);
+    u = await gravarNome(novo, antigo.codigo, id);
   } catch (e) {
     if (negado(e)) throw nomeTomado(novo);
     throw new Error(mensagemDeErro(e));
   }
   if (antigo.chave !== u.chave) {
+    const cofre = await cofreDe(id, u.codigo);
+    await comLimite(update(ref(db, `historicos/${cofre}`), { perfil: { nome: u.nome, chave: u.chave } })).catch(() => {});
+    // só o aparelho dono do nome pode apagá-lo: com o código, o nome antigo volta para cá antes
+    await gravarNome(antigo.nome, antigo.codigo, id).catch(() => {});
     await remove(ref(db, `ranking/${antigo.chave}`)).catch(() => {}); // o recorde volta no nome novo
     await remove(ref(db, `usuarios/${antigo.chave}`)).catch(() => {});
   }
-  await sincronizarHistorico(); // traz tudo do cofre do nome antigo antes de trocar
-  guardarUsuario(u);
-  historicoMudou(); // e manda tudo para o cofre do nome novo
+  guardarUsuario({ ...antigo, ...u });
+  historicoMudou();
 }
 
 // ---------- histórico na nuvem ----------
-// historicos/<cofre>/<id> = a partida (ou {excluida: true}). O cofre é o resumo
-// SHA-256 de "yam-historico:<nome>:<código>": só quem sabe o nome e o código
-// acha o histórico, em qualquer aparelho. A conta de juntar está no app.js
-// (mesclarHistorico). Sem internet ou com as regras antigas, fica para depois.
+// historicos/<cofre>/<id> = a partida (ou {excluida: true}), e
+// historicos/<cofre>/perfil = { nome, chave } (o nome atual da pessoa). O cofre
+// é o resumo SHA-256 de "yam-historico:<identidade>:<código>": só quem tem o
+// nome e o código acha, em qualquer aparelho, e trocar de nome não muda o
+// cofre. Antes da identidade, o cofre era pelo nome ("cofre antigo"): ele é
+// lido uma vez em cada aparelho e as partidas passam para o cofre novo.
+// A conta de juntar está no app.js (mesclarHistorico).
 
-async function cofreDoHistorico() {
-  const u = lerUsuario();
-  if (!u || !u.chave || !u.codigo) return null;
-  const digitos = String(u.codigo).replace(/\D/g, "");
-  const bytes = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(`yam-historico:${u.chave}:${digitos}`));
+async function resumo(texto) {
+  const bytes = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(texto));
   return [...new Uint8Array(bytes)].map(b => b.toString(16).padStart(2, "0")).join("");
+}
+const digitosDe = codigo => String(codigo).replace(/\D/g, "");
+const cofreDe = (id, codigo) => resumo(`yam-historico:${id}:${digitosDe(codigo)}`);
+const cofreAntigoDe = (chave, codigo) => resumo(`yam-historico:${chave}:${digitosDe(codigo)}`);
+
+// Outro aparelho trocou o nome? O cofre diz o nome atual; troca aqui também se
+// o nome novo é mesmo desta pessoa (mesma identidade).
+async function seguirTrocaDeNome(u) {
+  const perfil = (await comLimite(lerDoBanco(`historicos/${await cofreDe(u.id, u.codigo)}/perfil`))).val();
+  if (!perfil || !perfil.chave || perfil.chave === u.chave || typeof perfil.nome !== "string") return u;
+  if (await idPublicoDe(perfil.chave) !== u.id) return u;
+  const novo = { ...u, nome: perfil.nome, chave: perfil.chave };
+  guardarUsuario(novo);
+  ultimoAviso = Date.now();
+  mostrarLegenda(["Seu nome mudou", `Você trocou o nome para ${perfil.nome} em outro aparelho. Aqui também já está assim.`]);
+  return novo;
+}
+
+// A identidade que vale é a registrada no nome. Nome antigo, sem identidade
+// ainda: este aparelho cria (e, se dois criarem juntos, todos ficam com a do banco).
+async function garantirIdentidade(u) {
+  const publico = await idPublicoDe(u.chave);
+  if (publico === undefined) return null; // regras antigas: segue com o cofre antigo
+  if (publico) {
+    if (publico !== u.id) { u = { ...u, id: publico }; guardarUsuario(u); }
+    return u;
+  }
+  if (!(await comLimite(lerDoBanco(`usuarios/${u.chave}/nome`))).exists()) return null; // o nome não existe mais
+  const gravado = await gravarNome(u.nome, u.codigo, u.id || gerarId());
+  u = { ...u, ...gravado };
+  guardarUsuario(u);
+  return u;
+}
+
+// O cofre antigo (pelo nome) é lido uma vez neste aparelho: o que tiver lá
+// entra no histórico daqui e, daí, vai para o cofre novo.
+async function trazerCofreAntigo(u) {
+  const cofre = await cofreAntigoDe(u.chave, u.codigo);
+  if (localStorage.getItem("yam-cofre-antigo-lido") === cofre) return 0;
+  const antigo = (await comLimite(lerDoBanco(`historicos/${cofre}`))).val();
+  let chegaram = 0;
+  if (antigo) {
+    const r = mesclarHistorico(historico, antigo, lerExcluidas());
+    chegaram = aplicarHistoricoDaNuvem({ ...r, enviar: {} });
+  }
+  localStorage.setItem("yam-cofre-antigo-lido", cofre);
+  return chegaram;
+}
+
+async function sincronizarCofre(cofre, u) {
+  const remoto = { ...((await comLimite(lerDoBanco(`historicos/${cofre}`))).val() || {}) };
+  const perfil = remoto.perfil;
+  delete remoto.perfil;
+  const r = mesclarHistorico(historico, remoto, lerExcluidas());
+  const enviar = { ...r.enviar };
+  if (u && (!perfil || perfil.nome !== u.nome || perfil.chave !== u.chave)) enviar.perfil = { nome: u.nome, chave: u.chave };
+  if (Object.keys(enviar).length) await comLimite(update(ref(db, `historicos/${cofre}`), enviar));
+  return aplicarHistoricoDaNuvem(r);
+}
+
+async function sincronizarAgora() {
+  let u = lerUsuario();
+  if (!u || !u.chave || !u.codigo || navigator.onLine === false) return null;
+  await usuario();
+  if (u.id) u = await seguirTrocaDeNome(u).catch(() => u);
+  const comIdentidade = await garantirIdentidade(u);
+  if (!comIdentidade) return sincronizarCofre(await cofreAntigoDe(u.chave, u.codigo), null); // como antes
+  u = comIdentidade;
+  const doAntigo = await trazerCofreAntigo(u).catch(() => 0);
+  return doAntigo + await sincronizarCofre(await cofreDe(u.id, u.codigo), u);
 }
 
 let sincronizacao = null;
@@ -359,19 +462,7 @@ let sincronizarDeNovo = false;
 // Devolve quantas partidas chegaram da nuvem (ou null se não deu para falar com ela).
 async function sincronizarHistorico() {
   if (sincronizacao) { sincronizarDeNovo = true; return sincronizacao; }
-  sincronizacao = (async () => {
-    const cofre = await cofreDoHistorico();
-    if (!cofre || navigator.onLine === false) return null;
-    try {
-      await usuario();
-      const snap = await comLimite(lerDoBanco(`historicos/${cofre}`));
-      const r = mesclarHistorico(historico, snap.val() || {}, lerExcluidas());
-      if (Object.keys(r.enviar).length) await comLimite(update(ref(db, `historicos/${cofre}`), r.enviar));
-      return aplicarHistoricoDaNuvem(r);
-    } catch {
-      return null; // sem internet, ou o banco ainda não tem as regras do histórico
-    }
-  })();
+  sincronizacao = sincronizarAgora().catch(() => null); // sem internet: fica para depois
   let resultado = null;
   try {
     resultado = await sincronizacao;
@@ -748,7 +839,7 @@ function mostrarPodio() {
   const podio = {
     titulo: tituloDoPodio(vencedores.map(v => v.nome)),
     terminaram: terminaram.map(j => ({
-      nome: j.nome, total: j.total, posicao: posicao(j), ...euSou(j),
+      nome: j.nome, total: j.total, posicao: posicao(j), ...euSou(j), ...(typeof j.id === "string" ? { id: j.id } : {}),
       ...(j.valores && typeof j.valores === "object" ? { valores: j.valores } : {})
     })),
     naoTerminaram: naoTerminaram.map(j => ({ nome: j.nome, ...euSou(j) }))

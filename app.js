@@ -8,7 +8,7 @@ const rows = [
 const COLUNAS = 4;
 
 // Versão do app: igual ao número do CACHE_NAME do service-worker.js (um teste confere).
-const VERSAO = 69;
+const VERSAO = 70;
 
 // Avisos da vez com o app fechado: servidor na Cloudflare (worker/avisos.mjs).
 // Sem o endereço, a opção "Avisar a minha vez" não aparece.
@@ -2128,7 +2128,8 @@ async function importarHistorico(campo) {
   const doBackup = dados && dados.usuario;
   if (!lerUsuario() && doBackup && typeof doBackup.nome === "string" && typeof doBackup.chave === "string" &&
       /^\d{4}-\d{4}$/.test(doBackup.codigo)) {
-    guardarUsuario({ nome: doBackup.nome, chave: doBackup.chave, codigo: doBackup.codigo });
+    guardarUsuario({ nome: doBackup.nome, chave: doBackup.chave, codigo: doBackup.codigo,
+      ...(typeof doBackup.id === "string" ? { id: doBackup.id } : {}) });
   }
 
   const ids = new Set(historico.map(p => p.id));
@@ -3049,7 +3050,16 @@ function podeJogarAgora() {
 const normalizarNome = nome => String(nome).normalize("NFD").replace(/[\u0300-\u036f]/g, "")
   .toLowerCase().trim().replace(/\s+/g, " ");
 
+// Cada pessoa é achada pela identidade (que não muda quando ela troca de nome).
+// Partidas de antes da identidade só têm o nome: se esse nome já apareceu com
+// uma identidade em outra partida, contam para a mesma pessoa.
 function confrontos(partidas) {
+  const salas = partidas.map(p => p.sala && p.sala.podio)
+    .filter(podio => podio && Array.isArray(podio.terminaram) && podio.terminaram.some(j => j.eu));
+  const identidadeDoNome = new Map();
+  for (const podio of salas) {
+    for (const j of podio.terminaram) if (!j.eu && j.id) identidadeDoNome.set(normalizarNome(j.nome), j.id);
+  }
   const porPessoa = new Map();
   for (const p of partidas) {
     const podio = p.sala && p.sala.podio;
@@ -3058,7 +3068,7 @@ function confrontos(partidas) {
     if (!eu) continue;
     for (const outro of podio.terminaram) {
       if (outro.eu) continue;
-      const chave = normalizarNome(outro.nome);
+      const chave = outro.id || identidadeDoNome.get(normalizarNome(outro.nome)) || `nome:${normalizarNome(outro.nome)}`;
       const c = porPessoa.get(chave) ||
         { nome: outro.nome, partidas: 0, vitorias: 0, derrotas: 0, empates: 0, meus: 0, deles: 0, data: "" };
       c.partidas++;

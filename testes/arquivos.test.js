@@ -122,3 +122,10 @@ test("app.js carrega até o fim e o index.html recarrega se ele não carregar", 
   assert.match(sw, /request\.mode === "navigate" \? caches\.match\("\.\/index\.html"\)/,
     "o index.html só substitui páginas, nunca um .js");
 });
+
+test("regras: a identidade do nome pode ser lida e o cofre guarda o nome atual", () => {
+  const regras = JSON.parse(lerArquivo("firebase-regras.json")).rules;
+  assert.equal(regras.usuarios.$chave.id[".read"], "auth != null");
+  assert.ok(regras.usuarios.$chave.segredo === undefined, "o segredo continua sem leitura");
+  assert.ok(regras.historicos.$cofre.perfil[".write"], "perfil no cofre");
+});

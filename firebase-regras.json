@@ -3,6 +3,7 @@
     "usuarios": {
       "$chave": {
         "nome": { ".read": "auth != null" },
+        "id": { ".read": "auth != null", ".validate": "newData.isString() && newData.val().length <= 40" },
         ".write": "auth != null && ((!newData.exists() && data.child('dono').val() === auth.uid) || (newData.child('dono').val() === auth.uid && (!data.exists() || data.child('dono').val() === auth.uid || data.child('segredo').val() === newData.child('segredo').val())))",
         ".validate": "newData.hasChildren(['dono', 'segredo', 'nome']) && newData.child('segredo').isString() && newData.child('segredo').val().length === 64 && newData.child('nome').isString() && newData.child('nome').val().length > 0 && newData.child('nome').val().length <= 20"
       }
@@ -10,6 +11,10 @@
     "historicos": {
       "$cofre": {
         ".read": "auth != null && $cofre.matches(/^[0-9a-f]{64}$/)",
+        "perfil": {
+          ".write": "auth != null && $cofre.matches(/^[0-9a-f]{64}$/)",
+          ".validate": "newData.hasChildren(['nome', 'chave']) && newData.child('nome').isString() && newData.child('nome').val().length > 0 && newData.child('nome').val().length <= 20 && newData.child('chave').isString() && newData.child('chave').val().length <= 40"
+        },
         "$id": {
           ".write": "auth != null && $cofre.matches(/^[0-9a-f]{64}$/) && $id.matches(/^[0-9]{1,16}$/)",
           ".validate": "newData.child('excluida').val() === true || (newData.hasChildren(['id', 'data', 'total']) && newData.child('data').isString() && newData.child('total').isNumber())"

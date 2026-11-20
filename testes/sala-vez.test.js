@@ -84,3 +84,21 @@ test("lembrete de backup: com 3 partidas e sem backup há mais de 30 dias", () =
   assert.equal(lembra({ "yam-historico": tres, "yam-ultimo-backup": JSON.stringify("2026-09-01T10:00:00Z") }), true, "backup antigo");
   assert.equal(lembra({ "yam-historico": tres, "yam-lembrete-backup": JSON.stringify("2026-11-10T10:00:00Z") }), false, "lembrou há pouco");
 });
+
+test("você contra cada um: quem trocou de nome continua sendo a mesma pessoa", () => {
+  const { app } = carregarApp();
+  const sala = (data, outro) => ({
+    id: Date.parse(data), data, total: 300, valores: {},
+    sala: { podio: { terminaram: [{ nome: "Davi", total: 300, posicao: 1, eu: true }, outro] } }
+  });
+  const lista = JSON.parse(JSON.stringify(app.confrontos([
+    sala("2026-11-01T10:00:00Z", { nome: "Maria", total: 200, posicao: 2 }),                 // antes da identidade
+    sala("2026-11-05T10:00:00Z", { nome: "Maria", total: 250, posicao: 2, id: "jmaria" }),   // já com identidade
+    sala("2026-11-09T10:00:00Z", { nome: "Maria Silva", total: 350, posicao: 1, id: "jmaria" }), // trocou de nome
+    sala("2026-11-10T10:00:00Z", { nome: "João", total: 100, posicao: 2 })
+  ])));
+  assert.equal(lista.length, 2, "Maria e Maria Silva são a mesma pessoa");
+  const maria = lista.find(c => c.partidas === 3);
+  assert.equal(maria.nome, "Maria Silva", "aparece o nome mais recente");
+  assert.deepEqual([maria.vitorias, maria.derrotas], [2, 1]);
+});
