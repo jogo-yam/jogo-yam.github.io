@@ -661,6 +661,7 @@ function atualizarBarra(erro) {
   barra.hidden = !sessao;
   atualizarBotaoNovoJogo();
   atualizarBotaoDesfazer();
+  atualizarEsperaDaSala(); // também ao sair: a sala de espera tem que sumir
   if (!sessao) return;
 
   const info = document.createElement("div");
@@ -708,7 +709,6 @@ function atualizarBarra(erro) {
   botaoSair.textContent = "Sair";
   botaoSair.onclick = confirmarSair;
   barra.appendChild(botaoSair);
-  atualizarEsperaDaSala();
 }
 
 // ---------- sala de espera ----------
@@ -749,9 +749,12 @@ function atualizarEsperaDaSala() {
     }
     lista.appendChild(li);
   }
+  // quem criou saiu antes de começar: só ele podia começar, então a sala não anda
+  const criadorSaiu = !partida.jogadores[partida.criador];
   $("sala-espera-dica").textContent = souCriador
     ? (jogadores.length < 2 ? `Passe o código ${sessao.codigo} (botão Convidar). Quando todos chegarem, toque em Começar.`
       : `${jogadores.length} na sala. Toque em Começar quando todos chegarem.`)
+    : criadorSaiu ? "Quem criou a sala saiu antes de começar. Saia e crie uma sala nova para jogar."
     : `Esperando ${nomeDe(partida.criador)} começar a partida…`;
   $("sala-espera-comecar").hidden = !souCriador;
   const novas = naoLidas();
