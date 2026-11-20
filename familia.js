@@ -836,6 +836,7 @@ let pulosVistos = null;       // quantas vezes já fui pulado (para avisar)
 let avisosPublicados = null;  // inscrição de push já gravada nesta sala ("" = nenhuma)
 let perguntouAvisos = false;  // já sugeriu ligar os avisos nesta sala
 let timerVisto = null;
+let rolagemVista = null;      // { uid, jogada }: a última rolagem de quem está jogando já mostrada
 
 function escolherModo(modo) {
   modoEscolhido = modo === "vez" ? "vez" : "livre";
@@ -877,6 +878,7 @@ function reiniciarVez() {
   timerVez = null;
   casasPublicadas = null;
   vezAnterior = undefined;
+  rolagemVista = null;
   jogadasVistas = null;
   pulosVistos = null;
   avisosPublicados = null;
@@ -1061,10 +1063,12 @@ function sugerirAvisos() {
 }
 
 // Na sua vez, os dados vão para a sala (os outros veem rolando).
-function mesaMudou() {
+// Ao rolar, vai já o resultado (sorteado no começo): os outros veem a rolagem
+// junto com quem rolou, não só depois que os dados param.
+function mesaMudou(valores = mesa.valores) {
   if (!comVez() || daVez() !== minhaUid() || esperandoPassar()) return;
   update(ref(db, `partidas/${sessao.codigo}/jogadores/${minhaUid()}`), {
-    mesa: { valores: [...mesa.valores], segurados: [...mesa.segurados], jogada: mesa.jogada }
+    mesa: { valores: [...valores], segurados: [...mesa.segurados], jogada: mesa.jogada }
   }).catch(() => {});
 }
 
@@ -1139,6 +1143,7 @@ function atualizarBarraVez() {
     acao.onclick = () => desfazer();
   } else if (vez === uid) {
     quem.textContent = "Sua vez!";
+    rolagemVista = { uid: vez, jogada: 0 };
   } else {
     const j = partida.jogadores[vez];
     quem.textContent = `Vez de ${nomeDe(vez)}`;
@@ -1147,6 +1152,13 @@ function atualizarBarraVez() {
       const segurados = j.mesa.segurados || [];
       dados.innerHTML = j.mesa.valores.map((f, i) => dadoMini(f, !!segurados[i])).join("");
       dados.setAttribute("aria-label", `Dados de ${j.nome}: ${j.mesa.valores.join(", ")} (${j.mesa.jogada}ª jogada)`);
+      // rolou agora (não é só alguém segurando um dado, nem o app abrindo): som e animação
+      const rolouAgora = rolagemVista !== null &&
+        (rolagemVista.uid !== vez || j.mesa.jogada > rolagemVista.jogada);
+      rolagemVista = { uid: vez, jogada: j.mesa.jogada };
+      if (rolouAgora) animarRolagemDoOutro(dados, j.mesa);
+    } else {
+      rolagemVista = { uid: vez, jogada: 0 };
     }
     if (partida.criador === uid) {
       acao.hidden = false;
@@ -1162,6 +1174,33 @@ function atualizarBarraVez() {
     ? (ultima.uid === uid ? textoDaJogada("Você", ultima.ultima.key, ultima.ultima.valor)
       : textoDaJogada(ultima.nome, ultima.ultima.key, ultima.ultima.valor))
     : (vez === uid ? "Você começa." : "Ninguém jogou ainda.");
+}
+
+// Os dados de quem está jogando rolam aqui também: mesmo som da sua rolagem, e
+// os dados que não estavam segurados pulam, giram e trocam de face até parar no
+// resultado. Com o app em segundo plano, nada (ninguém está vendo).
+function animarRolagemDoOutro(caixa, mesaDoOutro) {
+  if (document.visibilityState === "hidden") return;
+  tocar("rolar");
+  const segurados = mesaDoOutro.segurados || [];
+  const rolaram = [...caixa.children].map((svg, i) => ({ svg, final: mesaDoOutro.valores[i] }))
+    .filter((_, i) => !segurados[i]);
+  if (matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+  rolaram.forEach(({ svg }) => {
+    svg.style.setProperty("--giro", `${(Math.random() < 0.5 ? -1 : 1) * (Math.random() < 0.5 ? 360 : 720)}deg`);
+    svg.style.animationDelay = `${Math.floor(Math.random() * 40)}ms`;
+    svg.classList.add("rolando");
+  });
+  let passos = 0;
+  const timer = setInterval(() => {
+    const acabou = ++passos >= 8;
+    rolaram.forEach(({ svg, final }) => {
+      if (!svg.isConnected) return; // a barra foi redesenhada: já está com o resultado
+      trocarFaceMini(svg, acabou ? final : 1 + Math.floor(Math.random() * 6));
+      if (acabou) { svg.classList.remove("rolando"); svg.classList.add("assentou"); }
+    });
+    if (acabou) clearInterval(timer);
+  }, 60);
 }
 
 // ---------- ligação com o resto do app ----------

@@ -8,7 +8,7 @@ const rows = [
 const COLUNAS = 4;
 
 // Versão do app: igual ao número do CACHE_NAME do service-worker.js (um teste confere).
-const VERSAO = 64;
+const VERSAO = 65;
 
 // Avisos da vez com o app fechado: servidor na Cloudflare (worker/avisos.mjs).
 // Sem o endereço, a opção "Avisar a minha vez" não aparece.
@@ -26,6 +26,13 @@ function dadoMini(face, segurado = false) {
     `<circle cx="${5.5 + (p % 3) * 6.5}" cy="${5.5 + Math.floor(p / 3) * 6.5}" r="2"/>`).join("");
   return `<svg class="dado-mini${segurado ? " segurado" : ""}" viewBox="0 0 24 24" aria-hidden="true">` +
     `<rect x="1" y="1" width="22" height="22" rx="5"/>${pontos}</svg>`;
+}
+
+// Troca os pontos de um dadinho já desenhado (animação dos dados de quem está jogando).
+function trocarFaceMini(svg, face) {
+  svg.querySelectorAll("circle").forEach(c => c.remove());
+  svg.insertAdjacentHTML("beforeend", PONTOS_DO_DADO[face].map(p =>
+    `<circle cx="${5.5 + (p % 3) * 6.5}" cy="${5.5 + Math.floor(p / 3) * 6.5}" r="2"/>`).join(""));
 }
 
 // Partidas antigas guardaram o título do pódio com o emoji 🏆 na frente.
@@ -2235,6 +2242,7 @@ function rolarDados() {
   try {
     localStorage.setItem(CHAVE_MESA, JSON.stringify({ ...mesa, valores: resultado, novaVez: false }));
   } catch {}
+  if (window.familia) familia.mesaMudou(resultado); // na sala, os outros já começam a ver rolar
   soltos.forEach(i => { mesa.valores[i] = sortearFace(); });
   desenharDados(soltos); // começa a animação (giro e pulo de cada dado)
   vibrar([12, 50, 12, 50, 12]);

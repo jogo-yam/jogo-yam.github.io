@@ -1815,6 +1815,12 @@ button:disabled {
 }
 
 .vez-dados .dado-mini.segurado { transform: translateY(-3px); }
+/* quem está jogando rolou: os dadinhos pulam e giram como os seus */
+.vez-dados .dado-mini.rolando { animation: rolar 0.44s ease-out both; }
+.vez-dados .dado-mini.assentou { animation: assentar 0.22s ease-out; }
+@media (prefers-reduced-motion: reduce) {
+  .vez-dados .dado-mini.rolando, .vez-dados .dado-mini.assentou { animation: none; }
+}
 
 .barra-vez button {
   flex-shrink: 0;
