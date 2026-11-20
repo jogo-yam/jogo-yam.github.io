@@ -1213,7 +1213,7 @@ function animarRolagemDoOutro(caixa, mesaDoOutro) {
 // todos da sala, com o nome de quem mandou. Vai no próprio jogador
 // (jogadores/<uid>/reacao), que cada um já pode gravar: não precisa de regra nova.
 
-const REACOES = ["👏", "😂", "😮", "😬", "🔥", "🍀"];
+const REACOES = ["👏", "😂", "😮", "😭", "💩", "🍀"];
 let reacoesVistas = null;     // uid -> id da última reação já mostrada (null: ainda não olhou a sala)
 let ultimaReacaoEnviada = 0;
 
@@ -1273,7 +1273,18 @@ function mostrarReacao(emoji, nome) {
   area.appendChild(el);
   setTimeout(() => el.remove(), 2800);
   tocar("reacao");
+  // a versão animada (Noto Emoji, do Google) entra no lugar assim que carregar;
+  // sem internet ou com "menos animação" no aparelho, fica o emoji normal
+  if (!CODIGO_ANIMADO[emoji] || matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+  const animado = new Image();
+  animado.className = "reacao-emoji reacao-animada";
+  animado.alt = emoji;
+  animado.decoding = "async";
+  animado.onload = () => { if (simbolo.isConnected) simbolo.replaceWith(animado); };
+  animado.src = `https://fonts.gstatic.com/s/e/notoemoji/latest/${CODIGO_ANIMADO[emoji]}/512.webp`;
 }
+
+const CODIGO_ANIMADO = { "👏": "1f44f", "😂": "1f602", "😮": "1f62e", "😭": "1f62d", "💩": "1f4a9", "🍀": "1f340" };
 
 // ---------- ligação com o resto do app ----------
 

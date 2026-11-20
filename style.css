@@ -2396,3 +2396,4 @@ button.podio-nome {
   .reacao { animation: reacao-sumir 2.6s ease-out forwards; transform: translate(calc(-50% + var(--x, 0px)), -60px); }
 }
 @keyframes reacao-sumir { 0%, 75% { opacity: 1; } 100% { opacity: 0; } }
+.reacao-animada { width: 60px; height: 60px; }
