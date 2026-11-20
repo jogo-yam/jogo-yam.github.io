@@ -2353,7 +2353,7 @@ button.podio-nome {
 .reacoes-voando {
   position: fixed;
   inset: 0;
-  z-index: 22; /* acima da sala de espera e do pódio (20), abaixo do chat e das janelas (25) */
+  z-index: 26; /* por cima de tudo (inclusive do chat aberto); não pega toque */
   pointer-events: none;
   overflow: hidden;
 }

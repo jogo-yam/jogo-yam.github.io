@@ -1584,6 +1584,7 @@ function enviarMensagem() {
   ultimaMensagemEnviada = Date.now();
   campo.value = "";
   gravarMensagem({ t: texto });
+  mostrarMensagemNaTela(texto, "Você"); // quem mandou também vê subir
 }
 
 // A cada retrato da sala: chat aberto, redesenha; fechado, avisa a mensagem nova
