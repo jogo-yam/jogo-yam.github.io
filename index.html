@@ -20,13 +20,13 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="theme-color" content="#f3f3f0" media="(prefers-color-scheme: light)">
   <meta name="theme-color" content="#121212" media="(prefers-color-scheme: dark)">
-  <link rel="manifest" href="manifest.json?v=66">
+  <link rel="manifest" href="manifest.json?v=67">
   <link rel="icon" type="image/png" sizes="32x32" href="icone-dado-32.png">
   <link rel="apple-touch-icon" href="apple-touch-icon.png">
 
   <link rel="preload" href="fontes/nunito.woff2" as="font" type="font/woff2" crossorigin>
   <!-- ?v= é a versão do app (igual ao VERSAO do app.js; um teste confere): versão nova, endereço novo -->
-  <link rel="stylesheet" href="style.css?v=66">
+  <link rel="stylesheet" href="style.css?v=67">
 
   <!-- Aplica o tema escolhido antes de desenhar a página, para não piscar. -->
   <script>
@@ -42,6 +42,7 @@
 <!-- Ícones do app (desenhados: iguais em todo celular, ao contrário dos emojis) -->
 <svg class="sprite" aria-hidden="true" focusable="false">
   <symbol id="i-sala" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c0-3.6 2.9-6 6.5-6s6.5 2.4 6.5 6"/><path d="M16 4.6a3.5 3.5 0 0 1 0 6.8"/><path d="M18 14.3c2.2.7 3.5 2.7 3.5 5.7"/></symbol>
+  <symbol id="i-reagir" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9.5"/><path d="M8.2 14.2a4.6 4.6 0 0 0 7.6 0"/><path d="M9 9.6h.01M15 9.6h.01" stroke-width="3"/></symbol>
   <symbol id="i-pessoa" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 3.6-7 8-7s8 3 8 7"/></symbol>
   <symbol id="i-ajuda" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9.5"/><path d="M9.2 9.3a2.9 2.9 0 0 1 5.6 1c0 2-2.8 2.4-2.8 4.2"/><path d="M12 17.6h.01" stroke-width="3"/></symbol>
   <symbol id="i-ajustes" viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h16"/><circle cx="9" cy="6" r="2.2" fill="currentColor"/><circle cx="15.5" cy="12" r="2.2" fill="currentColor"/><circle cx="7.5" cy="18" r="2.2" fill="currentColor"/></symbol>
@@ -93,7 +94,19 @@
     </div>
     <span id="vez-dados" class="vez-dados"></span>
     <button id="vez-acao" hidden></button>
+    <button id="vez-reagir" class="vez-reagir" hidden onclick="familia.alternarReacoes()"
+            aria-label="Reagir à jogada" aria-expanded="false" aria-controls="vez-reacoes" title="Reagir à jogada"><svg class="icone" aria-hidden="true"><use href="#i-reagir"/></svg></button>
+    <div id="vez-reacoes" class="vez-reacoes" hidden>
+      <button onclick="familia.reagir('👏')" aria-label="Palmas">👏</button>
+      <button onclick="familia.reagir('😂')" aria-label="Risada">😂</button>
+      <button onclick="familia.reagir('😮')" aria-label="Uau">😮</button>
+      <button onclick="familia.reagir('😬')" aria-label="Ixi">😬</button>
+      <button onclick="familia.reagir('🔥')" aria-label="Arrasou">🔥</button>
+      <button onclick="familia.reagir('🍀')" aria-label="Boa sorte">🍀</button>
+    </div>
   </div>
+  <!-- reações da sala subindo na tela -->
+  <div id="reacoes-voando" class="reacoes-voando" aria-live="polite"></div>
 
   <div class="tabela">
   <table>
@@ -598,7 +611,7 @@
   </div>
 </div>
 
-<script src="app.js?v=66"></script>
+<script src="app.js?v=67"></script>
 <script>
   // Rede de segurança: se o app.js não carregou (ex.: troca de versão no meio
   // do caminho), recarrega sozinho uma vez, em vez de ficar com a tabela vazia.
@@ -612,7 +625,7 @@
     setTimeout(function () { location.replace(location.pathname + "?atualizado=" + Date.now()); }, 1500);
   })();
 </script>
-<script type="module" src="familia.js?v=66"></script>
+<script type="module" src="familia.js?v=67"></script>
 
 <!-- Service Worker -->
 <script>

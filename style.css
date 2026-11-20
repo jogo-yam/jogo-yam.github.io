@@ -2319,3 +2319,80 @@ button.podio-nome {
 }
 
 .janela.por-cima { z-index: 45; }
+
+/* ---------- reações na sala ---------- */
+
+.barra-vez .vez-reagir {
+  padding: 5px 7px;
+  line-height: 1;
+}
+.vez-reagir .icone { margin: 0; width: 20px; height: 20px; }
+.vez-reagir[aria-expanded="true"] {
+  background: color-mix(in srgb, var(--destaque) 14%, var(--superficie));
+}
+
+.vez-reacoes {
+  order: 4;
+  display: flex;
+  flex: 1 0 100%;
+  justify-content: space-between;
+  gap: 4px;
+  padding: 4px 0 2px;
+}
+.vez-reacoes[hidden] { display: none; }
+.barra-vez .vez-reacoes button {
+  flex: 1 1 0;
+  min-width: 0;
+  padding: 6px 0;
+  border: 1px solid var(--borda);
+  border-radius: 10px;
+  font-size: 22px;
+  line-height: 1;
+}
+
+.reacoes-voando {
+  position: fixed;
+  inset: 0;
+  z-index: 15;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.reacao {
+  position: absolute;
+  bottom: calc(96px + env(safe-area-inset-bottom));
+  left: 50%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  transform: translateX(-50%);
+  animation: reacao-subir 2.6s ease-out forwards;
+}
+.reacao-emoji { font-size: 44px; line-height: 1; filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.25)); }
+.reacao-nome {
+  max-width: 140px;
+  padding: 2px 8px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--superficie);
+  color: var(--texto);
+  font-size: 12px;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.2);
+}
+
+@keyframes reacao-subir {
+  0%   { opacity: 0; transform: translate(calc(-50% + var(--x, 0px)), 20px) scale(0.6); }
+  12%  { opacity: 1; transform: translate(calc(-50% + var(--x, 0px)), 0) scale(1.1); }
+  20%  { transform: translate(calc(-50% + var(--x, 0px)), -10px) scale(1); }
+  75%  { opacity: 1; }
+  100% { opacity: 0; transform: translate(calc(-50% + var(--x, 0px) + var(--deriva, 0px)), -220px) scale(1); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .reacao { animation: reacao-sumir 2.6s ease-out forwards; transform: translate(calc(-50% + var(--x, 0px)), -60px); }
+}
+@keyframes reacao-sumir { 0%, 75% { opacity: 1; } 100% { opacity: 0; } }

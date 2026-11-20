@@ -8,7 +8,7 @@ const rows = [
 const COLUNAS = 4;
 
 // Versão do app: igual ao número do CACHE_NAME do service-worker.js (um teste confere).
-const VERSAO = 66;
+const VERSAO = 67;
 
 // Avisos da vez com o app fechado: servidor na Cloudflare (worker/avisos.mjs).
 // Sem o endereço, a opção "Avisar a minha vez" não aparece.
@@ -2833,6 +2833,10 @@ const SONS = {
     nota(ctx, 784, 0, 0.16, { tipo: "sine", volume: 0.16 });
     nota(ctx, 1175, 0.14, 0.3, { tipo: "sine", volume: 0.14 });
   },
+  reacao(ctx) {
+    nota(ctx, 880, 0, 0.07, { tipo: "sine", volume: 0.07 });
+    nota(ctx, 1320, 0.05, 0.1, { tipo: "sine", volume: 0.05 });
+  },
   podio(ctx) {
     [392, 523.25, 659.25, 783.99, 1046.5].forEach((f, i) => nota(ctx, f, i * 0.1, 0.35, { volume: 0.14 }));
     nota(ctx, 1046.5, 0.55, 0.7, { volume: 0.12 });
@@ -3265,6 +3269,7 @@ try {
 // Esc fecha a janela que estiver aberta por cima (a de cima primeiro).
 const FECHAR_COM_ESC = [
   ["janela-pergunta", () => responder(false)],
+  ["vez-reacoes", () => window.familia && familia.alternarReacoes(false)],
   ["janela-recuperar", () => fecharRecuperar()],
   ["janela-nome", () => fecharJanelaNome()],
   ["janela-instalar", () => fecharInstalar()],

@@ -439,6 +439,7 @@ function escutar() {
     avisarDaVez();
     sugerirAvisos();
     atualizarBarra();
+    verReacoes();
     atualizarEspera();
     verificarRevelacao();
     if (podioMostrado) atualizarRevanche();
@@ -879,6 +880,8 @@ function reiniciarVez() {
   casasPublicadas = null;
   vezAnterior = undefined;
   rolagemVista = null;
+  reacoesVistas = null;
+  alternarReacoes(false);
   jogadasVistas = null;
   pulosVistos = null;
   avisosPublicados = null;
@@ -1124,8 +1127,9 @@ function atualizarBarraVez() {
   atualizarBotaoDesfazer(); // o Desfazer depende de a vez ter passado ou não
   const barra = $("barra-vez");
   if (!barra) return;
-  if (!comVez()) { barra.hidden = true; return; }
+  if (!comVez()) { barra.hidden = true; alternarReacoes(false); return; }
   barra.hidden = false;
+  $("vez-reagir").hidden = jogadoresDe(partida).length < 2; // reagir: só com mais alguém na sala
   const uid = minhaUid();
   const vez = daVez();
   const quem = $("vez-quem"), dados = $("vez-dados"), acao = $("vez-acao");
@@ -1204,13 +1208,80 @@ function animarRolagemDoOutro(caixa, mesaDoOutro) {
   }, 60);
 }
 
+// ---------- reações ----------
+// Na barra da vez, um toque manda uma reação (👏 😂 …) e ela sobe na tela de
+// todos da sala, com o nome de quem mandou. Vai no próprio jogador
+// (jogadores/<uid>/reacao), que cada um já pode gravar: não precisa de regra nova.
+
+const REACOES = ["👏", "😂", "😮", "😬", "🔥", "🍀"];
+let reacoesVistas = null;     // uid -> id da última reação já mostrada (null: ainda não olhou a sala)
+let ultimaReacaoEnviada = 0;
+
+function alternarReacoes(abrir) {
+  const caixa = $("vez-reacoes"), botao = $("vez-reagir");
+  if (!caixa || !botao) return;
+  const aberta = typeof abrir === "boolean" ? abrir : caixa.hidden;
+  caixa.hidden = !aberta;
+  botao.setAttribute("aria-expanded", String(aberta));
+}
+
+function reagir(emoji) {
+  if (!sessao || !partida || !REACOES.includes(emoji)) return;
+  alternarReacoes(false);
+  const agora = Date.now();
+  if (agora - ultimaReacaoEnviada < 700) return; // sem metralhadora de reações
+  ultimaReacaoEnviada = agora;
+  const id = agora.toString(36) + Math.random().toString(36).slice(2, 6);
+  mostrarReacao(emoji, "Você");
+  update(ref(db, `partidas/${sessao.codigo}/jogadores/${minhaUid()}`), {
+    reacao: { e: emoji, id, em: serverTimestamp() }
+  }).catch(() => {});
+}
+
+// A cada retrato da sala: mostra as reações novas dos outros. No primeiro
+// retrato (entrou na sala, abriu o app) só anota as que já estavam lá.
+function verReacoes() {
+  if (!partida || !partida.jogadores) return;
+  const eu = minhaUid();
+  const primeira = reacoesVistas === null;
+  if (primeira) reacoesVistas = {};
+  for (const [uid, j] of Object.entries(partida.jogadores)) {
+    const r = j && j.reacao;
+    if (!r || !r.id || uid === eu || reacoesVistas[uid] === r.id) continue;
+    reacoesVistas[uid] = r.id;
+    const recente = typeof r.em !== "number" || Math.abs(Date.now() - r.em) < 60000;
+    if (!primeira && recente && REACOES.includes(r.e) && document.visibilityState !== "hidden") {
+      mostrarReacao(r.e, j.nome || "Alguém");
+    }
+  }
+}
+
+function mostrarReacao(emoji, nome) {
+  const area = $("reacoes-voando");
+  if (!area) return;
+  const el = document.createElement("div");
+  el.className = "reacao";
+  el.style.setProperty("--x", `${Math.round((Math.random() - 0.5) * 140)}px`);
+  el.style.setProperty("--deriva", `${Math.round((Math.random() - 0.5) * 60)}px`);
+  const simbolo = document.createElement("span");
+  simbolo.className = "reacao-emoji";
+  simbolo.textContent = emoji;
+  const quem = document.createElement("span");
+  quem.className = "reacao-nome";
+  quem.textContent = nome;
+  el.append(simbolo, quem);
+  area.appendChild(el);
+  setTimeout(() => el.remove(), 2800);
+  tocar("reacao");
+}
+
 // ---------- ligação com o resto do app ----------
 
 window.familia = {
   abrir, fecharJanela, acaoJanela, sair, confirmarSair, compartilharCodigo,
   aoTerminar, fecharEspera, fecharPodio, jogarDeNovo, limparSalasAntigas, sincronizar, registrarResultado,
   escolherModo, podeJogar, porQueNaoPode, podeDesfazer, mesaMudou, recuperar, trocarNome, avisosMudaram,
-  historicoMudou, sincronizarHistorico, registrarNomeSePrecisar,
+  historicoMudou, sincronizarHistorico, registrarNomeSePrecisar, alternarReacoes, reagir,
   soDadosDoApp: () => !!(sessao && partida && !partida.revelada && !partida.encerrada && soDadosDaSala()),
   ativa: () => !!sessao,
   revelada: () => !!(partida && (partida.revelada || partida.encerrada))
