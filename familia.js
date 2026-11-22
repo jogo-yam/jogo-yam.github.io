@@ -1457,6 +1457,35 @@ function animarRolagemDoOutro(caixa, mesaDoOutro) {
   }, 60);
 }
 
+// ---------- lembrete da vez ----------
+// Na sala "cada um na sua vez": se é a sua vez e você passa 30 s sem jogar
+// (sem rolar, segurar dado nem marcar), o app lembra com som, vibração, aviso
+// e a barra da vez piscando. Repete a cada 30 s. Com o app fechado, não.
+
+const LEMBRAR_A_CADA = 30000;
+let paradoDesde = 0;
+let jeitoDaVez = "";
+
+function conferirLembrete() {
+  const minhaVezAgora = !!(sessao && partida && comVez() && !antesDeComecar() && !partida.revelada &&
+    !partida.encerrada && daVez() === minhaUid() && !esperandoPassar());
+  if (!minhaVezAgora) { paradoDesde = 0; return; }
+  // qualquer jogada (rolar, segurar, marcar) recomeça a contagem
+  const jeito = `${mesa.jogada}|${mesa.segurados.join()}|${casasMarcadas()}`;
+  if (!paradoDesde || jeito !== jeitoDaVez) { paradoDesde = Date.now(); jeitoDaVez = jeito; return; }
+  if (document.visibilityState === "hidden" || Date.now() - paradoDesde < LEMBRAR_A_CADA) return;
+  paradoDesde = Date.now();
+  ultimoAviso = Date.now();
+  mostrarLegenda(["Ainda é a sua vez!", "Os outros estão esperando você jogar."]);
+  tocar("suaVez");
+  vibrar([80, 60, 80]);
+  const barra = $("barra-vez");
+  barra.classList.remove("chamando");
+  void barra.offsetWidth; // recomeça a animação
+  barra.classList.add("chamando");
+}
+setInterval(conferirLembrete, 5000);
+
 // ---------- reações ----------
 // Na barra da vez, um toque manda uma reação (👏 😂 …) e ela sobe na tela de
 // todos da sala, com o nome de quem mandou. Vai no próprio jogador
@@ -1481,7 +1510,7 @@ function alternarReacoes(abrir) {
 
 function reagir(emoji) {
   if (!sessao || !partida || !REACOES.includes(emoji)) return;
-  alternarReacoes(false);
+  // a fileira continua aberta: só fecha no botão das reações (dá para mandar várias)
   const agora = Date.now();
   if (agora - ultimaReacaoEnviada < 700) return; // sem metralhadora de reações
   ultimaReacaoEnviada = agora;

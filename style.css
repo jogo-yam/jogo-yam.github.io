@@ -2717,3 +2717,13 @@ button.podio-nome {
 @media (prefers-reduced-motion: reduce) {
   .reacao-palmas, .reacao-risada, .reacao-bravo, .reacao-chorando, .reacao-coco, .reacao-surpreso, .reacao-festa { animation: none; }
 }
+
+/* lembrete: sua vez faz tempo, a barra pisca */
+.barra-vez.chamando { animation: chamar-vez 0.5s ease-in-out 4; }
+@keyframes chamar-vez {
+  0%, 100% { transform: scale(1); box-shadow: none; }
+  50% { transform: scale(1.03); box-shadow: 0 0 0 4px color-mix(in srgb, var(--foco) 55%, transparent); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .barra-vez.chamando { animation: none; box-shadow: 0 0 0 3px var(--foco); }
+}

@@ -8,7 +8,7 @@ const rows = [
 const COLUNAS = 4;
 
 // Versão do app: igual ao número do CACHE_NAME do service-worker.js (um teste confere).
-const VERSAO = 81;
+const VERSAO = 82;
 
 // Avisos da vez com o app fechado: servidor na Cloudflare (worker/avisos.mjs).
 // Sem o endereço, a opção "Avisar a minha vez" não aparece.
@@ -1618,6 +1618,8 @@ function abrirPartida(id) {
   mostrarTextoDaSala(infoSala, partidaAberta.sala);
   infoSala.hidden = !partidaAberta.sala;
   document.getElementById("ver-podio-partida").hidden = !(partidaAberta.sala && partidaAberta.sala.podio);
+  // só partida que ficou pela metade sai do histórico; terminada fica (recorde, ranking, estatísticas)
+  document.getElementById("excluir-partida").hidden = partidaTerminada(partidaAberta);
   const tbody = document.getElementById("tableBody-partida");
   montarTabela(tbody, partidaAberta.valores, false);
   atualizarTotais(tbody, document.getElementById("total-geral-partida"), partidaAberta.valores);
@@ -1626,8 +1628,8 @@ function abrirPartida(id) {
 }
 
 async function excluirPartida() {
-  if (!partidaAberta) return;
-  if (!await confirmar("Excluir partida?", "Ela sai do histórico e não dá para desfazer.", "Excluir", true)) return;
+  if (!partidaAberta || partidaTerminada(partidaAberta)) return; // terminada não sai
+  if (!await confirmar("Excluir partida?", "Ela não foi terminada e sai do histórico. Não dá para desfazer.", "Excluir", true)) return;
 
   historico = historico.filter(p => p.id !== partidaAberta.id);
   // lembra que foi excluída: some também da nuvem e dos outros aparelhos
