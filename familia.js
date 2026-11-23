@@ -475,10 +475,33 @@ async function atualizarNomes() {
   }
 }
 
+// O nome deste aparelho foi juntado a outro da mesma pessoa (ex.: um nome
+// criado sem querer no app instalado do iPhone, que não vê o do Safari). Aqui o
+// nome antigo para de valer, senão ele voltaria a existir; as partidas ficam e
+// vão junto quando a pessoa entrar com o nome de agora e o código dele.
+async function nomeFoiJuntado(u) {
+  if (!u.id) return false;
+  const eu = (await comLimite(lerDoBanco(`identidades/${u.id}`))).val();
+  const alvo = eu && typeof eu.unidaA === "string" ? eu.unidaA : "";
+  if (!alvo || alvo === u.id) return false;
+  const outro = (await comLimite(lerDoBanco(`identidades/${alvo}`))).val();
+  if (!outro || !outro.unidos || outro.unidos[u.id] !== true || typeof outro.nome !== "string") return false;
+  guardarUsuario(null);
+  definirNome(outro.nome);
+  try { atualizarInicio(); } catch {}
+  try { localStorage.setItem("yam-nome-tomado", chaveDoNome(outro.nome)); } catch {} // sem o aviso de "nome de outra pessoa"
+  ultimoAviso = Date.now();
+  mostrarLegenda([`Agora você é ${outro.nome}`,
+    `O nome ${u.nome} foi juntado ao ${outro.nome}. Para continuar neste aparelho, entre com o nome ${outro.nome} ` +
+    "e o código dele em Mais (Já tem nome de usuário?)."]);
+  return true;
+}
+
 async function sincronizarAgora() {
   let u = lerUsuario();
   if (!u || !u.chave || !u.codigo || navigator.onLine === false) return null;
   await usuario();
+  if (await nomeFoiJuntado(u).catch(() => false)) return null;
   if (u.id) u = await seguirTrocaDeNome(u).catch(() => u);
   const comIdentidade = await garantirIdentidade(u);
   if (!comIdentidade) return sincronizarCofre(await cofreAntigoDe(u.chave, u.codigo), null); // como antes

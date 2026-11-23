@@ -619,6 +619,7 @@ thead th {
   font-weight: bold;
   border-bottom: 2px solid var(--borda-forte);
   border-right-color: rgba(255, 255, 255, 0.25);
+  box-shadow: 0 -8px 0 var(--destaque); /* cobre a sobrinha de 1px em cima ao rolar (iPhone) */
   cursor: pointer;
 }
 

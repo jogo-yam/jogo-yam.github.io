@@ -8,7 +8,7 @@ const rows = [
 const COLUNAS = 4;
 
 // Versão do app: igual ao número do CACHE_NAME do service-worker.js (um teste confere).
-const VERSAO = 82;
+const VERSAO = 83;
 
 // Avisos da vez com o app fechado: servidor na Cloudflare (worker/avisos.mjs).
 // Sem o endereço, a opção "Avisar a minha vez" não aparece.
@@ -1098,6 +1098,12 @@ const CHAVE_NOMES = "yam-nomes";
 let nomesAtuais = ler(CHAVE_NOMES, { porId: {}, antigos: {} });
 const chaveDeNome = nome => normalizarNome(nome).replace(/[.#$[\]/]/g, "_");
 
+// A identidade que vale para quem juntou dois nomes (segue a cadeia, com limite).
+function identidadeReal(id, unidos = (nomesAtuais && nomesAtuais.unidos) || {}) {
+  for (let i = 0; i < 10 && id && unidos[id]; i++) id = unidos[id];
+  return id;
+}
+
 function nomeAtual(nome, id) {
   const porId = (nomesAtuais && nomesAtuais.porId) || {};
   if (id) return porId[id] || nome;
@@ -1117,13 +1123,24 @@ function podioComNomesAtuais(p) {
 // A lista chegou do Firebase: guarda e, se a pessoa está olhando o histórico
 // ou as estatísticas, redesenha com os nomes novos.
 function guardarNomesAtuais(todos) {
-  const porId = {}, antigos = {};
-  for (const [id, r] of Object.entries(todos || {})) {
-    if (!r || typeof r.nome !== "string") continue;
-    porId[id] = r.nome;
-    for (const chave of Object.keys(r.antigos || {})) antigos[chave] = id;
+  todos = todos || {};
+  // nomes juntados (feito no console do Firebase: identidades/<antigo>/unidaA =
+  // <id de agora> e identidades/<id de agora>/unidos/<antigo> = true): vale só
+  // se os dois lados confirmam
+  const unidos = {};
+  for (const [id, r] of Object.entries(todos)) {
+    const alvo = r && r.unidaA;
+    if (typeof alvo === "string" && alvo !== id && todos[alvo] && todos[alvo].unidos && todos[alvo].unidos[id] === true) unidos[id] = alvo;
   }
-  const novos = { porId, antigos };
+  const real = id => identidadeReal(id, unidos);
+  const porId = {}, antigos = {};
+  for (const [id, r] of Object.entries(todos)) {
+    if (!r || typeof r.nome !== "string") continue;
+    const dono = todos[real(id)];
+    porId[id] = dono && typeof dono.nome === "string" ? dono.nome : r.nome;
+    for (const chave of Object.keys(r.antigos || {})) antigos[chave] = real(id);
+  }
+  const novos = { porId, antigos, unidos };
   if (JSON.stringify(novos) === JSON.stringify(nomesAtuais)) return;
   nomesAtuais = novos;
   try { localStorage.setItem(CHAVE_NOMES, JSON.stringify(novos)); } catch {}
@@ -2026,6 +2043,7 @@ function guardarUsuario(u) {
   if (u) {
     localStorage.setItem(CHAVE_USUARIO, JSON.stringify(u));
     definirNome(u.nome);
+    if (!document.getElementById("janela-instalar").hidden) mostrarPassoDoCodigo(); // o código chegou agora
   } else {
     localStorage.removeItem(CHAVE_USUARIO);
   }
@@ -2852,7 +2870,28 @@ function abrirInstalar(primeiraVez = false) {
     ? "O YAM já está instalado aqui. Se alguém precisar de ajuda, o passo a passo está aqui."
     : "Ele ganha um ícone próprio, abre como um app e funciona até sem internet.";
   document.getElementById("instalar-fechar").textContent = primeiraVez ? "Agora não" : "Fechar";
+  mostrarPassoDoCodigo();
   document.getElementById("janela-instalar").hidden = false;
+}
+
+// No iPhone, o app da Tela de Início começa do zero (não vê o que ficou no
+// Safari): sem entrar com o código, a pessoa acabava criando outro nome.
+function mostrarPassoDoCodigo() {
+  const passo = document.getElementById("passo-ios-codigo");
+  const u = lerUsuario();
+  passo.hidden = appInstalado();
+  // partes: texto comum e [texto em negrito]
+  const partes = u && u.codigo
+    ? ["Abra o YAM pelo ícone novo e toque em ", ["Já tem nome de usuário? Entrar com o código"], ". Use o nome ",
+       [u.nome], " e o código ", [u.codigo], ": assim seu histórico vai junto."]
+    : ["Abra o YAM pelo ícone novo. Se você já jogou aqui no Safari, toque em ",
+       ["Já tem nome de usuário? Entrar com o código"], " (o código fica em Mais) para o histórico ir junto."];
+  passo.replaceChildren(...partes.map(p => {
+    if (!Array.isArray(p)) return document.createTextNode(p);
+    const forte = document.createElement("strong");
+    forte.textContent = p[0];
+    return forte;
+  }));
 }
 
 function fecharInstalar() {
@@ -3188,7 +3227,9 @@ function mostrarSlide(n) {
 }
 
 function abrirBoasVindas() {
-  document.getElementById("bv-nome").value = nomeJogador || "";
+  const registrado = lerUsuario();
+  document.getElementById("bv-nome").value = registrado ? registrado.nome : (nomeJogador || "");
+  document.getElementById("bv-nome").readOnly = !!registrado; // nome de usuário: troca em Mais
   document.getElementById("bv-recuperar").hidden = !!lerUsuario();
   mostrarSlide(0);
   document.getElementById("boas-vindas").hidden = false;
@@ -3200,6 +3241,7 @@ function proximaBoasVindas() {
     return;
   }
   const nome = document.getElementById("bv-nome").value.trim().replace(/\s+/g, " ").slice(0, TAMANHO_MAX_NOME);
+  if (lerUsuario()) { fecharBoasVindas(); return; } // já tem nome de usuário (link de convite)
   if (nome) definirNome(nome);
   fecharBoasVindas();
   // ganha o nome de usuário (e o código) para o histórico ir para a nuvem
@@ -3313,7 +3355,7 @@ function confrontos(partidas) {
     .filter(podio => podio && Array.isArray(podio.terminaram) && podio.terminaram.some(j => j.eu));
   const identidadeDoNome = new Map();
   for (const podio of salas) {
-    for (const j of podio.terminaram) if (!j.eu && j.id) identidadeDoNome.set(normalizarNome(j.nome), j.id);
+    for (const j of podio.terminaram) if (!j.eu && j.id) identidadeDoNome.set(normalizarNome(j.nome), identidadeReal(j.id));
   }
   const porPessoa = new Map();
   for (const p of partidas) {
@@ -3323,7 +3365,8 @@ function confrontos(partidas) {
     if (!eu) continue;
     for (const outro of podio.terminaram) {
       if (outro.eu) continue;
-      const chave = outro.id || identidadeDoNome.get(normalizarNome(outro.nome)) || `nome:${normalizarNome(outro.nome)}`;
+      const chave = identidadeReal(outro.id) || identidadeDoNome.get(normalizarNome(outro.nome)) ||
+        identidadeReal(((nomesAtuais && nomesAtuais.antigos) || {})[chaveDeNome(outro.nome || "")]) || `nome:${normalizarNome(outro.nome)}`;
       const c = porPessoa.get(chave) ||
         { nome: outro.nome, partidas: 0, vitorias: 0, derrotas: 0, empates: 0, meus: 0, deles: 0, data: "" };
       c.partidas++;

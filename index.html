@@ -20,13 +20,13 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="theme-color" content="#f3f3f0" media="(prefers-color-scheme: light)">
   <meta name="theme-color" content="#121212" media="(prefers-color-scheme: dark)">
-  <link rel="manifest" href="manifest.json?v=82">
+  <link rel="manifest" href="manifest.json?v=83">
   <link rel="icon" type="image/png" sizes="32x32" href="icone-dado-32.png">
   <link rel="apple-touch-icon" href="apple-touch-icon.png">
 
   <link rel="preload" href="fontes/nunito.woff2" as="font" type="font/woff2" crossorigin>
   <!-- ?v= é a versão do app (igual ao VERSAO do app.js; um teste confere): versão nova, endereço novo -->
-  <link rel="stylesheet" href="style.css?v=82">
+  <link rel="stylesheet" href="style.css?v=83">
 
   <!-- Aplica o tema escolhido antes de desenhar a página, para não piscar. -->
   <script>
@@ -668,6 +668,7 @@
         Se não estiver aparecendo, toque antes em <strong>···</strong>, ao lado do endereço.</li>
       <li>Role a lista e toque em <strong>Adicionar à Tela de Início</strong>.</li>
       <li>Se aparecer a opção de abrir como app, deixe ligada. Depois toque em <strong>Adicionar</strong>.</li>
+      <li id="passo-ios-codigo" hidden></li>
     </ol>
     <ol id="passos-android" class="passos" hidden>
       <li>Abra este site no <strong>Chrome</strong>.</li>
@@ -706,7 +707,7 @@
   </div>
 </div>
 
-<script src="app.js?v=82"></script>
+<script src="app.js?v=83"></script>
 <script>
   // Rede de segurança: se o app.js não carregou (ex.: troca de versão no meio
   // do caminho), recarrega sozinho uma vez, em vez de ficar com a tabela vazia.
@@ -720,7 +721,7 @@
     setTimeout(function () { location.replace(location.pathname + "?atualizado=" + Date.now()); }, 1500);
   })();
 </script>
-<script type="module" src="familia.js?v=82"></script>
+<script type="module" src="familia.js?v=83"></script>
 
 <!-- Service Worker -->
 <script>

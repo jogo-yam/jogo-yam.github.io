@@ -132,3 +132,35 @@ test("nomes de agora: quem trocou de nome aparece com o nome novo no histórico 
   const lista = JSON.parse(JSON.stringify(app.confrontos([{ id: 1, data: "2026-11-01T10:00:00Z", total: 300, valores: {}, sala: { podio } }])));
   assert.equal(lista[0].nome, "Maria Silva");
 });
+
+test("nomes juntados: as duas identidades viram uma pessoa só, com o nome de agora", () => {
+  const { app, rodar } = carregarApp({ armazenado: { "yam-nome": JSON.stringify("Davi") } });
+  const sala = (data, outro) => ({
+    id: Date.parse(data), data, total: 300, valores: {},
+    sala: { podio: { terminaram: [{ nome: "Davi", total: 300, posicao: 1, eu: true }, outro] } }
+  });
+  const partidas = [
+    sala("2026-11-01T10:00:00Z", { nome: "Maria", total: 200, posicao: 2 }),                // antes da identidade
+    sala("2026-11-02T10:00:00Z", { nome: "Maria", total: 250, posicao: 2, id: "jmaria" }),
+    sala("2026-11-03T10:00:00Z", { nome: "Giovana", total: 350, posicao: 1, id: "jgiovana" })
+  ];
+  // só um lado diz que juntou: não vale (ninguém junta a identidade de outra pessoa)
+  rodar(`guardarNomesAtuais(${JSON.stringify({
+    jmaria: { nome: "Maria", chave: "maria" },
+    jgiovana: { nome: "Giovana", chave: "giovana", unidos: { jmaria: true } }
+  })})`);
+  assert.equal(JSON.parse(JSON.stringify(app.confrontos(partidas))).length, 2);
+  assert.equal(app.nomeAtual("Maria", "jmaria"), "Maria");
+
+  rodar(`guardarNomesAtuais(${JSON.stringify({
+    jmaria: { nome: "Maria", chave: "maria", unidaA: "jgiovana" },
+    jgiovana: { nome: "Giovana", chave: "giovana", antigos: { maria: true }, unidos: { jmaria: true } }
+  })})`);
+  const lista = JSON.parse(JSON.stringify(app.confrontos(partidas)));
+  assert.equal(lista.length, 1, "Maria e Giovana são a mesma pessoa");
+  assert.equal(lista[0].nome, "Giovana");
+  assert.equal(lista[0].partidas, 3);
+  assert.deepEqual([lista[0].vitorias, lista[0].derrotas], [2, 1]);
+  assert.equal(app.nomeAtual("Maria", "jmaria"), "Giovana", "pela identidade antiga");
+  assert.equal(app.nomeAtual("Maria"), "Giovana", "partida antiga, só com o nome");
+});
