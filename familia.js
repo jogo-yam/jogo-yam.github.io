@@ -153,7 +153,7 @@ async function entrar(codigo, nome, modo = null, soDados = null) {
 
   const identidade = (lerUsuario() || {}).id || null; // as estatísticas dos outros acham a pessoa por ela
   await update(ref(db, `${raiz}/jogadores/${user.uid}`), {
-    nome, chave, id: identidade, terminou: false, total: null, colunas: null, valores: null,
+    nome, chave, id: identidade, corMesa: mesaAtual(), terminou: false, total: null, colunas: null, valores: null,
     modo: modoDaSalaAgora, soDados: soDadosAgora,
     casas: casasMarcadas(), base: jaEstava ? (sala.jogadores[user.uid].base || 0) : base,
     ...(jaEstava ? {} : { entrouEm: serverTimestamp() }) // a ordem da vez não muda se entrar de novo
@@ -454,11 +454,12 @@ async function sincronizarCofre(cofre, u) {
   // a mesa acompanha o nome: vale a escolhida por último, neste ou em outro aparelho
   if (u) {
     const aqui = mesaGuardada();
-    const la = { mesa: perfil && perfil.mesa, textura: perfil && perfil.textura, em: Number(perfil && perfil.mesaEm) || 0 };
-    if (la.em > aqui.em && mesaValida(la.mesa)) aplicarMesaDaNuvem(la.mesa, la.em, la.textura);
+    const la = { ...(perfil || {}), em: Number(perfil && perfil.mesaEm) || 0 };
+    if (la.em > aqui.em && mesaValida(la.mesa)) aplicarMesaDaNuvem(la.mesa, la.em, la.textura, la.dados);
     else if (aqui.em > la.em) {
       enviar["perfil/mesa"] = aqui.mesa;
       enviar["perfil/textura"] = aqui.textura;
+      enviar["perfil/dados"] = aqui.dados;
       enviar["perfil/mesaEm"] = aqui.em;
     }
   }
@@ -555,17 +556,18 @@ async function publicarRecorde(historicoCompleto) {
   const u = lerUsuario();
   const melhor = melhorPartida(historico);
   if (!u || !melhor || navigator.onLine === false) return;
-  const chave = `${u.chave}|${melhor.total}|${melhor.data}`;
+  const chave = `${u.chave}|${melhor.total}|${melhor.data}|${mesaAtual()}`;
   if (recordeConferido === chave) return;
   await usuario();
   const atual = (await comLimite(lerDoBanco(`ranking/${u.chave}`))).val();
-  const igual = atual && atual.total === melhor.total && atual.data === melhor.data && atual.nome === u.nome;
+  const igual = atual && atual.total === melhor.total && atual.data === melhor.data && atual.nome === u.nome &&
+    atual.corMesa === mesaAtual(); // a cor da ficha no ranking acompanha a mesa
   const desceria = atual && typeof atual.total === "number" && atual.total > melhor.total;
   if (!igual && !(desceria && !historicoCompleto)) {
     // o nome precisa ser deste aparelho para gravar (com o código, ele volta para cá)
     await garantirUsuario(u.nome);
     await comLimite(set(ref(db, `ranking/${u.chave}`), {
-      nome: u.nome, total: melhor.total, data: melhor.data, em: serverTimestamp()
+      nome: u.nome, total: melhor.total, data: melhor.data, corMesa: mesaAtual(), em: serverTimestamp()
     }));
   }
   recordeConferido = chave;
@@ -577,7 +579,7 @@ async function lerRanking() {
   const snap = await comLimite(lerDoBanco("ranking"));
   return Object.entries(snap.val() || {})
     .filter(([, r]) => r && typeof r.nome === "string" && typeof r.total === "number")
-    .map(([chave, r]) => ({ chave, nome: r.nome, total: r.total, data: r.data }));
+    .map(([chave, r]) => ({ chave, nome: r.nome, total: r.total, data: r.data, corMesa: mesaValida(r.corMesa) ? r.corMesa : null }));
 }
 
 let timerHistorico = null;
@@ -779,7 +781,10 @@ function atualizarEsperaDaSala() {
   lista.innerHTML = "";
   for (const j of jogadores) {
     const li = document.createElement("li");
-    li.appendChild(document.createTextNode(j.nome + (j.uid === eu ? " (você)" : "")));
+    const quem = document.createElement("span");
+    quem.className = "jogador-sala";
+    quem.append(avatar(j.nome, j.uid === eu ? mesaAtual() : j.corMesa), j.nome + (j.uid === eu ? " (você)" : ""));
+    li.appendChild(quem);
     if (j.uid === partida.criador) {
       const criou = document.createElement("small");
       criou.textContent = "criou a sala";
@@ -984,9 +989,11 @@ function mostrarPodio() {
     titulo: tituloDoPodio(vencedores.map(v => v.nome)),
     terminaram: terminaram.map(j => ({
       nome: j.nome, total: j.total, posicao: posicao(j), ...euSou(j), ...(typeof j.id === "string" ? { id: j.id } : {}),
+      ...(mesaValida(j.corMesa) ? { corMesa: j.corMesa } : {}),
       ...(j.valores && typeof j.valores === "object" ? { valores: j.valores } : {})
     })),
-    naoTerminaram: naoTerminaram.map(j => ({ nome: j.nome, ...euSou(j), ...(typeof j.id === "string" ? { id: j.id } : {}) }))
+    naoTerminaram: naoTerminaram.map(j => ({ nome: j.nome, ...euSou(j), ...(typeof j.id === "string" ? { id: j.id } : {}),
+      ...(mesaValida(j.corMesa) ? { corMesa: j.corMesa } : {}) }))
   };
 
   // tocar no nome abre a tabela daquela pessoa
@@ -1424,6 +1431,7 @@ function atualizarBarraVez() {
   barra.classList.toggle("minha", vez === uid && !passando);
   dados.innerHTML = "";
   acao.hidden = true;
+  $("vez-avatar").replaceChildren(); // passando a vez: sem bolinha
 
   if (passando) {
     // quem vem depois de mim
@@ -1434,6 +1442,7 @@ function atualizarBarraVez() {
     acao.onclick = () => desfazer();
   } else if (vez === uid) {
     quem.textContent = "Sua vez!";
+    $("vez-avatar").replaceChildren(avatar(nomeDe(uid), mesaAtual()));
     rolagemVista = { uid: vez, jogada: 0 };
   } else {
     const j = partida.jogadores[vez];
@@ -1451,6 +1460,7 @@ function atualizarBarraVez() {
     } else {
       rolagemVista = { uid: vez, jogada: 0 };
     }
+    $("vez-avatar").replaceChildren(avatar(nomeDe(vez), j && j.corMesa));
     if (partida.criador === uid) {
       acao.hidden = false;
       acao.textContent = "Pular";

@@ -2265,24 +2265,6 @@ button.link {
   min-width: 0;
 }
 
-/* medalha desenhada: círculo com a colocação */
-.medalha {
-  display: grid;
-  place-items: center;
-  width: 38px;
-  height: 38px;
-  border-radius: 50%;
-  background: var(--borda);
-  box-shadow: inset 0 0 0 3px rgba(255, 255, 255, 0.45);
-  color: #ffffff;
-  font-size: 18px;
-  font-weight: 800;
-  line-height: 1;
-}
-.medalha.ouro { background: #e0a800; }
-.medalha.prata { background: #9aa4ad; }
-.medalha.bronze { background: #c27a3a; }
-
 #podio-titulo .icone { color: #e0a800; }
 
 .podio-nome {
@@ -2994,8 +2976,8 @@ thead th { border-right-color: rgba(255, 255, 255, 0.18); font-size: 19px; }
 .barra-vez .vez-reacoes button { border-color: var(--destaque-borda); }
 
 /* dadinhos de quem está jogando: marfim, com sombra de dado de verdade */
-.dado-mini rect { fill: var(--marfim); stroke: var(--marfim-sombra); stroke-width: 1; }
-.dado-mini circle { fill: var(--pinta); }
+.dado-mini rect { fill: var(--dado); stroke: var(--dado-sombra); stroke-width: 1; }
+.dado-mini circle { fill: var(--dado-pinta); }
 .dado-mini.segurado rect { stroke: var(--foco); stroke-width: 3; }
 .vez-dados .dado-mini { filter: drop-shadow(0 3px 0 rgba(0, 0, 0, 0.28)); }
 
@@ -3020,14 +3002,14 @@ thead th { border-right-color: rgba(255, 255, 255, 0.18); font-size: 19px; }
 .dado {
   border: none;
   border-radius: 14px;
-  background: var(--marfim);
-  box-shadow: 0 4px 0 var(--marfim-sombra), inset 0 -3px 0 rgba(0, 0, 0, 0.06);
+  background: var(--dado-fundo);
+  box-shadow: 0 4px 0 var(--dado-sombra), inset 0 -3px 0 rgba(0, 0, 0, 0.06);
 }
 
-.dado:active { box-shadow: 0 2px 0 var(--marfim-sombra); }
+.dado:active { box-shadow: 0 2px 0 var(--dado-sombra); }
 
 .dado i {
-  background: var(--pinta);
+  background: var(--dado-pinta);
   box-shadow: inset 0 1px 1px rgba(0, 0, 0, 0.5); /* pinta "afundada" */
 }
 
@@ -3137,3 +3119,144 @@ tbody td.brilhar { animation: brilhar 0.6s ease-in-out 3; }
 /* sem textura (escolha em Mais): o feltro fica liso */
 :root[data-textura="nao"],
 :root[data-textura="nao"][data-mesa] { --textura-mesa: none; }
+
+/* ---------- cor dos dados (escolha em Mais) ---------- */
+/* Marfim é o padrão; as outras têm um brilho de cima, como dado de verdade. */
+:root {
+  --dado: var(--marfim);
+  --dado-fundo: var(--dado);
+  --dado-sombra: var(--marfim-sombra);
+  --dado-pinta: var(--pinta);
+}
+:root[data-dados="vermelho"] {
+  --dado: #c8202f;
+  --dado-fundo: radial-gradient(circle at 30% 22%, #f0606b, #c8202f 55%, #a5131f);
+  --dado-sombra: #6e0b14;
+  --dado-pinta: #fffaf0;
+}
+:root[data-dados="preto"] {
+  --dado: #22201d;
+  --dado-fundo: radial-gradient(circle at 30% 22%, #4a453e, #22201d 60%, #161412);
+  --dado-sombra: #000000;
+  --dado-pinta: #e8bf55;
+}
+:root[data-dados="azul"] {
+  --dado: #1f4fae;
+  --dado-fundo: radial-gradient(circle at 30% 22%, #5f8fe8, #1f4fae 55%, #163c8c);
+  --dado-sombra: #0b2155;
+  --dado-pinta: #fffaf0;
+}
+:root[data-dados="preto"] .dado i { box-shadow: inset 0 -1px 1px rgba(0, 0, 0, 0.5); } /* pinta dourada com brilho */
+
+/* escolher os dados: um "três" em cada cor */
+button.bolinha-dado {
+  border-radius: 9px;
+  border-width: 2px;
+  display: grid;
+  grid-template: repeat(3, 1fr) / repeat(3, 1fr);
+  padding: 4px;
+}
+button.bolinha-dado i {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--pinta-dado);
+  place-self: center;
+}
+button.bolinha-dado i:nth-child(1) { grid-area: 1 / 1; }
+button.bolinha-dado i:nth-child(2) { grid-area: 2 / 2; }
+button.bolinha-dado i:nth-child(3) { grid-area: 3 / 3; }
+
+/* ---------- avatar e fichas de cassino ---------- */
+/* avatar: bolinha com a inicial, na cor da mesa da pessoa */
+.avatar {
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  width: 1.6em;
+  height: 1.6em;
+  margin-right: 0.45em;
+  border-radius: 50%;
+  background: var(--cor-jogador);
+  box-shadow: 0 0 0 2px var(--borda-jogador);
+  color: #fff;
+  font: 600 0.85em/1 var(--letra-titulo);
+  vertical-align: middle;
+}
+.barra-vez .avatar { box-shadow: 0 0 0 2px var(--superficie); }
+
+/* ficha: vista de cima, listras na borda e a inicial no meio */
+.ficha {
+  --listra: #fffaf0;
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  background:
+    radial-gradient(circle, var(--cor-jogador) 0 50%, var(--listra) 50% 55%, transparent 55%),
+    repeating-conic-gradient(from -7.5deg, var(--listra) 0 15deg, var(--cor-jogador) 15deg 45deg);
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.3), 0 3px 0 rgba(0, 0, 0, 0.3);
+  color: #fff;
+  font: 600 18px/1 var(--letra-titulo);
+  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.35);
+}
+.ficha.ouro { --listra: #f2b53a; }
+.ficha.prata { --listra: #dfe4ea; }
+.ficha.bronze { --listra: #cf8a4c; }
+
+/* pódio da sala: a ficha no lugar da medalha; a do 1º maior e girando ao aparecer */
+.degrau .ficha { margin: 0 auto 6px; }
+.degrau-1 .ficha { width: 60px; height: 60px; font-size: 24px; animation: ficha-chegar 0.8s cubic-bezier(.2, 1.4, .4, 1) both; }
+@keyframes ficha-chegar {
+  from { transform: translateY(-40px) rotate(-200deg) scale(0.6); opacity: 0; }
+  to { transform: none; opacity: 1; }
+}
+.podio-lista .avatar,
+.vez-avatar .avatar,
+.jogador-sala .avatar { margin: 0; font-size: 15px; }
+.vez-avatar:empty { display: none; }
+.jogador-sala { display: inline-flex; align-items: center; gap: 8px; min-width: 0; }
+
+/* ranking: os três primeiros em pilhas de fichas */
+.ranking-podio {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  align-items: end;
+  gap: 8px;
+  margin: 8px 0 14px;
+  padding: 14px 8px 12px;
+  border-radius: 16px;
+  background-color: var(--destaque);
+  background-image: var(--textura-mesa);
+  box-shadow: inset 0 0 0 4px var(--destaque-borda);
+  color: var(--destaque-texto);
+  text-align: center;
+}
+.pilha-coluna { display: flex; flex-direction: column; align-items: center; min-width: 0; }
+.pilha-posicao { font: 600 15px var(--letra-titulo); color: var(--foco); margin-bottom: 4px; }
+.pilha { display: flex; flex-direction: column-reverse; align-items: center; }
+.pilha-ficha {
+  width: 46px;
+  height: 9px;
+  margin-top: -2px;
+  border-radius: 50% / 45%;
+  background: repeating-linear-gradient(90deg, var(--cor-jogador) 0 7px, #fffaf0 7px 11px);
+  box-shadow: inset 0 -2px 0 rgba(0, 0, 0, 0.3), 0 1px 0 rgba(0, 0, 0, 0.35);
+}
+.pilha .ficha { width: 46px; height: 46px; margin-bottom: 2px; }
+.pilha-1 .ficha { box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.3), 0 0 0 3px var(--foco), 0 3px 0 rgba(0, 0, 0, 0.3); }
+.pilha-nome {
+  max-width: 100%;
+  margin-top: 8px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 15px;
+}
+.pilha-pontos { font: 600 14px var(--letra-titulo); color: var(--destaque-suave); }
+.pilha-coluna.eu .pilha-nome { color: var(--foco); }
+.item-ranking .avatar { font-size: 15px; margin: 0; }
+
+@media (prefers-reduced-motion: reduce) { .degrau-1 .ficha { animation: none; } }

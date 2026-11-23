@@ -8,7 +8,7 @@ const rows = [
 const COLUNAS = 4;
 
 // Versão do app: igual ao número do CACHE_NAME do service-worker.js (um teste confere).
-const VERSAO = 92;
+const VERSAO = 93;
 
 // Avisos da vez com o app fechado: servidor na Cloudflare (worker/avisos.mjs).
 // Sem o endereço, a opção "Avisar a minha vez" não aparece.
@@ -844,6 +844,10 @@ function tituloDoPodio(vencedores) {
     : `Empate: ${vencedores.join(" e ")}!`;
 }
 
+// A mesa de quem está no pódio: a minha é a de agora; a dos outros, a que
+// estava escolhida quando jogaram.
+const corDaMesaNoPodio = j => (j.eu ? mesaAtual() : j.corMesa);
+
 // p.terminaram: [{ nome, total, posicao, eu?, valores? }] do 1º ao último;
 // p.naoTerminaram: [{ nome, eu? }]. verTabela(j) diz o que fazer ao tocar num nome.
 function desenharPodio(p, verTabela, partidaDoHistorico = null) {
@@ -868,16 +872,15 @@ function desenharPodio(p, verTabela, partidaDoHistorico = null) {
     const coluna = document.createElement("div");
     coluna.className = `degrau degrau-${i + 1}`;
     if (j) {
-      const medalha = document.createElement("div");
-      medalha.className = `medalha ${medalhas[j.posicao] || ""}`;
-      medalha.textContent = j.posicao;
+      // ficha de cassino na cor da mesa da pessoa, com a borda de ouro, prata ou bronze
+      const medalha = avatar(j.nome, corDaMesaNoPodio(j), `ficha ${medalhas[j.posicao] || ""}`);
       const nome = document.createElement(podeVer(j) ? "button" : "div");
       nome.className = "podio-nome";
       nome.textContent = nomeCom(j);
       if (podeVer(j)) nome.onclick = verTabela(j);
       const pontos = document.createElement("div");
       pontos.className = "podio-pontos";
-      pontos.textContent = `${j.total} pts`;
+      contarAte(pontos, j.total, n => `${n} pts`, 700 + 500 * (3 - Math.min(j.posicao, 3)));
       const bloco = document.createElement("div");
       bloco.className = "bloco-degrau";
       bloco.textContent = `${j.posicao}º`;
@@ -901,6 +904,7 @@ function desenharPodio(p, verTabela, partidaDoHistorico = null) {
       const span = document.createElement("span");
       span.className = c;
       span.textContent = texto;
+      if (c === "nome") li.appendChild(avatar(j.nome, corDaMesaNoPodio(j))); // fora do nome: o corte do nome comprido não pega a bolinha
       li.appendChild(span);
     });
     lista.appendChild(li);
@@ -1172,7 +1176,7 @@ function mostrarFimDeJogo(recordeAnterior) {
   const novoRecorde = !primeira && geral > recordeAnterior;
 
   document.getElementById("fim-titulo").textContent = nomeJogador ? `Fim de jogo, ${nomeJogador}!` : "Fim de jogo!";
-  document.getElementById("fim-total").textContent = geral;
+  contarAte(document.getElementById("fim-total"), geral);
   const textoRecorde = document.getElementById("fim-recorde");
   textoRecorde.textContent =
     primeira ? "Sua primeira partida salva!"
@@ -2214,11 +2218,18 @@ const CHAVE_TEXTURA = "yam-textura"; // "0" = feltro liso
 
 const texturaLigada = () => document.documentElement.dataset.textura !== "nao";
 
-// A mesa deste aparelho (cor e textura) e quando foi escolhida (0 = nunca escolheu aqui).
+// A mesa deste aparelho (cor, textura e cor dos dados) e
+// quando foi escolhida (0 = nunca escolheu aqui).
 function mesaGuardada() {
   let em = 0;
   try { em = Number(localStorage.getItem(CHAVE_COR_MESA_EM)) || 0; } catch {}
-  return { mesa: mesaAtual(), textura: texturaLigada(), em };
+  return { mesa: mesaAtual(), textura: texturaLigada(), dados: dadosAtuais(), em };
+}
+
+// Mudou algo da aparência: vale a partir de agora, aqui e (com nome) na nuvem.
+function aparenciaMudou() {
+  try { localStorage.setItem(CHAVE_COR_MESA_EM, String(Date.now())); } catch {}
+  if (window.familia && lerUsuario()) familia.historicoMudou();
 }
 
 function mostrarTextura(ligada) {
@@ -2232,11 +2243,8 @@ function mostrarTextura(ligada) {
 function alternarTextura() {
   const ligada = !texturaLigada();
   mostrarTextura(ligada);
-  try {
-    localStorage.setItem(CHAVE_TEXTURA, ligada ? "1" : "0");
-    localStorage.setItem(CHAVE_COR_MESA_EM, String(Date.now()));
-  } catch {}
-  if (window.familia && lerUsuario()) familia.historicoMudou();
+  try { localStorage.setItem(CHAVE_TEXTURA, ligada ? "1" : "0"); } catch {}
+  aparenciaMudou();
 }
 
 function mostrarMesa(nome) {
@@ -2261,13 +2269,17 @@ function escolherMesa(nome) {
 }
 
 // A nuvem tem uma escolha mais nova (feita em outro aparelho com o mesmo nome).
-function aplicarMesaDaNuvem(nome, em, textura) {
+function aplicarMesaDaNuvem(nome, em, textura, dados) {
   if (!mesaValida(nome)) return;
   mostrarMesa(nome);
   guardarCorDaMesa(nome, em);
   if (typeof textura === "boolean") {
     mostrarTextura(textura);
     try { localStorage.setItem(CHAVE_TEXTURA, textura ? "1" : "0"); } catch {}
+  }
+  if (dadosValidos(dados)) {
+    mostrarDados(dados);
+    try { localStorage.setItem(CHAVE_COR_DADOS, dados); } catch {}
   }
 }
 
@@ -2291,6 +2303,101 @@ function desenharEscolhaMesa() {
 }
 desenharEscolhaMesa();
 mostrarTextura(texturaLigada());
+
+// ---------- cor dos dados ----------
+// Como a mesa: escolha em Mais, acompanha o nome. As cores estão no style.css
+// (data-dados); aqui só o que aparece no botão de escolher.
+const DADOS = {
+  marfim: { nome: "Marfim", cor: "#fffdf6", borda: "#c9bfa5", pinta: "#2a1d0e" },
+  vermelho: { nome: "Vermelho de cassino", cor: "#c8202f", borda: "#6e0b14", pinta: "#fffaf0" },
+  preto: { nome: "Preto com pintas douradas", cor: "#22201d", borda: "#000000", pinta: "#e8bf55" },
+  azul: { nome: "Azul de cassino", cor: "#1f4fae", borda: "#0b2155", pinta: "#fffaf0" }
+};
+const CHAVE_COR_DADOS = "yam-cor-dados";
+const dadosValidos = nome => Object.prototype.hasOwnProperty.call(DADOS, nome);
+
+function dadosAtuais() {
+  const d = document.documentElement.dataset.dados;
+  return dadosValidos(d) ? d : "marfim";
+}
+
+function mostrarDados(nome) {
+  if (nome === "marfim") delete document.documentElement.dataset.dados;
+  else document.documentElement.dataset.dados = nome;
+  desenharEscolhaDados();
+}
+
+function escolherDados(nome) {
+  if (!dadosValidos(nome)) return;
+  mostrarDados(nome);
+  try { localStorage.setItem(CHAVE_COR_DADOS, nome); } catch {}
+  aparenciaMudou();
+}
+
+function desenharEscolhaDados() {
+  const caixa = document.getElementById("escolha-dados");
+  if (!caixa) return;
+  const atual = dadosAtuais();
+  caixa.replaceChildren(...Object.entries(DADOS).map(([chave, d]) => {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.className = "bolinha-mesa bolinha-dado";
+    b.setAttribute("role", "radio");
+    b.setAttribute("aria-checked", chave === atual);
+    b.setAttribute("aria-label", d.nome);
+    b.title = d.nome;
+    b.style.setProperty("--cor-mesa", d.cor);
+    b.style.setProperty("--borda-mesa", d.borda);
+    b.style.setProperty("--pinta-dado", d.pinta);
+    b.innerHTML = "<i></i><i></i><i></i>"; // o três do dado
+    b.addEventListener("click", () => escolherDados(chave));
+    return b;
+  }));
+}
+desenharEscolhaDados();
+
+// ---------- avatar (bolinha com a inicial) ----------
+// Na cor da mesa que a pessoa escolheu; sem saber a mesa dela, uma cor fixa
+// tirada do nome (a mesma pessoa sempre com a mesma cor).
+function mesaDoJogador(nome, mesa) {
+  if (mesaValida(mesa)) return mesa;
+  const chaves = Object.keys(MESAS);
+  let h = 0;
+  for (const c of normalizarNome(String(nome || ""))) h = (h * 31 + c.codePointAt(0)) >>> 0;
+  return chaves[h % chaves.length];
+}
+
+function inicialDe(nome) {
+  const primeira = Array.from(String(nome || "").trim())[0] || "?";
+  return primeira.toLocaleUpperCase("pt-BR");
+}
+
+// classe: "avatar" (bolinha) ou "ficha" (ficha de cassino, no pódio e no ranking)
+function avatar(nome, mesa, classe = "avatar") {
+  const m = MESAS[mesaDoJogador(nome, mesa)];
+  const el = document.createElement("span");
+  el.className = classe;
+  el.setAttribute("aria-hidden", "true");
+  el.style.setProperty("--cor-jogador", m.cor);
+  el.style.setProperty("--borda-jogador", m.borda);
+  el.textContent = inicialDe(nome);
+  return el;
+}
+
+// O número sobe de 0 até o total, como num placar (sem animação: já aparece pronto).
+function contarAte(el, total, formato = n => String(n), duracao = 900) {
+  const fim = Number(total) || 0;
+  if (fim <= 0 || matchMedia("(prefers-reduced-motion: reduce)").matches) { el.textContent = formato(fim); return; }
+  const inicio = performance.now();
+  el.textContent = formato(0);
+  const passo = () => {
+    const t = Math.min(1, Math.max(0, (performance.now() - inicio) / duracao));
+    el.textContent = formato(Math.round(fim * (1 - Math.pow(1 - t, 3))));
+    if (t < 1 && el.isConnected) requestAnimationFrame(passo);
+  };
+  requestAnimationFrame(passo);
+  setTimeout(() => { el.textContent = formato(fim); }, duracao + 200); // aba em segundo plano: termina mesmo assim
+}
 atualizarBotaoDesfazer();
 mostrarNome();
 
@@ -3753,7 +3860,10 @@ async function abrirRanking(de = "tela-mais") {
   const lista = document.getElementById("lista-ranking");
   const meu = document.getElementById("ranking-meu");
   const status = document.getElementById("ranking-status");
+  const podio = document.getElementById("ranking-podio");
   lista.innerHTML = "";
+  podio.replaceChildren();
+  podio.hidden = true;
   meu.hidden = true;
   status.textContent = "Carregando o ranking…";
   mostrarTela("tela-ranking");
@@ -3771,7 +3881,8 @@ async function abrirRanking(de = "tela-mais") {
   const u = lerUsuario();
   const minhaPosicao = u ? todos.findIndex(r => r.chave === u.chave) : -1;
   const MOSTRAR = 100;
-  todos.slice(0, MOSTRAR).forEach((r, i) => lista.appendChild(linhaDoRanking(r, i, i === minhaPosicao)));
+  desenharPilhasDoRanking(podio, todos.slice(0, 3), minhaPosicao);
+  todos.slice(3, MOSTRAR).forEach((r, i) => lista.appendChild(linhaDoRanking(r, i + 3, i + 3 === minhaPosicao)));
 
   if (minhaPosicao >= MOSTRAR) {
     meu.hidden = false;
@@ -3784,9 +3895,36 @@ async function abrirRanking(de = "tela-mais") {
     : "Termine uma partida para entrar no ranking.";
 }
 
+// Os três primeiros: pilhas de fichas de cassino na cor de cada um (a do 1º
+// mais alta, no meio), com a inicial na ficha de cima.
+function desenharPilhasDoRanking(caixa, tres, minhaPosicao) {
+  const ALTURA = [7, 5, 3];
+  caixa.hidden = !tres.length;
+  [1, 0, 2].forEach(i => {
+    const r = tres[i];
+    const coluna = elemento("div", `pilha-coluna pilha-${i + 1}${r ? "" : " vazio"}${i === minhaPosicao ? " eu" : ""}`);
+    if (r) {
+      const pilha = elemento("div", "pilha");
+      const m = MESAS[mesaDoJogador(r.nome, r.corMesa)];
+      pilha.style.setProperty("--cor-jogador", m.cor);
+      pilha.style.setProperty("--borda-jogador", m.borda);
+      for (let k = 0; k < ALTURA[i]; k++) pilha.appendChild(elemento("span", "pilha-ficha"));
+      pilha.appendChild(avatar(r.nome, r.corMesa, "ficha"));
+      coluna.appendChild(elemento("span", "pilha-posicao", `${i + 1}º`));
+      coluna.appendChild(pilha);
+      coluna.appendChild(elemento("strong", "pilha-nome", i === minhaPosicao ? `${r.nome} (você)` : r.nome));
+      const pontos = elemento("span", "pilha-pontos");
+      contarAte(pontos, r.total, n => `${n} pts`);
+      coluna.appendChild(pontos);
+    }
+    caixa.appendChild(coluna);
+  });
+}
+
 function linhaDoRanking(r, i, eu) {
   const li = elemento("li", `item-ranking${eu ? " eu" : ""}${i < 3 ? ` podio-${i + 1}` : ""}`);
   li.appendChild(elemento("span", "ranking-posicao", `${i + 1}º`));
+  li.appendChild(avatar(r.nome, r.corMesa));
   const info = elemento("span", "ranking-info");
   info.appendChild(elemento("strong", "", eu ? `${r.nome} (você)` : r.nome));
   if (r.data) info.appendChild(elemento("small", "", new Date(r.data).toLocaleDateString("pt-BR")));
