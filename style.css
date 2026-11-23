@@ -1502,17 +1502,18 @@ button:disabled {
 .dado.rolando { animation: rolar 0.44s ease-out both; }
 .dado.assentou { animation: assentar 0.22s ease-out; }
 
+/* rolando: entra de lado, pula, quica e para deitado do seu jeito (--pouso) */
 @keyframes rolar {
-  0%   { transform: translateY(0) rotate(0deg); }
-  25%  { transform: translateY(-14px) rotate(calc(var(--giro) * 0.45)); }
-  50%  { transform: translateY(0) rotate(calc(var(--giro) * 0.8)); }
-  70%  { transform: translateY(-5px) rotate(calc(var(--giro) * 0.95)); }
-  100% { transform: translateY(0) rotate(var(--giro)); }
+  0%   { transform: translate(-28px, -6px) rotate(0deg); }
+  25%  { transform: translate(-12px, -16px) rotate(calc(var(--giro) * 0.45)); }
+  50%  { transform: translate(var(--pouso-x), var(--pouso-y)) rotate(calc(var(--giro) * 0.8)); }
+  70%  { transform: translate(var(--pouso-x), calc(var(--pouso-y) - 5px)) rotate(calc(var(--giro) * 0.95 + var(--pouso))); }
+  100% { transform: translate(var(--pouso-x), var(--pouso-y)) rotate(calc(var(--giro) + var(--pouso))); }
 }
 
 @keyframes assentar {
-  0%   { transform: scale(1.12); }
-  100% { transform: scale(1); }
+  0%   { transform: translate(var(--pouso-x), var(--pouso-y)) rotate(var(--pouso)) scale(1.12); }
+  100% { transform: translate(var(--pouso-x), var(--pouso-y)) rotate(var(--pouso)) scale(1); }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -3260,3 +3261,86 @@ button.bolinha-dado i:nth-child(3) { grid-area: 3 / 3; }
 .item-ranking .avatar { font-size: 15px; margin: 0; }
 
 @media (prefers-reduced-motion: reduce) { .degrau-1 .ficha { animation: none; } }
+
+/* ---------- dados deitados no feltro ---------- */
+.dado {
+  --pouso: 0deg;
+  --pouso-x: 0px;
+  --pouso-y: 0px;
+  transform: translate(var(--pouso-x), var(--pouso-y)) rotate(var(--pouso));
+  box-shadow: 0 4px 0 var(--dado-sombra), 0 8px 12px rgba(0, 0, 0, 0.35), inset 0 -3px 0 rgba(0, 0, 0, 0.06);
+}
+.dado:active { box-shadow: 0 2px 0 var(--dado-sombra), 0 4px 6px rgba(0, 0, 0, 0.3); }
+.dado.segurado {
+  transform: translate(var(--pouso-x), calc(var(--pouso-y) - 6px)) rotate(var(--pouso));
+  box-shadow: 0 0 0 3px var(--foco), 0 6px 0 var(--foco-sombra), 0 12px 16px rgba(0, 0, 0, 0.35);
+}
+@media (prefers-reduced-motion: reduce) {
+  .dado { transform: none; }
+  .dado.segurado { transform: translateY(-6px); }
+}
+
+/* ---------- marcar: o número entra com um pulinho, os totais piscam ---------- */
+tbody td.marcou > input { animation: marcou 0.4s cubic-bezier(0.2, 1.6, 0.4, 1); }
+@keyframes marcou {
+  from { transform: scale(0.3); opacity: 0; }
+  to { transform: none; opacity: 1; }
+}
+td.mudou { animation: mudou 0.7s ease-out; }
+@keyframes mudou {
+  0%, 30% { background-color: color-mix(in srgb, var(--foco) 60%, var(--superficie)); }
+}
+.total-geral td.mudou { animation-name: mudou-geral; }
+@keyframes mudou-geral {
+  0%, 30% { color: var(--foco-texto); background-color: var(--foco); }
+}
+@media (prefers-reduced-motion: reduce) {
+  tbody td.marcou > input, td.mudou { animation: none; }
+}
+
+/* ---------- histórico: fichinha e barra da média ---------- */
+.item-historico { gap: 12px; }
+.item-historico .ficha {
+  width: 36px;
+  height: 36px;
+  font-size: 13px;
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.3), 0 2px 0 rgba(0, 0, 0, 0.25);
+}
+.item-historico .ficha .icone { width: 16px; height: 16px; color: #fff; }
+.item-historico .item-info { flex: 1; }
+.item-pontos { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; flex: none; }
+.barra-media {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--texto-suave);
+}
+.barra-media .trilho-media {
+  position: relative;
+  width: 64px;
+  height: 6px;
+  border-radius: 3px;
+  background: var(--borda);
+}
+.barra-media .trilho-media::after { /* a média: risquinho no meio */
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: -3px;
+  width: 2px;
+  height: 12px;
+  margin-left: -1px;
+  border-radius: 1px;
+  background: var(--texto-suave);
+}
+.barra-media .enche {
+  position: absolute;
+  top: 0;
+  height: 100%;
+  border-radius: 3px;
+}
+.barra-media.acima { color: var(--acento); }
+.barra-media.acima .enche { left: 50%; background: var(--acento); }
+.barra-media.abaixo .enche { right: 50%; background: var(--texto-suave); opacity: 0.6; }

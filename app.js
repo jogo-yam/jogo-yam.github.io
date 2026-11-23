@@ -8,7 +8,7 @@ const rows = [
 const COLUNAS = 4;
 
 // Versão do app: igual ao número do CACHE_NAME do service-worker.js (um teste confere).
-const VERSAO = 93;
+const VERSAO = 94;
 
 // Avisos da vez com o app fechado: servidor na Cloudflare (worker/avisos.mjs).
 // Sem o endereço, a opção "Avisar a minha vez" não aparece.
@@ -617,16 +617,24 @@ function totalSemJogada(valores, linha, col) {
   return true;
 }
 
+// Totais da tabela do jogo que mudaram na última conta (piscam quando a casa é confirmada).
+let totaisQueMudaram = [];
+
 function atualizarTotais(tbody, totalCell, valores) {
   const { calculados, geral } = calcularTotais(valores);
+  const mudaram = [];
   for (const [key, valor] of Object.entries(calculados)) {
     const [linha, col] = key.split("-").map(Number);
     const td = tbody.querySelector(`[data-key="${key}"]`);
     const vazio = totalSemJogada(valores, linha, col);
     td.classList.toggle("total-vazio", vazio);
-    td.textContent = vazio ? "–" : valor;
+    const texto = vazio ? "–" : String(valor);
+    if (td.textContent !== texto) mudaram.push(td);
+    td.textContent = texto;
   }
+  if (totalCell.textContent !== String(geral)) mudaram.push(totalCell);
   totalCell.textContent = geral;
+  if (tbody === body) totaisQueMudaram = mudaram;
   marcarRiscados(tbody, valores);
   mostrarFaltaBonus(tbody, valores);
 }
@@ -963,6 +971,122 @@ function caber(ctx, texto, largura) {
   return texto + "…";
 }
 
+// ---------- desenhos das imagens de compartilhar ----------
+const fonteTitulo = tam => `600 ${tam}px "Fredoka", "Nunito", system-ui, sans-serif`;
+
+// A textura da mesa (a mesma do app, desenhada maior) para pintar o feltro.
+// Sem textura, ou se o celular não deixar usar o desenho: feltro liso.
+async function texturaParaImagem(ctx) {
+  if (!texturaLigada()) return null;
+  try {
+    const valor = getComputedStyle(document.documentElement).getPropertyValue("--textura-mesa");
+    const url = [...valor.matchAll(/url\("([^"]+)"\)/g)].map(m => m[1]).pop();
+    if (!url) return null;
+    const img = new Image();
+    img.src = url;
+    await img.decode();
+    const escala = 2.5;
+    const tela = document.createElement("canvas");
+    tela.width = Math.round(img.width * escala);
+    tela.height = Math.round(img.height * escala);
+    tela.getContext("2d").drawImage(img, 0, 0, tela.width, tela.height);
+    tela.getContext("2d").getImageData(0, 0, 1, 1); // se o desenho "sujar" a imagem, dá erro aqui e fica liso
+    return ctx.createPattern(tela, "repeat");
+  } catch {
+    return null;
+  }
+}
+
+// Pinta um pedaço de feltro (com a luz suave de cima) no caminho atual, ou num retângulo.
+function pintarFeltro(ctx, x, y, w, h, cor, textura, raio = 0) {
+  ctx.save();
+  ctx.beginPath();
+  if (raio) retanguloArredondado(ctx, x, y, w, h, raio);
+  else ctx.rect(x, y, w, h);
+  ctx.clip();
+  ctx.fillStyle = cor;
+  ctx.fillRect(x, y, w, h);
+  if (textura) {
+    ctx.fillStyle = textura;
+    ctx.fillRect(x, y, w, h);
+  }
+  const luz = ctx.createLinearGradient(0, y, 0, y + h);
+  luz.addColorStop(0, "rgba(255,255,255,0.08)");
+  luz.addColorStop(1, "rgba(0,0,0,0.1)");
+  ctx.fillStyle = luz;
+  ctx.fillRect(x, y, w, h);
+  ctx.restore();
+}
+
+// Ficha de cassino vista de cima: listras na borda e a letra no meio.
+function desenharFichaNaImagem(ctx, cx, cy, r, cor, listra, letra) {
+  ctx.save();
+  ctx.fillStyle = "rgba(0,0,0,0.28)";
+  ctx.beginPath();
+  ctx.arc(cx, cy + r * 0.12, r, 0, 2 * Math.PI);
+  ctx.fill();
+  ctx.fillStyle = cor;
+  ctx.beginPath();
+  ctx.arc(cx, cy, r, 0, 2 * Math.PI);
+  ctx.fill();
+  ctx.fillStyle = listra;
+  for (let k = 0; k < 6; k++) {
+    const a1 = (k * 60 - 97.5) * Math.PI / 180, a2 = a1 + 15 * Math.PI / 180;
+    ctx.beginPath();
+    ctx.arc(cx, cy, r, a1, a2);
+    ctx.arc(cx, cy, r * 0.76, a2, a1, true);
+    ctx.closePath();
+    ctx.fill();
+  }
+  ctx.strokeStyle = listra;
+  ctx.lineWidth = r * 0.07;
+  ctx.beginPath();
+  ctx.arc(cx, cy, r * 0.6, 0, 2 * Math.PI);
+  ctx.stroke();
+  ctx.strokeStyle = "rgba(0,0,0,0.3)";
+  ctx.lineWidth = Math.max(2, r * 0.04);
+  ctx.beginPath();
+  ctx.arc(cx, cy, r, 0, 2 * Math.PI);
+  ctx.stroke();
+  if (letra) {
+    ctx.fillStyle = "#ffffff";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.font = fonteTitulo(Math.round(r * 0.85));
+    ctx.fillText(letra, cx, cy + r * 0.05);
+  }
+  ctx.restore();
+}
+
+// Um dado na cor escolhida em Mais, deitado (giro em graus) e com sombra.
+function desenharDadoNaImagem(ctx, cx, cy, t, face, giro = 0) {
+  const d = DADOS[dadosAtuais()];
+  const raio = t * 0.2;
+  ctx.save();
+  ctx.translate(cx, cy);
+  ctx.rotate(giro * Math.PI / 180);
+  ctx.fillStyle = "rgba(0,0,0,0.3)";
+  retanguloArredondado(ctx, -t / 2 + 4, -t / 2 + 14, t, t, raio);
+  ctx.fill();
+  ctx.fillStyle = d.borda;
+  retanguloArredondado(ctx, -t / 2, -t / 2 + 7, t, t, raio);
+  ctx.fill();
+  const brilho = ctx.createRadialGradient(-t * 0.2, -t * 0.28, 0, -t * 0.2, -t * 0.28, t * 0.9);
+  brilho.addColorStop(0, d.brilho);
+  brilho.addColorStop(0.55, d.cor);
+  brilho.addColorStop(1, d.cor);
+  ctx.fillStyle = brilho;
+  retanguloArredondado(ctx, -t / 2, -t / 2, t, t, raio);
+  ctx.fill();
+  ctx.fillStyle = d.pinta;
+  for (const p of PONTOS_DO_DADO[face]) {
+    ctx.beginPath();
+    ctx.arc(((p % 3) - 1) * t * 0.27, (Math.floor(p / 3) - 1) * t * 0.27, t * 0.085, 0, 2 * Math.PI);
+    ctx.fill();
+  }
+  ctx.restore();
+}
+
 // Imagem do pódio (1080 x 1350), no mesmo estilo do cartão de resultado.
 async function gerarImagemPodio(p, dataIso) {
   await fonteCarregada();
@@ -972,19 +1096,23 @@ async function gerarImagemPodio(p, dataIso) {
   canvas.height = H;
   const ctx = canvas.getContext("2d");
   const fonte = (peso, tam) => `${peso} ${tam}px "Nunito", system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif`;
-  const NAVY = MESAS[mesaAtual()].cor, FUNDO = "#f4ecd8", TEXTO = "#3a2a17", SUAVE = "#7a6649", OURO = "#b37a12"; // feltro da mesa escolhida
+  const NAVY = MESAS[mesaAtual()].cor, FUNDO = "#f4ecd8", TEXTO = "#3a2a17", SUAVE = "#7a6649", OURO = "#d99a12"; // feltro da mesa escolhida
   const data = new Date(dataIso).toLocaleDateString("pt-BR");
+  const textura = await texturaParaImagem(ctx);
 
   ctx.fillStyle = FUNDO;
   ctx.fillRect(0, 0, W, H);
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
 
-  // faixa do topo
-  ctx.fillStyle = NAVY;
-  ctx.fillRect(0, 0, W, 230);
+  // faixa do topo: o feltro da mesa, com dois dados
+  pintarFeltro(ctx, 0, 0, W, 230, NAVY, textura);
+  desenharDadoNaImagem(ctx, W / 2 - 210, 92, 74, 6, -12);
+  desenharDadoNaImagem(ctx, W / 2 + 210, 96, 74, 6, 9);
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
   ctx.fillStyle = "#ffffff";
-  ctx.font = fonte(800, 100);
+  ctx.font = fonteTitulo(110);
   ctx.fillText("YAM", W / 2, 100);
   ctx.font = fonte(500, 40);
   ctx.fillStyle = "rgba(255,255,255,0.8)";
@@ -992,8 +1120,8 @@ async function gerarImagemPodio(p, dataIso) {
 
   // lista de quem ficou do 4º em diante e de quem não terminou
   const linhas = [
-    ...p.terminaram.slice(3).map(j => [`${j.posicao}º`, j.nome, `${j.total} pts`]),
-    ...p.naoTerminaram.map(j => ["–", j.nome, "não terminou"])
+    ...p.terminaram.slice(3).map(j => [`${j.posicao}º`, j.nome, `${j.total} pts`, j]),
+    ...p.naoTerminaram.map(j => ["–", j.nome, "não terminou", j])
   ];
   const cabem = linhas.length > 5 ? 4 : 5;
   const alturaLista = (Math.min(linhas.length, cabem) + (linhas.length > cabem ? 1 : 0)) * 54;
@@ -1002,37 +1130,27 @@ async function gerarImagemPodio(p, dataIso) {
 
   // quem venceu
   ctx.fillStyle = TEXTO;
-  ctx.font = fonte(800, 64);
+  ctx.font = fonteTitulo(68);
   ctx.fillText(caber(ctx, semTrofeu(p.titulo), W - 100), W / 2, 330 + desce);
 
   // degraus: 2º à esquerda, 1º no meio, 3º à direita
   const alturas = { 1: 360, 2: 260, 3: 190 };
-  const CORES_MEDALHA = { 1: "#e0a800", 2: "#9aa4ad", 3: "#c27a3a" };
+  const LISTRAS = { 1: "#f2b53a", 2: "#dfe4ea", 3: "#cf8a4c" }; // ouro, prata e bronze na borda da ficha
   const larg = 300, gap = 30, x0 = (W - (3 * larg + 2 * gap)) / 2, base = 1010 + desce;
   [1, 0, 2].forEach((i, coluna) => {
     const j = p.terminaram[i];
     if (!j) return;
     const h = alturas[Math.min(j.posicao, 3)];
     const x = x0 + coluna * (larg + gap), topo = base - h;
-    ctx.fillStyle = j.posicao === 1 ? OURO : NAVY;
-    retanguloArredondado(ctx, x, topo, larg, h + 20, 22);
-    ctx.fill();
+    pintarFeltro(ctx, x, topo, larg, h + 20, j.posicao === 1 ? OURO : NAVY, j.posicao === 1 ? null : textura, 22);
     ctx.fillStyle = "#ffffff";
-    ctx.font = fonte(800, 84);
+    ctx.font = fonteTitulo(88);
     ctx.fillText(`${j.posicao}º`, x + larg / 2, topo + 75);
-    if (CORES_MEDALHA[j.posicao]) {
-      ctx.fillStyle = CORES_MEDALHA[j.posicao];
-      ctx.beginPath();
-      ctx.arc(x + larg / 2, topo - 190, 44, 0, 2 * Math.PI);
-      ctx.fill();
-      ctx.lineWidth = 6;
-      ctx.strokeStyle = "rgba(255, 255, 255, 0.55)";
-      ctx.beginPath();
-      ctx.arc(x + larg / 2, topo - 190, 34, 0, 2 * Math.PI);
-      ctx.stroke();
-      ctx.fillStyle = "#ffffff";
-      ctx.font = fonte(800, 48);
-      ctx.fillText(String(j.posicao), x + larg / 2, topo - 188);
+    if (LISTRAS[j.posicao]) {
+      const cor = MESAS[mesaDoJogador(j.nome, corDaMesaNoPodio(j))].cor;
+      desenharFichaNaImagem(ctx, x + larg / 2, topo - 190, j.posicao === 1 ? 62 : 50, cor, LISTRAS[j.posicao], inicialDe(j.nome));
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
     }
     ctx.fillStyle = TEXTO;
     ctx.font = fonte(700, 46);
@@ -1048,15 +1166,25 @@ async function gerarImagemPodio(p, dataIso) {
   ctx.fillRect(x0 - 20, base, 3 * larg + 2 * gap + 40, 6);
 
   // do 4º em diante e quem não terminou
-  linhas.slice(0, cabem).forEach(([pos, nome, pts], k) => {
+  linhas.slice(0, cabem).forEach(([pos, nome, pts, j], k) => {
     const y = base + 55 + k * 54;
     ctx.textAlign = "left";
     ctx.fillStyle = SUAVE;
     ctx.font = fonte(700, 38);
     ctx.fillText(pos, 140, y);
+    // bolinha com a inicial, na cor da mesa da pessoa
+    ctx.fillStyle = MESAS[mesaDoJogador(nome, corDaMesaNoPodio(j))].cor;
+    ctx.beginPath();
+    ctx.arc(232, y, 21, 0, 2 * Math.PI);
+    ctx.fill();
+    ctx.fillStyle = "#ffffff";
+    ctx.textAlign = "center";
+    ctx.font = fonteTitulo(24);
+    ctx.fillText(inicialDe(nome), 232, y + 1);
+    ctx.textAlign = "left";
     ctx.fillStyle = TEXTO;
     ctx.font = fonte(600, 38);
-    ctx.fillText(caber(ctx, nome, 520), 230, y);
+    ctx.fillText(caber(ctx, nome, 500), 270, y);
     ctx.textAlign = "right";
     ctx.fillStyle = pts === "não terminou" ? SUAVE : TEXTO;
     ctx.font = fonte(pts === "não terminou" ? 500 : 700, 38);
@@ -1231,29 +1359,20 @@ async function gerarImagemResultado(valores, total, dataIso, selo, nome = "") {
   const ctx = canvas.getContext("2d");
   const fonte = (peso, tam) => `${peso} ${tam}px "Nunito", system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif`;
   const NAVY = MESAS[mesaAtual()].cor, FUNDO = "#f4ecd8", TEXTO = "#3a2a17", SUAVE = "#7a6649", AMBAR = "#f2b53a"; // feltro da mesa escolhida
+  const textura = await texturaParaImagem(ctx);
 
   ctx.fillStyle = FUNDO;
   ctx.fillRect(0, 0, W, H);
 
-  // faixa do topo com o dado e o nome
-  ctx.fillStyle = NAVY;
-  ctx.fillRect(0, 0, W, 330);
-  const dado = 120, dx = W / 2 - 190, dy = 85;
-  ctx.fillStyle = "#ffffff";
-  retanguloArredondado(ctx, dx, dy, dado, dado, 24);
-  ctx.fill();
-  ctx.fillStyle = NAVY;
-  const o = dado * 0.27, r = dado * 0.085;
-  for (const [px, py] of [[-o, -o], [o, -o], [0, 0], [-o, o], [o, o]]) {
-    ctx.beginPath();
-    ctx.arc(dx + dado / 2 + px, dy + dado / 2 + py, r, 0, Math.PI * 2);
-    ctx.fill();
-  }
+  // faixa do topo: o feltro da mesa, dois dados deitados e o nome
+  pintarFeltro(ctx, 0, 0, W, 330, NAVY, textura);
+  desenharDadoNaImagem(ctx, W / 2 - 250, 140, 104, 5, -14);
+  desenharDadoNaImagem(ctx, W / 2 - 128, 150, 104, 6, 8);
   ctx.fillStyle = "#ffffff";
   ctx.textBaseline = "middle";
   ctx.textAlign = "left";
-  ctx.font = fonte(800, 120);
-  ctx.fillText("YAM", dx + dado + 40, dy + dado / 2 + 6);
+  ctx.font = fonteTitulo(130);
+  ctx.fillText("YAM", W / 2 - 40, 150);
   ctx.textAlign = "center";
   ctx.font = fonte(500, 40);
   ctx.fillStyle = "rgba(255,255,255,0.8)";
@@ -1261,7 +1380,7 @@ async function gerarImagemResultado(valores, total, dataIso, selo, nome = "") {
 
   // total
   ctx.fillStyle = selo ? "#c98a00" : NAVY;
-  ctx.font = fonte(800, 250);
+  ctx.font = fonteTitulo(250);
   ctx.fillText(String(total), W / 2, 540);
   ctx.fillStyle = SUAVE;
   ctx.font = fonte(500, 52);
@@ -1384,7 +1503,8 @@ function comecarNovaPartida() {
 async function fonteCarregada() {
   try {
     await Promise.race([
-      Promise.all([document.fonts.load("800 64px Nunito"), document.fonts.load("400 40px Nunito")]),
+      Promise.all([document.fonts.load("800 64px Nunito"), document.fonts.load("400 40px Nunito"),
+        document.fonts.load("600 64px Fredoka")]),
       new Promise(r => setTimeout(r, 1500))
     ]);
   } catch {}
@@ -1415,8 +1535,20 @@ function vibrar(padrao) {
 
 // Depois de anotar uma casa: comemora um YAM ou a coluna que acabou de
 // garantir o bônus de +30.
+// Reinicia uma animação de CSS (a mesma classe de novo).
+function reanimar(el, classe) {
+  el.classList.remove(classe);
+  void el.offsetWidth;
+  el.classList.add(classe);
+}
+
 function comemorarJogada(key, antes, depois) {
   const [linha, col] = key.split("-").map(Number);
+  // o número entra na casa com um pulinho e os totais que mudaram piscam
+  const casa = body.querySelector(`[data-key="${key}"]`);
+  if (casa) reanimar(casa, "marcou");
+  totaisQueMudaram.forEach(td => reanimar(td, "mudou"));
+  totaisQueMudaram = [];
   if (!(Number(depois) > 0)) return;
   if (linha === 15) {
     festa(`YAM! +${Number(depois)}`, `Na ${NOMES_COLUNAS[col]}.`, ["YAM!", `+${Number(depois)}`], [key]);
@@ -1601,6 +1733,7 @@ function abrirHistorico() {
     const totais = historico.map(p => p.total);
     const recorde = Math.max(...totais);
     const media = Math.round(totais.reduce((a, b) => a + b, 0) / totais.length);
+    const maiorDiferenca = Math.max(1, ...totais.map(t => Math.abs(t - media)));
 
     resumo.hidden = false;
     document.getElementById("qtd-partidas").textContent = historico.length;
@@ -1616,7 +1749,29 @@ function abrirHistorico() {
       data.textContent = formatarData(partida.data);
       const total = document.createElement("strong");
       total.textContent = `${partida.total} pts`;
-      if (partida.total === recorde) total.insertAdjacentHTML("beforeend", icone("estrela", "estrela-recorde"));
+
+      // fichinha: dourada no recorde (com estrela), na cor da mesa nas outras;
+      // em sala, com a colocação
+      const ehRecorde = partida.total === recorde;
+      const ficha = avatar("", mesaAtual(), "ficha");
+      if (ehRecorde) {
+        ficha.style.setProperty("--cor-jogador", "#d99a12");
+        ficha.style.setProperty("--listra", "#fff3cf");
+      }
+      ficha.textContent = partida.sala && partida.sala.posicao ? `${partida.sala.posicao}º` : "";
+      if (ehRecorde) ficha.innerHTML = icone("estrela");
+
+      // barrinha: quanto ficou acima ou abaixo da média
+      const diferenca = partida.total - media;
+      const barra = elemento("span", `barra-media ${diferenca >= 0 ? "acima" : "abaixo"}`);
+      const trilho = elemento("span", "trilho-media");
+      const enche = elemento("span", "enche");
+      enche.style.width = `${Math.round(50 * Math.min(1, Math.abs(diferenca) / maiorDiferenca))}%`;
+      trilho.appendChild(enche);
+      barra.append(trilho, diferenca === 0 ? "na média" : `${diferenca > 0 ? "+" : "−"}${Math.abs(diferenca)}`);
+      barra.title = "Comparado com a sua média";
+      const pontos = elemento("span", "item-pontos");
+      pontos.append(total, barra);
 
       const esquerda = elemento("span", "item-info");
       esquerda.appendChild(data);
@@ -1625,7 +1780,7 @@ function abrirHistorico() {
         mostrarTextoDaSala(infoSala, partida.sala);
         esquerda.appendChild(infoSala);
       }
-      botao.append(esquerda, total);
+      botao.append(ficha, esquerda, pontos);
       botao.addEventListener("click", () => abrirPartida(partida.id));
       li.appendChild(botao);
       lista.appendChild(li);
@@ -2251,6 +2406,7 @@ function mostrarMesa(nome) {
   if (nome === "verde") delete document.documentElement.dataset.mesa;
   else document.documentElement.dataset.mesa = nome;
   desenharEscolhaMesa();
+  if (window.familia) familia.corDaMesaMudou(); // na sala, os outros veem a cor nova na hora
 }
 
 function guardarCorDaMesa(nome, em) {
@@ -2308,10 +2464,10 @@ mostrarTextura(texturaLigada());
 // Como a mesa: escolha em Mais, acompanha o nome. As cores estão no style.css
 // (data-dados); aqui só o que aparece no botão de escolher.
 const DADOS = {
-  marfim: { nome: "Marfim", cor: "#fffdf6", borda: "#c9bfa5", pinta: "#2a1d0e" },
-  vermelho: { nome: "Vermelho de cassino", cor: "#c8202f", borda: "#6e0b14", pinta: "#fffaf0" },
-  preto: { nome: "Preto com pintas douradas", cor: "#22201d", borda: "#000000", pinta: "#e8bf55" },
-  azul: { nome: "Azul de cassino", cor: "#1f4fae", borda: "#0b2155", pinta: "#fffaf0" }
+  marfim: { nome: "Marfim", cor: "#fffdf6", borda: "#c9bfa5", pinta: "#2a1d0e", brilho: "#ffffff" },
+  vermelho: { nome: "Vermelho de cassino", cor: "#c8202f", borda: "#6e0b14", pinta: "#fffaf0", brilho: "#f0606b" },
+  preto: { nome: "Preto com pintas douradas", cor: "#22201d", borda: "#000000", pinta: "#e8bf55", brilho: "#4a453e" },
+  azul: { nome: "Azul de cassino", cor: "#1f4fae", borda: "#0b2155", pinta: "#fffaf0", brilho: "#5f8fe8" }
 };
 const CHAVE_COR_DADOS = "yam-cor-dados";
 const dadosValidos = nome => Object.prototype.hasOwnProperty.call(DADOS, nome);
@@ -2873,12 +3029,26 @@ function sugestaoDeNumero(qtd) {
   return melhor;
 }
 
+// Como cada dado ficou deitado no feltro: um pouco torto e fora da linha,
+// sorteado a cada rolagem (o segurado fica como estava).
+const sortearPouso = () => ({
+  giro: (Math.random() < 0.5 ? -1 : 1) * (3 + Math.random() * 11),
+  x: Math.round(Math.random() * 6 - 3),
+  y: Math.round(Math.random() * 8 - 4)
+});
+const pousoDosDados = [0, 1, 2, 3, 4].map(sortearPouso);
+
 function desenharDados(rolando = [], assentaram = []) {
   const area = document.getElementById("dados-mesa");
   area.innerHTML = "";
+  rolando.forEach(i => { pousoDosDados[i] = sortearPouso(); });
   mesa.valores.forEach((valor, i) => {
     const dado = document.createElement("button");
     dado.className = "dado";
+    const pouso = pousoDosDados[i];
+    dado.style.setProperty("--pouso", `${pouso.giro.toFixed(1)}deg`);
+    dado.style.setProperty("--pouso-x", `${pouso.x}px`);
+    dado.style.setProperty("--pouso-y", `${pouso.y}px`);
     if (mesa.segurados[i]) dado.classList.add("segurado");
     if (rolando.includes(i)) {
       dado.classList.add("rolando");

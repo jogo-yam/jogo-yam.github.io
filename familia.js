@@ -1745,8 +1745,16 @@ function mostrarMensagemNaTela(texto, nome) {
 
 // ---------- ligação com o resto do app ----------
 
+// Trocou a cor da mesa: quem está na sala já vê a bolinha e a ficha na cor nova.
+function corDaMesaMudou() {
+  const uid = minhaUid();
+  if (!sessao || !uid || !partida || !partida.jogadores || !partida.jogadores[uid]) return;
+  if (partida.jogadores[uid].corMesa === mesaAtual()) return;
+  update(ref(db, `partidas/${sessao.codigo}/jogadores/${uid}`), { corMesa: mesaAtual() }).catch(() => {});
+}
+
 window.familia = {
-  abrir, fecharJanela, acaoJanela, sair, confirmarSair, compartilharCodigo,
+  abrir, corDaMesaMudou, fecharJanela, acaoJanela, sair, confirmarSair, compartilharCodigo,
   aoTerminar, fecharEspera, fecharPodio, jogarDeNovo, limparSalasAntigas, sincronizar, registrarResultado,
   escolherModo, podeJogar, porQueNaoPode, podeDesfazer, mesaMudou, recuperar, trocarNome, avisosMudaram,
   historicoMudou, sincronizarHistorico, registrarNomeSePrecisar, alternarReacoes, reagir, lerRanking,
