@@ -1189,11 +1189,6 @@ tbody tr td.piscar {
 .sala-info .icone,
 .fim-recorde .icone { color: #e0a800; }
 
-.estrela-recorde {
-  margin: 0 0 0 0.3em;
-  color: #e0a800;
-}
-
 .fim-dado .logo-dado {
   width: 52px;
   height: 52px;
@@ -1686,7 +1681,6 @@ button:disabled {
 .grafico .linha { fill: none; stroke: var(--grafico); stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
 .grafico .area { fill: var(--grafico); opacity: 0.1; }
 .grafico .ponto { fill: var(--grafico); stroke: var(--superficie); stroke-width: 2; }
-.grafico .ponto.recorde { fill: #f2b134; }
 .grafico .rotulo-recorde { fill: var(--texto); font-size: 11px; font-weight: bold; }
 .grafico .alvo { fill: transparent; cursor: pointer; }
 
@@ -3392,3 +3386,14 @@ td.mudou { animation: mudou 0.7s ease-out; }
 .grafico .ficha-corpo { fill: #d99a12; stroke: rgba(0, 0, 0, 0.3); stroke-width: 1; }
 .grafico .ficha-listras { fill: none; stroke: #fff3cf; stroke-width: 3; stroke-dasharray: 2.2 3.69; }
 .grafico .ficha-anel { fill: none; stroke: #fff3cf; stroke-width: 1; }
+
+/* histórico: a linha nunca passa da tela (data longa, letra maior) */
+.lista-historico { grid-template-columns: minmax(0, 1fr); }
+.item-info > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* letra maior: o botão Estatísticas do topo fica só com o ícone, para não cobrir o título */
+:root[data-letra="grande"] .topo button.direita { font-size: 0; padding: 8px 12px; }
+:root[data-letra="grande"] .topo button.direita .icone { width: 24px; height: 24px; margin: 0; }
+/* bolinhas da mesa com um brilho: a preta não parece vazia no modo escuro */
+button.bolinha-mesa:not(.bolinha-dado) {
+  background: radial-gradient(circle at 35% 30%, rgba(255, 255, 255, 0.28), transparent 60%), var(--cor-mesa);
+}

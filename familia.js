@@ -1017,7 +1017,7 @@ function mostrarPodio() {
   $("podio").hidden = false;
   // as fichas caem na cor da mesa de quem venceu
   const campeao = terminaram.find(j => posicao(j) === 1);
-  confetePodio(campeao && (campeao.uid === uid ? mesaAtual() : campeao.corMesa));
+  confetePodio(campeao && (campeao.uid === uid ? mesaAtual() : mesaDoJogador(campeao.nome, campeao.corMesa)));
 }
 
 // ---------- revanche ----------

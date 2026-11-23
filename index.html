@@ -20,17 +20,18 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="theme-color" content="#f4ecd8" media="(prefers-color-scheme: light)">
   <meta name="theme-color" content="#121413" media="(prefers-color-scheme: dark)">
-  <link rel="manifest" href="manifest.json?v=95">
+  <link rel="manifest" href="manifest.json?v=96">
   <link rel="icon" type="image/png" sizes="32x32" href="icone-mesa-32.png">
   <link rel="apple-touch-icon" href="icone-mesa-apple-180.png">
 
   <link rel="preload" href="fontes/nunito.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="preload" href="fontes/fredoka.woff2" as="font" type="font/woff2" crossorigin>
   <!-- ?v= é a versão do app (igual ao VERSAO do app.js; um teste confere): versão nova, endereço novo -->
-  <link rel="stylesheet" href="style.css?v=95">
+  <link rel="stylesheet" href="style.css?v=96">
 
   <!-- Aplica o tema escolhido antes de desenhar a página, para não piscar. -->
   <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
   <!-- tela de abertura do app instalado no iPhone (feltro com o logo), uma por tamanho de tela -->
   <link rel="apple-touch-startup-image" media="screen and (device-width: 440px) and (device-height: 956px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)" href="abertura/abertura-1320x2868.png">
   <link rel="apple-touch-startup-image" media="screen and (device-width: 402px) and (device-height: 874px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)" href="abertura/abertura-1206x2622.png">
@@ -209,7 +210,7 @@
   <div class="topo">
     <button onclick="voltarParaPrincipal()"><svg class="icone" aria-hidden="true"><use href="#i-voltar"/></svg>Voltar</button>
     <h1>Histórico</h1>
-    <button class="direita" onclick="abrirEstatisticas()"><svg class="icone" aria-hidden="true"><use href="#i-grafico"/></svg>Estatísticas</button>
+    <button class="direita" onclick="abrirEstatisticas()" aria-label="Estatísticas" title="Estatísticas"><svg class="icone" aria-hidden="true"><use href="#i-grafico"/></svg>Estatísticas</button>
   </div>
 
   <div id="resumo-historico" class="resumo">
@@ -745,7 +746,7 @@
   </div>
 </div>
 
-<script src="app.js?v=95"></script>
+<script src="app.js?v=96"></script>
 <script>
   // Rede de segurança: se o app.js não carregou (ex.: troca de versão no meio
   // do caminho), recarrega sozinho uma vez, em vez de ficar com a tabela vazia.
@@ -759,7 +760,7 @@
     setTimeout(function () { location.replace(location.pathname + "?atualizado=" + Date.now()); }, 1500);
   })();
 </script>
-<script type="module" src="familia.js?v=95"></script>
+<script type="module" src="familia.js?v=96"></script>
 
 <!-- Service Worker -->
 <script>
