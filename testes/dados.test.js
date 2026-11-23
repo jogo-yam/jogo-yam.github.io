@@ -197,7 +197,7 @@ test("sorteio: só sai de 1 a 6, e sai de tudo", () => {
 
 test("rolar e segurar: até 3 jogadas por vez", async () => {
   naTabela();
-  const esperarRolagem = () => new Promise(r => setTimeout(r, 700));
+  const esperarRolagem = () => new Promise(r => setTimeout(r, 900)); // a rolagem leva 700 ms
   const mesa = () => JSON.parse(rodar("JSON.stringify(mesa)"));
 
   app.novaVez();

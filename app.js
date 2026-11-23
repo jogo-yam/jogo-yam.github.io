@@ -8,7 +8,7 @@ const rows = [
 const COLUNAS = 4;
 
 // Versão do app: igual ao número do CACHE_NAME do service-worker.js (um teste confere).
-const VERSAO = 107;
+const VERSAO = 108;
 
 // Avisos da vez com o app fechado: servidor na Cloudflare (worker/avisos.mjs).
 // Sem o endereço, a opção "Avisar a minha vez" não aparece.
@@ -3079,35 +3079,18 @@ function rolarDados() {
     localStorage.setItem(CHAVE_MESA, JSON.stringify({ ...mesa, valores: resultado, novaVez: false }));
   } catch {}
   if (window.familia) familia.mesaMudou(resultado); // na sala, os outros já começam a ver rolar
-  soltos.forEach(i => { mesa.valores[i] = sortearFace(); });
-  desenharDados(soltos); // começa a animação (giro e pulo de cada dado)
+  // o cubo de cada dado gira no ar até a face sorteada ficar de frente
+  mesa.valores = [...resultado];
+  desenharDados(soltos);
   vibrar([12, 50, 12, 50, 12]);
   tocar("rolar");
-  let passos = 0;
-  const animar = setInterval(() => {
-    soltos.forEach(i => { mesa.valores[i] = sortearFace(); });
-    trocarFaces(soltos);
-    if (++passos >= 8) {
-      clearInterval(animar);
-      rolandoDados = false;
-      mesa.valores = resultado;
-      guardarMesa();
-      desenharDados([], soltos);
-      vibrar(30);
-      avisarMesa();
-    }
-  }, 60);
-}
-
-// Durante a rolagem só troca os pontos, sem refazer o dado (a animação segue).
-function trocarFaces(indices) {
-  const dados = document.getElementById("dados-mesa").children;
-  indices.forEach(i => {
-    if (!dados[i]) return;
-    Array.from(dados[i].children).forEach((ponto, p) => {
-      ponto.className = PONTOS_DO_DADO[mesa.valores[i]].includes(p) ? "on" : "";
-    });
-  });
+  setTimeout(() => {
+    rolandoDados = false;
+    guardarMesa();
+    desenharDados();
+    vibrar(30);
+    avisarMesa();
+  }, 700); // 0,62 s da queda + até 40 ms de atraso de cada dado
 }
 
 // Quanto os dados valem numa linha da tabela (mesmas regras de valoresPossiveis);
@@ -3340,31 +3323,242 @@ function sugestaoDeNumero(qtd) {
   return melhor;
 }
 
-function desenharDados(rolando = [], assentaram = []) {
+// ---------- dados em 3D ----------
+// Cada dado é um cubo com as seis faces; a do número sorteado fica de frente.
+// O giro de cada dado (graus) fica guardado: a próxima rolagem continua dele.
+const FACE_DE_FRENTE = { 1: [0, 0], 2: [-90, 0], 3: [0, -90], 4: [0, 90], 5: [90, 0], 6: [0, 180] };
+const giroDosDados = [0, 1, 2, 3, 4].map(() => ({ x: 0, y: 0, z: 0 }));
+const proximoQuadro = f => (typeof requestAnimationFrame === "function" ? requestAnimationFrame(f) : setTimeout(f, 16));
+const agoraMs = () => (typeof performance !== "undefined" && performance.now ? performance.now() : Date.now());
+
+// O dado girando é desenhado pelo próprio app, quadro a quadro, num canvas: um
+// cubo de quinas redondas (o mesmo arredondado do dado parado) feito de faces
+// retas, arestas curvas e cantos. Como só os lados virados para quem olha são
+// desenhados, não sobra fresta nem lado sumido, em qualquer navegador.
+// Coordenadas a partir do centro do dado: x para a direita, y para baixo, z
+// para quem olha (as mesmas do CSS).
+const LADO_DO_DADO = 54, RAIO_DA_QUINA = 14, PARTES_DA_CURVA = 4;
+const MALHA_DO_DADO = (() => {
+  const h = LADO_DO_DADO / 2, R = RAIO_DA_QUINA, M = h - R, P = PARTES_DA_CURVA;
+  const mais = (a, b) => a.map((v, i) => v + b[i]);
+  const menos = (a, b) => a.map((v, i) => v - b[i]);
+  const vezes = (a, k) => a.map(v => v * k);
+  const cruz = (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
+  const ponto3 = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+  const unit = a => vezes(a, 1 / Math.hypot(...a));
+  const poligonos = [];
+  const juntar = pts => {
+    const centro = vezes(pts.reduce(mais, [0, 0, 0]), 1 / pts.length);
+    let n = unit(cruz(menos(pts[1], pts[0]), menos(pts[2], pts[0])));
+    if (ponto3(n, centro) < 0) n = vezes(n, -1);
+    poligonos.push({ pts, n, centro });
+  };
+  // as faces, do mesmo jeito que o CSS as põe (lado-1 a lado-6): ponto (u, v) da face
+  const FACES = {
+    1: (u, v) => [u, v, h], 6: (u, v) => [-u, v, -h], 3: (u, v) => [h, v, -u],
+    4: (u, v) => [-h, v, u], 2: (u, v) => [u, -h, v], 5: (u, v) => [u, h, -v]
+  };
+  const pontos = {};
+  const passo = (LADO_DO_DADO - 16) / 3; // a grade dos pontos do dado parado (38 px em 3)
+  for (const [f, F] of Object.entries(FACES)) {
+    juntar([F(-M, -M), F(M, -M), F(M, M), F(-M, M)]);
+    const eu = menos(F(1, 0), F(0, 0)), ev = menos(F(0, 1), F(0, 0));
+    pontos[f] = PONTOS_DO_DADO[f].map(p => {
+      const c = F(((p % 3) - 1) * passo, (Math.floor(p / 3) - 1) * passo);
+      return [...Array(14)].map((_, k) => {
+        const g = (k / 14) * 2 * Math.PI;
+        return mais(c, mais(vezes(eu, 4.5 * Math.cos(g)), vezes(ev, 4.5 * Math.sin(g))));
+      });
+    });
+  }
+  const sinais = [-1, 1];
+  const angulos = [...Array(P + 1)].map((_, k) => Math.atan2(k, P - k));
+  // arestas: ao longo do eixo a, na quina dos sinais sb (eixo b) e sc (eixo c)
+  for (let a = 0; a < 3; a++) {
+    const [b, c] = [0, 1, 2].filter(e => e !== a);
+    for (const sb of sinais) for (const sc of sinais) {
+      const p = (va, g) => { const q = [0, 0, 0]; q[a] = va; q[b] = sb * (M + R * Math.cos(g)); q[c] = sc * (M + R * Math.sin(g)); return q; };
+      for (let k = 0; k < P; k++) juntar([p(-M, angulos[k]), p(M, angulos[k]), p(M, angulos[k + 1]), p(-M, angulos[k + 1])]);
+    }
+  }
+  // cantos: o pedaço de esfera entre as três arestas, numa malha de triângulos
+  for (const sx of sinais) for (const sy of sinais) for (const sz of sinais) {
+    const O = [sx * M, sy * M, sz * M];
+    const no = (i, j) => mais(O, vezes(unit([sx * (P - i - j), sy * i, sz * j]), R));
+    for (let i = 0; i < P; i++) for (let j = 0; i + j < P; j++) {
+      juntar([no(i, j), no(i + 1, j), no(i, j + 1)]);
+      if (i + j < P - 1) juntar([no(i + 1, j), no(i + 1, j + 1), no(i, j + 1)]);
+    }
+  }
+  return { poligonos, pontos, faces: Object.fromEntries(Object.entries(FACES).map(([f, F]) => [f, unit(F(0, 0))])) };
+})();
+
+// Gira um ponto como o CSS faria com rotateZ(z) rotateX(x) rotateY(y).
+function matrizDoGiro(g) {
+  const r = v => (v * Math.PI) / 180;
+  const [cz, sz, cx, sx, cy, sy] = [Math.cos(r(g.z)), Math.sin(r(g.z)), Math.cos(r(g.x)), Math.sin(r(g.x)), Math.cos(r(g.y)), Math.sin(r(g.y))];
+  const Z = [[cz, -sz, 0], [sz, cz, 0], [0, 0, 1]], X = [[1, 0, 0], [0, cx, -sx], [0, sx, cx]], Y = [[cy, 0, sy], [0, 1, 0], [-sy, 0, cy]];
+  const vezesM = (A, B) => A.map(l => [0, 1, 2].map(j => l[0] * B[0][j] + l[1] * B[1][j] + l[2] * B[2][j]));
+  const m = vezesM(vezesM(Z, X), Y);
+  return p => [0, 1, 2].map(i => m[i][0] * p[0] + m[i][1] * p[1] + m[i][2] * p[2]);
+}
+
+// Desenha o dado no giro g; "tom" (0 a 1) é quanto aparece a luz e sombra do volume.
+const TELA_DO_DADO = 100, DISTANCIA_DO_OLHO = 400;
+const LUZ_DO_DADO = (() => { const l = [-0.35, -0.55, 0.76], n = Math.hypot(...l); return l.map(v => v / n); })();
+function desenharDadoGirando(ctx, g, cores, tom) {
+  const h = LADO_DO_DADO / 2, meio = TELA_DO_DADO / 2, D = DISTANCIA_DO_OLHO;
+  const girar = matrizDoGiro(g);
+  const tela = p => { const q = girar(p); const s = D / (D - (q[2] - h)); return [meio + q[0] * s, meio + q[1] * s, q[2] - h]; };
+  const olhando = (n, c) => { const nq = girar(n), cq = girar(c); return nq[0] * -cq[0] + nq[1] * -cq[1] + nq[2] * (D + h - cq[2]) > 0; };
+  ctx.clearRect(0, 0, TELA_DO_DADO, TELA_DO_DADO);
+  ctx.lineJoin = "round";
+  ctx.lineWidth = 0.8; // o contorno na mesma cor cobre a emenda entre as partes
+  const caminho = pts => { ctx.beginPath(); pts.forEach((p, k) => { const [x, y] = tela(p); if (k) ctx.lineTo(x, y); else ctx.moveTo(x, y); }); ctx.closePath(); };
+  for (const pol of MALHA_DO_DADO.poligonos) {
+    if (!olhando(pol.n, pol.centro)) continue;
+    const nq = girar(pol.n);
+    const escuro = tom * 0.13 * (1 - Math.max(0, nq[0] * LUZ_DO_DADO[0] + nq[1] * LUZ_DO_DADO[1] + nq[2] * LUZ_DO_DADO[2]));
+    const cor = `rgb(${cores.dado.map(v => Math.round(v * (1 - escuro))).join(",")})`;
+    caminho(pol.pts);
+    ctx.fillStyle = cor;
+    ctx.strokeStyle = cor;
+    ctx.fill();
+    ctx.stroke();
+  }
+  // os pontos: só nos lados bem virados para quem olha (aparecem aos poucos,
+  // para não riscarem a borda quando o lado está quase de perfil)
+  ctx.fillStyle = cores.pinta;
+  for (const [f, n] of Object.entries(MALHA_DO_DADO.faces)) {
+    const nq = girar(n), cq = girar(n.map(v => v * h));
+    const olho = [-cq[0], -cq[1], D + h - cq[2]], dist = Math.hypot(...olho);
+    const frente = (nq[0] * olho[0] + nq[1] * olho[1] + nq[2] * olho[2]) / dist;
+    if (frente < 0.2) continue;
+    ctx.globalAlpha = Math.min(1, (frente - 0.2) / 0.25);
+    for (const pip of MALHA_DO_DADO.pontos[f]) { caminho(pip); ctx.fill(); }
+  }
+  ctx.globalAlpha = 1;
+}
+
+// As cores do dado (as mesmas do CSS: marfim, vermelho, preto ou azul, claro ou escuro).
+function coresDoDado(ctx, el) {
+  const estilo = typeof getComputedStyle === "function" ? getComputedStyle(el) : { getPropertyValue: () => "" };
+  const rgb = css => {
+    ctx.fillStyle = "#000";
+    ctx.fillStyle = (css || "").trim() || "#fffdf6";
+    const hex = String(ctx.fillStyle);
+    const m = hex.match(/^#([0-9a-f]{6})$/i);
+    if (m) return [0, 2, 4].map(i => parseInt(m[1].slice(i, i + 2), 16));
+    const n = hex.match(/[\d.]+/g);
+    return n && n.length >= 3 ? n.slice(0, 3).map(Number) : [255, 253, 246];
+  };
+  return { dado: rgb(estilo.getPropertyValue("--dado")), pinta: (estilo.getPropertyValue("--dado-pinta") || "#2a1d0e").trim() };
+}
+
+// Faz o dado girar de "de" até "ate" em "duracao" ms (depois de "atraso" ms).
+function animarDadoGirando(tela, de, ate, atraso, duracao) {
+  try {
+    desenharGiroNaTela(tela, de, ate, atraso, duracao);
+  } catch {} // se o desenho falhar, a jogada segue (o dado aparece quando assenta)
+}
+
+function desenharGiroNaTela(tela, de, ate, atraso, duracao) {
+  const ctx = tela.getContext && tela.getContext("2d");
+  if (!ctx) return;
+  const dpr = Math.min(3, (typeof devicePixelRatio === "number" && devicePixelRatio) || 1);
+  tela.width = TELA_DO_DADO * dpr;
+  tela.height = TELA_DO_DADO * dpr;
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  const cores = coresDoDado(ctx, tela);
+  const calmo = typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const inicio = agoraMs() + atraso;
+  const quadro = () => {
+    if (!tela.isConnected && agoraMs() > inicio) return;
+    const t = calmo ? 1 : Math.min(1, Math.max(0, (agoraMs() - inicio) / duracao));
+    const e = 1 - Math.pow(1 - t, 3); // começa rápido e assenta devagar
+    const g = { x: de.x + (ate.x - de.x) * e, y: de.y + (ate.y - de.y) * e, z: de.z + (ate.z - de.z) * e };
+    try { desenharDadoGirando(ctx, g, cores, 1 - Math.max(0, (t - 0.55) / 0.45)); } catch { return; } // a sombra some no fim
+    if (t < 1) proximoQuadro(quadro);
+  };
+  quadro();
+}
+
+// O giro mais perto do atual que deixa a face de frente (com voltas inteiras a mais ao rolar).
+function giroParaFace(face, atual, voltas = { x: 0, y: 0, z: 0 }) {
+  const [ax, ay] = FACE_DE_FRENTE[face];
+  const perto = (de, alvo) => alvo + 360 * Math.round((de - alvo) / 360);
+  return {
+    x: perto(atual.x, ax) + 360 * voltas.x,
+    y: perto(atual.y, ay) + 360 * voltas.y,
+    z: 360 * Math.round(atual.z / 360) + 360 * voltas.z
+  };
+}
+
+// Quando o cubo termina de girar (já de face para cima, ainda no ar) e vira o
+// dado de sempre, que termina a queda e quica (o giro de 0,25 s, no CSS).
+const GIRO_ATE_TROCAR = 255;
+
+function desenharDados(rolando = []) {
   const area = document.getElementById("dados-mesa");
   area.innerHTML = "";
-  mesa.valores.forEach((valor, i) => {
+  const pontos = (alvo, face) => {
+    for (let p = 0; p < 9; p++) {
+      const ponto = document.createElement("i");
+      if (PONTOS_DO_DADO[face].includes(p)) ponto.className = "on";
+      alvo.appendChild(ponto);
+    }
+  };
+  const novoDado = (valor, i) => {
     const dado = document.createElement("button");
     dado.className = "dado";
     if (mesa.segurados[i]) dado.classList.add("segurado");
-    if (rolando.includes(i)) {
-      dado.classList.add("rolando");
-      // cada dado entra de um lado, gira um tanto e para reto
-      const voltas = (Math.random() < 0.5 ? -1 : 1) * (Math.random() < 0.5 ? 360 : 720);
-      dado.style.setProperty("--giro", `${voltas}deg`);
-      dado.style.setProperty("--de-x", `${Math.round(Math.random() * 60 - 30)}px`);
-      dado.style.animationDelay = `${Math.floor(Math.random() * 40)}ms`;
-    }
-    if (assentaram.includes(i)) dado.classList.add("assentou");
     if (mesa.jogada === 0) dado.classList.add("parado");
     dado.setAttribute("aria-label", `Dado ${valor}${mesa.segurados[i] ? ", segurado" : ""}`);
-    for (let p = 0; p < 9; p++) {
-      const ponto = document.createElement("i");
-      if (PONTOS_DO_DADO[valor].includes(p)) ponto.className = "on";
-      dado.appendChild(ponto);
-    }
     dado.onclick = () => segurarDado(i);
+    return dado;
+  };
+  mesa.valores.forEach((valor, i) => {
+    const dado = novoDado(valor, i);
+    const antes = giroDosDados[i];
+
+    if (!rolando.includes(i)) {
+      // parado: o desenho de sempre, só a face do número
+      giroDosDados[i] = giroParaFace(valor, antes);
+      pontos(dado, valor);
+      area.appendChild(dado);
+      return;
+    }
+
+    // rolando: o dado em 3D, desenhado quadro a quadro, sai do giro de antes e dá
+    // voltas no ar até a face sorteada ficar de frente (mesa.valores já é o resultado)
+    const sombra = document.createElement("span");
+    sombra.className = "dado-sombra";
+    const pulo = document.createElement("span");
+    pulo.className = "dado-pulo";
+    const tela = document.createElement("canvas");
+    tela.className = "dado-tela";
+    tela.setAttribute("aria-hidden", "true");
+    pulo.appendChild(tela);
+    dado.append(sombra, pulo);
+
+    const lado = () => (Math.random() < 0.5 ? -1 : 1);
+    const voltas = { x: lado(), y: Math.random() < 0.6 ? lado() : 0, z: Math.random() < 0.5 ? 0 : lado() };
+    giroDosDados[i] = giroParaFace(valor, antes, voltas);
+    const atraso = Math.floor(Math.random() * 40);
+    dado.classList.add("rolando");
+    dado.style.setProperty("--de-x", `${Math.round(Math.random() * 60 - 30)}px`); // vem de cima, um pouco de lado
+    dado.style.setProperty("--atraso", `${atraso}ms`); // cada dado num tempo
     area.appendChild(dado);
+    animarDadoGirando(tela, antes, giroDosDados[i], atraso, GIRO_ATE_TROCAR - 5);
+    // parou de girar, de face para cima: vira o dado de sempre, que termina a queda e quica
+    setTimeout(() => {
+      if (!dado.isConnected) return;
+      const assentado = novoDado(valor, i);
+      assentado.classList.add("quicando");
+      assentado.style.setProperty("--de-x", dado.style.getPropertyValue("--de-x"));
+      pontos(assentado, valor);
+      dado.replaceWith(assentado);
+    }, atraso + GIRO_ATE_TROCAR);
   });
 
   const status = document.getElementById("dados-status");

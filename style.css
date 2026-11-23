@@ -1464,50 +1464,15 @@ button:disabled {
   display: flex;
   justify-content: center;
   gap: 8px;
-  margin: 14px 0 10px;
+  margin: 22px 0 10px; /* espaço para os dados pularem sem cobrir o texto */
 }
 
-.dado {
-  width: 54px;
-  height: 54px;
-  padding: 8px;
-  display: grid;
-  grid-template: repeat(3, 1fr) / repeat(3, 1fr);
-  place-items: center;
-  border: 2px solid #c8c8c4;
-  border-radius: 12px;
-  background: #ffffff;
-  cursor: pointer;
-  transition: transform 0.15s;
-}
-
-.dado i {
-  width: 9px;
-  height: 9px;
-  border-radius: 50%;
-  background: #1d1d1f;
-  visibility: hidden;
-}
-
-.dado i.on { visibility: visible; }
-.dado.parado { opacity: 0.45; }
-.dado.segurado {
-  border-color: var(--foco);
-  box-shadow: 0 0 0 3px var(--foco);
-  transform: translateY(-6px);
-}
-/* rolando: cada dado pula, gira e quica; ao parar dá um "tum" */
-.dado.rolando { animation: rolar 0.5s cubic-bezier(0.3, 0.7, 0.4, 1) both; }
-.dado.assentou { animation: assentar 0.22s ease-out; }
-
-/* rolando: cai de um lado, gira, bate no feltro (achata um pouco), quica e para reto */
-@keyframes rolar {
-  0%   { transform: translate(var(--de-x, 0px), -24px) rotate(0deg) scale(0.92); }
-  38%  { transform: translate(calc(var(--de-x, 0px) * 0.3), -10px) rotate(calc(var(--giro) * 0.6)) scale(1.04); }
-  56%  { transform: translate(0, 0) rotate(calc(var(--giro) * 0.86)) scale(1.06, 0.9); }
-  72%  { transform: translate(0, -8px) rotate(calc(var(--giro) * 0.96)) scale(0.98, 1.03); }
-  88%  { transform: translate(0, 0) rotate(var(--giro)) scale(1.03, 0.96); }
-  100% { transform: translate(0, 0) rotate(var(--giro)) scale(1); }
+/* os dadinhos de quem está jogando (na barra da vez): pulo simples, sem sombra */
+@keyframes rolar-mini {
+  0%   { transform: translateY(-16px) rotate(0deg) scale(0.92); }
+  55%  { transform: translateY(0) rotate(calc(var(--giro) * 0.9)) scale(1.06, 0.9); }
+  75%  { transform: translateY(-5px) rotate(var(--giro)) scale(0.98, 1.03); }
+  100% { transform: translateY(0) rotate(var(--giro)) scale(1); }
 }
 
 @keyframes assentar {
@@ -1516,9 +1481,6 @@ button:disabled {
   100% { transform: scale(1); }
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .dado.rolando, .dado.assentou { animation: none; }
-}
 
 .caixa-dados .fim-acoes button { white-space: nowrap; }
 
@@ -2040,7 +2002,7 @@ button.bolinha-mesa:active { transform: scale(0.92); box-shadow: none; }
 
 .vez-dados .dado-mini.segurado { transform: translateY(-3px); }
 /* quem está jogando rolou: os dadinhos pulam e giram como os seus */
-.vez-dados .dado-mini.rolando { animation: rolar 0.44s ease-out both; }
+.vez-dados .dado-mini.rolando { animation: rolar-mini 0.44s ease-out both; }
 .vez-dados .dado-mini.assentou { animation: assentar 0.22s ease-out; }
 @media (prefers-reduced-motion: reduce) {
   .vez-dados .dado-mini.rolando, .vez-dados .dado-mini.assentou { animation: none; }
@@ -2990,26 +2952,6 @@ thead th { border-right-color: rgba(255, 255, 255, 0.18); font-size: 19px; }
   box-shadow: 0 3px 0 var(--marfim-sombra);
 }
 
-.dado {
-  border: none;
-  border-radius: 14px;
-  background: var(--dado-fundo);
-  box-shadow: 0 4px 0 var(--dado-sombra), inset 0 -3px 0 rgba(0, 0, 0, 0.06);
-}
-
-.dado:active { box-shadow: 0 2px 0 var(--dado-sombra); }
-
-.dado i {
-  background: var(--dado-pinta);
-  box-shadow: inset 0 1px 1px rgba(0, 0, 0, 0.5); /* pinta "afundada" */
-}
-
-.dado.segurado {
-  box-shadow: 0 0 0 3px var(--foco), 0 6px 0 var(--foco-sombra);
-}
-
-.dado.parado { opacity: 0.55; }
-
 /* avisos: festa no feltro, alerta no dourado */
 .legenda.festa { background: var(--destaque); color: var(--destaque-texto); box-shadow: inset 0 0 0 3px var(--foco), 0 6px 24px rgba(0, 0, 0, 0.3); }
 .legenda.aviso { background: var(--foco); color: var(--foco-texto); }
@@ -3251,11 +3193,6 @@ button.bolinha-dado i:nth-child(3) { grid-area: 3 / 3; }
 .item-ranking .avatar { font-size: 15px; margin: 0; }
 
 @media (prefers-reduced-motion: reduce) { .degrau-1 .ficha { animation: none; } }
-
-/* ---------- dados com sombra no feltro ---------- */
-.dado { box-shadow: 0 4px 0 var(--dado-sombra), 0 8px 12px rgba(0, 0, 0, 0.35), inset 0 -3px 0 rgba(0, 0, 0, 0.06); }
-.dado:active { box-shadow: 0 2px 0 var(--dado-sombra), 0 4px 6px rgba(0, 0, 0, 0.3); }
-.dado.segurado { box-shadow: 0 0 0 3px var(--foco), 0 6px 0 var(--foco-sombra), 0 12px 16px rgba(0, 0, 0, 0.35); }
 
 /* ---------- marcar: o número entra com um pulinho, os totais piscam ---------- */
 tbody td.marcou > input { animation: marcou 0.4s cubic-bezier(0.2, 1.6, 0.4, 1); }
@@ -3550,4 +3487,112 @@ button.botao-dados.sua-vez { animation: dados-chamando 1.1s ease-in-out infinite
   .alerta-vez { animation: none; box-shadow: inset 0 0 0 6px var(--foco); }
   .barra-vez.minha:not(.chamando) { animation: none; box-shadow: inset 0 0 0 3px var(--foco); }
   button.botao-dados.sua-vez { animation: none; box-shadow: 0 3px 0 var(--foco-sombra), 0 0 0 4px var(--foco); }
+}
+
+/* ---------- dados ---------- */
+/* Parados: o desenho de sempre (quadrado arredondado com a bordinha embaixo).
+   Rolando: viram um cubo 3D sólido que chacoalha, pula, gira no ar até a face
+   sorteada e, no fim, arredonda os cantos e ganha a bordinha, virando de novo o
+   dado de sempre sem emenda. */
+.dado {
+  --lado: 54px;
+  position: relative;
+  width: var(--lado);
+  height: var(--lado);
+  padding: 8px;
+  display: grid;
+  grid-template: repeat(3, 1fr) / repeat(3, 1fr);
+  place-items: center;
+  border: none;
+  border-radius: 14px;
+  background: var(--dado-fundo);
+  box-shadow: 0 4px 0 var(--dado-sombra), 0 8px 12px rgba(0, 0, 0, 0.35), inset 0 -3px 0 rgba(0, 0, 0, 0.06);
+  cursor: pointer;
+  transition: transform 0.15s;
+}
+.dado:active { box-shadow: 0 2px 0 var(--dado-sombra), 0 4px 6px rgba(0, 0, 0, 0.3); }
+.dado.parado { opacity: 0.55; }
+.dado.segurado {
+  transform: translateY(-6px);
+  box-shadow: 0 0 0 3px var(--foco), 0 6px 0 var(--foco-sombra), 0 12px 16px rgba(0, 0, 0, 0.35);
+}
+
+.dado i {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--dado-pinta);
+  box-shadow: inset 0 1px 1px rgba(0, 0, 0, 0.5); /* pinta "afundada" */
+  visibility: hidden;
+}
+.dado i.on { visibility: visible; }
+
+/* ---------- rolando: o cubo em 3D ---------- */
+/* O mesmo dado de sempre (quinas redondas, mesma cor, mesmos pontos), só que em
+   3D, desenhado pelo app quadro a quadro num canvas (fechado em qualquer
+   ângulo). Cai de cima, como antes, girando no ar; quando para de girar vira o
+   dado de sempre, que termina a queda e quica. */
+.dado.rolando {
+  display: block;
+  padding: 0;
+  background: none;
+  box-shadow: none;
+}
+/* a sombra no feltro: fica embaixo, não cai junto */
+.dado-sombra {
+  position: absolute;
+  left: 8%;
+  right: 8%;
+  bottom: -7px;
+  height: 12px;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.4);
+  filter: blur(4px);
+}
+.dado-pulo {
+  position: absolute;
+  inset: 0;
+  border-radius: 14px;
+}
+/* o dado em 3D, desenhado pelo app: maior que o dado, porque girando ele ocupa mais */
+.dado-tela {
+  position: absolute;
+  left: calc((var(--lado) - 100px) / 2);
+  top: calc((var(--lado) - 100px) / 2);
+  width: 100px;
+  height: 100px;
+  pointer-events: none;
+}
+
+.dado.rolando .dado-pulo { animation: cai-dado 0.62s cubic-bezier(0.3, 0.7, 0.4, 1) var(--atraso, 0ms) both; }
+.dado.rolando .dado-sombra { animation: sombra-dado 0.62s cubic-bezier(0.3, 0.7, 0.4, 1) var(--atraso, 0ms) both; }
+/* o mesmo caminho de antes: vem de cima (um pouco de lado), bate, quica e assenta */
+@keyframes cai-dado {
+  0%   { transform: translate(var(--de-x, 0px), -24px) scale(0.84); box-shadow: 0 0 0 transparent, 0 0 0 transparent; }
+  38%  { transform: translate(calc(var(--de-x, 0px) * 0.3), -10px) scale(0.9); }
+  56%  { transform: translate(0, 0) scale(1); }
+  72%  { transform: translate(0, -8px) scale(1); }
+  88%  { transform: translate(0, 0) scale(1); box-shadow: 0 0 0 transparent, 0 0 0 transparent; }
+  100% { transform: translate(0, 0) scale(1); box-shadow: 0 4px 0 var(--dado-sombra), 0 8px 12px rgba(0, 0, 0, 0.35); }
+}
+@keyframes sombra-dado {
+  0%   { transform: scale(0.55); opacity: 0.35; }
+  38%  { transform: scale(0.8); opacity: 0.65; }
+  56%  { transform: scale(1.05); opacity: 1; }
+  72%  { transform: scale(0.85); opacity: 0.75; }
+  88%  { transform: scale(1); opacity: 1; }
+  100% { transform: scale(1); opacity: 0; }
+}
+/* já sem girar: o dado de sempre termina a queda e faz o quique (o mesmo caminho) */
+.dado.quicando { animation: quique-dado 0.37s cubic-bezier(0.3, 0.7, 0.4, 1) both; }
+@keyframes quique-dado {
+  0%   { transform: translate(calc(var(--de-x, 0px) * 0.25), -8px) scale(0.93); }
+  24%  { transform: translate(0, 0) scale(1); }
+  50%  { transform: translate(0, -8px) scale(1); }
+  76%  { transform: translate(0, 0) scale(1); }
+  88%  { transform: translate(0, -2px) scale(1); }
+  100% { transform: translate(0, 0) scale(1); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .dado.rolando .dado-pulo, .dado.rolando .dado-sombra, .dado.quicando { animation: none; }
 }
