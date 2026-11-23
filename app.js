@@ -8,7 +8,7 @@ const rows = [
 const COLUNAS = 4;
 
 // Versão do app: igual ao número do CACHE_NAME do service-worker.js (um teste confere).
-const VERSAO = 88;
+const VERSAO = 89;
 
 // Avisos da vez com o app fechado: servidor na Cloudflare (worker/avisos.mjs).
 // Sem o endereço, a opção "Avisar a minha vez" não aparece.
@@ -2201,18 +2201,48 @@ const MESAS = {
   preto: { nome: "Preto e dourado", cor: "#1f1d1a", borda: "#b8871c" }
 };
 const CHAVE_COR_MESA = "yam-cor-mesa";
+const CHAVE_COR_MESA_EM = "yam-cor-mesa-em"; // quando foi escolhida (vale a mais recente entre os aparelhos)
+
+const mesaValida = nome => Object.prototype.hasOwnProperty.call(MESAS, nome);
 
 function mesaAtual() {
   const m = document.documentElement.dataset.mesa;
-  return MESAS[m] ? m : "verde";
+  return mesaValida(m) ? m : "verde";
 }
 
-function escolherMesa(nome) {
-  if (!MESAS[nome]) return;
+// A mesa deste aparelho e quando foi escolhida (0 = nunca escolheu aqui).
+function mesaGuardada() {
+  let em = 0;
+  try { em = Number(localStorage.getItem(CHAVE_COR_MESA_EM)) || 0; } catch {}
+  return { mesa: mesaAtual(), em };
+}
+
+function mostrarMesa(nome) {
   if (nome === "verde") delete document.documentElement.dataset.mesa;
   else document.documentElement.dataset.mesa = nome;
-  try { localStorage.setItem(CHAVE_COR_MESA, nome); } catch {}
   desenharEscolhaMesa();
+}
+
+function guardarCorDaMesa(nome, em) {
+  try {
+    localStorage.setItem(CHAVE_COR_MESA, nome);
+    localStorage.setItem(CHAVE_COR_MESA_EM, String(em));
+  } catch {}
+}
+
+// Tocou numa bolinha: muda aqui e, com nome de usuário, vai para a nuvem.
+function escolherMesa(nome) {
+  if (!mesaValida(nome)) return;
+  mostrarMesa(nome);
+  guardarCorDaMesa(nome, Date.now());
+  if (window.familia && lerUsuario()) familia.historicoMudou();
+}
+
+// A nuvem tem uma escolha mais nova (feita em outro aparelho com o mesmo nome).
+function aplicarMesaDaNuvem(nome, em) {
+  if (!mesaValida(nome)) return;
+  mostrarMesa(nome);
+  guardarCorDaMesa(nome, em);
 }
 
 function desenharEscolhaMesa() {

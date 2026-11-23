@@ -365,7 +365,7 @@ async function trocarNome(novo) {
   }
   if (antigo.chave !== u.chave) {
     const cofre = await cofreDe(id, u.codigo);
-    await comLimite(update(ref(db, `historicos/${cofre}`), { perfil: { nome: u.nome, chave: u.chave } })).catch(() => {});
+    await comLimite(update(ref(db, `historicos/${cofre}`), { "perfil/nome": u.nome, "perfil/chave": u.chave })).catch(() => {});
     // a lista pública de nomes: o de agora e os que a pessoa já usou
     await comLimite(update(ref(db, `identidades/${id}`), {
       nome: u.nome, chave: u.chave, [`antigos/${antigo.chave}`]: true
@@ -381,7 +381,8 @@ async function trocarNome(novo) {
 
 // ---------- histórico na nuvem ----------
 // historicos/<cofre>/<id> = a partida (ou {excluida: true}), e
-// historicos/<cofre>/perfil = { nome, chave } (o nome atual da pessoa). O cofre
+// historicos/<cofre>/perfil = { nome, chave, mesa, mesaEm } (o nome atual da
+// pessoa e a mesa que ela escolheu, com quando escolheu). O cofre
 // é o resumo SHA-256 de "yam-historico:<identidade>:<código>": só quem tem o
 // nome e o código acha, em qualquer aparelho, e trocar de nome não muda o
 // cofre. Antes da identidade, o cofre era pelo nome ("cofre antigo"): ele é
@@ -446,7 +447,17 @@ async function sincronizarCofre(cofre, u) {
   delete remoto.perfil;
   const r = mesclarHistorico(historico, remoto, lerExcluidas());
   const enviar = { ...r.enviar };
-  if (u && (!perfil || perfil.nome !== u.nome || perfil.chave !== u.chave)) enviar.perfil = { nome: u.nome, chave: u.chave };
+  if (u && (!perfil || perfil.nome !== u.nome || perfil.chave !== u.chave)) {
+    enviar["perfil/nome"] = u.nome; // por partes: o resto do perfil (a mesa) fica
+    enviar["perfil/chave"] = u.chave;
+  }
+  // a mesa acompanha o nome: vale a escolhida por último, neste ou em outro aparelho
+  if (u) {
+    const aqui = mesaGuardada();
+    const la = { mesa: perfil && perfil.mesa, em: Number(perfil && perfil.mesaEm) || 0 };
+    if (la.em > aqui.em && mesaValida(la.mesa)) aplicarMesaDaNuvem(la.mesa, la.em);
+    else if (aqui.em > la.em) { enviar["perfil/mesa"] = aqui.mesa; enviar["perfil/mesaEm"] = aqui.em; }
+  }
   if (Object.keys(enviar).length) await comLimite(update(ref(db, `historicos/${cofre}`), enviar));
   if (u) publicarIdentidade(u).catch(() => {});
   return aplicarHistoricoDaNuvem(r);

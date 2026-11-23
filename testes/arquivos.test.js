@@ -134,3 +134,9 @@ test("regras: só quem criou a sala pode começar a partida (sala de espera)", (
   const regras = JSON.parse(lerArquivo("firebase-regras.json")).rules;
   assert.match(regras.partidas.$codigo.iniciada[".write"], /criador/);
 });
+
+test("nenhuma função do app.js tem o nome repetido (a de baixo engoliria a de cima)", () => {
+  const nomes = [...appJs.matchAll(/^(?:async )?function (\w+)\s*\(/gm)].map(m => m[1]);
+  const repetidos = nomes.filter((n, i) => nomes.indexOf(n) !== i);
+  assert.deepEqual(repetidos, []);
+});
