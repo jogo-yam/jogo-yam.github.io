@@ -696,6 +696,13 @@ html {
    embaça um bom pedaço logo abaixo da hora e da bateria, então o app começa
    um pouco mais para baixo. Nos outros (faixa menor ou nenhuma) a folga é 0. */
 :root { --folga-ilha: clamp(0px, (env(safe-area-inset-top, 0px) - 54px) * 100, 40px); }
+/* app instalado no iPhone com iOS 26 (o primeiro iOS com "anchor-name"): o
+   embaçado do sistema fica logo abaixo da hora mesmo sem a faixa informada */
+@supports (-webkit-touch-callout: none) and (anchor-name: --a) {
+  @media (display-mode: standalone) {
+    :root { --folga-ilha: 40px; }
+  }
+}
 
 body {
   margin: 0;
