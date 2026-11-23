@@ -20,14 +20,14 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="theme-color" content="#f4ecd8" media="(prefers-color-scheme: light)">
   <meta name="theme-color" content="#121413" media="(prefers-color-scheme: dark)">
-  <link rel="manifest" href="manifest.json?v=102">
+  <link rel="manifest" href="manifest.json?v=103">
   <link rel="icon" type="image/png" sizes="32x32" href="icone-mesa-32.png">
   <link rel="apple-touch-icon" href="icone-mesa-apple-180.png">
 
   <link rel="preload" href="fontes/nunito.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="preload" href="fontes/fredoka.woff2" as="font" type="font/woff2" crossorigin>
   <!-- ?v= é a versão do app (igual ao VERSAO do app.js; um teste confere): versão nova, endereço novo -->
-  <link rel="stylesheet" href="style.css?v=102">
+  <link rel="stylesheet" href="style.css?v=103">
 
   <!-- Aplica o tema escolhido antes de desenhar a página, para não piscar. -->
   <meta name="apple-mobile-web-app-capable" content="yes">
@@ -46,17 +46,6 @@
   <link rel="apple-touch-startup-image" media="screen and (device-width: 375px) and (device-height: 667px) and (-webkit-device-pixel-ratio: 2) and (orientation: portrait)" href="abertura/abertura-750x1334.png">
   <link rel="apple-touch-startup-image" media="screen and (device-width: 320px) and (device-height: 568px) and (-webkit-device-pixel-ratio: 2) and (orientation: portrait)" href="abertura/abertura-640x1136.png">
   <script>
-    // App instalado no iPhone com iOS 26: o sistema embaça o que fica atrás da
-    // hora e da bateria (e um pouco abaixo). Ali o app não se estende por trás
-    // dessa faixa (sem viewport-fit=cover): começa logo abaixo dela, como um
-    // aplicativo comum, e nada fica embaçado.
-    try {
-      if (CSS.supports("-webkit-touch-callout", "none") && CSS.supports("anchor-name", "--a") &&
-          matchMedia("(display-mode: standalone)").matches) {
-        document.querySelector('meta[name="viewport"]').setAttribute("content", "width=device-width, initial-scale=1.0");
-        document.documentElement.dataset.ios26 = "app";
-      }
-    } catch {}
     try {
       const tema = localStorage.getItem("yam-tema");
       if (tema === "light" || tema === "dark") document.documentElement.dataset.theme = tema;
@@ -70,6 +59,10 @@
   </script>
 </head>
 <body>
+<!-- iPhone/iPad com iOS 26, app instalado: o Safari procura um elemento fixo e
+     opaco encostado no topo para pintar a faixa da hora; sem ele, embaça o topo
+     do app. Esta faixa só serve para isso: não aparece e não pega toque. -->
+<div class="faixa-topo-ios" aria-hidden="true"></div>
 
 <!-- Ícones do app (desenhados: iguais em todo celular, ao contrário dos emojis) -->
 <svg class="sprite" aria-hidden="true" focusable="false">
@@ -758,7 +751,7 @@
   </div>
 </div>
 
-<script src="app.js?v=102"></script>
+<script src="app.js?v=103"></script>
 <script>
   // Rede de segurança: se o app.js não carregou (ex.: troca de versão no meio
   // do caminho), recarrega sozinho uma vez, em vez de ficar com a tabela vazia.
@@ -772,7 +765,7 @@
     setTimeout(function () { location.replace(location.pathname + "?atualizado=" + Date.now()); }, 1500);
   })();
 </script>
-<script type="module" src="familia.js?v=102"></script>
+<script type="module" src="familia.js?v=103"></script>
 
 <!-- Service Worker -->
 <script>

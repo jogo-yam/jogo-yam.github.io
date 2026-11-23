@@ -3417,3 +3417,27 @@ td.mudou { animation: mudou 0.7s ease-out; }
 button.bolinha-mesa:not(.bolinha-dado) {
   background: radial-gradient(circle at 35% 30%, rgba(255, 255, 255, 0.28), transparent 60%), var(--cor-mesa);
 }
+
+/* ---------- topo nítido no iPhone com iOS 26 (app instalado) ---------- */
+/* O WebKit olha 4px abaixo do meio do topo: se acha um elemento fixo, opaco,
+   com 90% da largura ou mais e mais de 10px de altura, pinta a faixa da hora
+   com a cor dele em vez de embaçar o topo do app. background-clip: text faz a
+   faixa não pintar nada (não tem texto): a cor é só para o WebKit ler. */
+.faixa-topo-ios { display: none; }
+@supports (-webkit-touch-callout: none) {
+  @media (display-mode: standalone) {
+    .faixa-topo-ios {
+      display: block;
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: max(12px, env(safe-area-inset-top));
+      background-color: var(--fundo);
+      -webkit-background-clip: text;
+      background-clip: text;
+      z-index: 2147483647;
+      pointer-events: none;
+    }
+  }
+}

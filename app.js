@@ -8,7 +8,7 @@ const rows = [
 const COLUNAS = 4;
 
 // Versão do app: igual ao número do CACHE_NAME do service-worker.js (um teste confere).
-const VERSAO = 102;
+const VERSAO = 103;
 
 // Avisos da vez com o app fechado: servidor na Cloudflare (worker/avisos.mjs).
 // Sem o endereço, a opção "Avisar a minha vez" não aparece.
@@ -3277,7 +3277,7 @@ function mostrarDiagnosticoDaTela() {
   sonda.remove();
   const vv = window.visualViewport;
   linha.textContent = [
-    `ios26:${document.documentElement.dataset.ios26 || "-"}`,
+    `faixa:${(() => { const f = document.querySelector(".faixa-topo-ios"); const c = f && getComputedStyle(f); return c && c.display !== "none" ? c.height : "-"; })()}`,
     `ancora:${CSS.supports("anchor-name", "--a") ? 1 : 0}`,
     `inst:${matchMedia("(display-mode: standalone)").matches ? 1 : 0}/${navigator.standalone ? 1 : 0}`,
     `cover:${/cover/.test(document.querySelector('meta[name="viewport"]').content) ? 1 : 0}`,
