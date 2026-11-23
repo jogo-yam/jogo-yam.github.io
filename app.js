@@ -8,7 +8,7 @@ const rows = [
 const COLUNAS = 4;
 
 // Versão do app: igual ao número do CACHE_NAME do service-worker.js (um teste confere).
-const VERSAO = 83;
+const VERSAO = 84;
 
 // Avisos da vez com o app fechado: servidor na Cloudflare (worker/avisos.mjs).
 // Sem o endereço, a opção "Avisar a minha vez" não aparece.
@@ -647,7 +647,7 @@ function situacaoBonus(valores, col) {
     .reduce((soma, l) => soma + 5 * (l + 1), 0);
 
   if (total1 + maximoQueFalta < META_BONUS) return { texto: "sem bônus", perdido: true };
-  return { texto: `falta ${META_BONUS - total1}`, perdido: false };
+  return { texto: `falta ${META_BONUS - total1}`, perdido: false, soma: total1 };
 }
 
 function mostrarFaltaBonus(tbody, valores) {
@@ -659,7 +659,18 @@ function mostrarFaltaBonus(tbody, valores) {
     if (!situacao || !comecou) continue;
     const dica = document.createElement("small");
     dica.className = situacao.perdido ? "dica-bonus perdido" : "dica-bonus";
-    dica.textContent = situacao.texto;
+    if (situacao.perdido) {
+      dica.textContent = situacao.texto;
+    } else {
+      // barrinha enchendo até 60, com "31/60" embaixo
+      const barra = document.createElement("span");
+      barra.className = "barra-bonus";
+      const cheio = document.createElement("i");
+      cheio.style.width = `${Math.min(100, Math.round(situacao.soma / META_BONUS * 100))}%`;
+      barra.appendChild(cheio);
+      dica.append(barra, `${situacao.soma}/${META_BONUS}`);
+      dica.setAttribute("aria-label", situacao.texto);
+    }
     td.appendChild(dica);
   }
 }
@@ -957,7 +968,7 @@ async function gerarImagemPodio(p, dataIso) {
   canvas.height = H;
   const ctx = canvas.getContext("2d");
   const fonte = (peso, tam) => `${peso} ${tam}px "Nunito", system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif`;
-  const NAVY = "#1f3a5f", FUNDO = "#f3f3f0", TEXTO = "#1d1d1f", SUAVE = "#66666a", OURO = "#c98a00";
+  const NAVY = "#1f6b47", FUNDO = "#f4ecd8", TEXTO = "#3a2a17", SUAVE = "#7a6649", OURO = "#b37a12"; // mesa de feltro
   const data = new Date(dataIso).toLocaleDateString("pt-BR");
 
   ctx.fillStyle = FUNDO;
@@ -1215,7 +1226,7 @@ async function gerarImagemResultado(valores, total, dataIso, selo, nome = "") {
   canvas.height = H;
   const ctx = canvas.getContext("2d");
   const fonte = (peso, tam) => `${peso} ${tam}px "Nunito", system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif`;
-  const NAVY = "#1f3a5f", FUNDO = "#f3f3f0", TEXTO = "#1d1d1f", SUAVE = "#66666a", AMBAR = "#f2b134";
+  const NAVY = "#1f6b47", FUNDO = "#f4ecd8", TEXTO = "#3a2a17", SUAVE = "#7a6649", AMBAR = "#f2b53a"; // mesa de feltro
 
   ctx.fillStyle = FUNDO;
   ctx.fillRect(0, 0, W, H);
@@ -1378,7 +1389,7 @@ async function fonteCarregada() {
 // Confete caindo pela tela toda (recorde, pódio, YAM, bônus).
 let timerConfete = null;
 function soltarConfete(quantos = 60) {
-  const cores = ["#f2b134", "#3d6ea8", "#ffffff", "#e8604c", "#5cb85c"];
+  const cores = ["#f2b53a", "#2f8a5c", "#fffdf6", "#e8604c", "#7fcf9f"];
   const area = document.getElementById("confete");
   area.innerHTML = "";
   for (let i = 0; i < quantos; i++) {
@@ -1404,20 +1415,44 @@ function comemorarJogada(key, antes, depois) {
   const [linha, col] = key.split("-").map(Number);
   if (!(Number(depois) > 0)) return;
   if (linha === 15) {
-    festa(`YAM! +${Number(depois)}`, `Na ${NOMES_COLUNAS[col]}.`);
+    festa(`YAM! +${Number(depois)}`, `Na ${NOMES_COLUNAS[col]}.`, ["YAM!", `+${Number(depois)}`], [key]);
   } else if (linha <= 5) {
     const tinha = somaColuna({ ...state, [key]: antes }, col, 0, 5);
     if (tinha < META_BONUS && somaColuna(state, col, 0, 5) >= META_BONUS) {
-      festa("Bônus +30 garantido!", `Na ${NOMES_COLUNAS[col]}.`);
+      festa("Bônus +30 garantido!", `Na ${NOMES_COLUNAS[col]}.`, ["Bônus!", "+30 garantido"], [key, `7-${col}`]);
     }
   }
 }
 
-function festa(titulo, texto) {
+// Comemoração grande: um "carimbo" no meio da tela, confete e as casas brilhando.
+function festa(titulo, texto, carimbo = null, casas = []) {
   mostrarLegenda([titulo, texto], "festa");
-  soltarConfete(45);
+  soltarConfete(carimbo ? 90 : 45);
   vibrar([40, 60, 40, 60, 80]);
   tocar("festa");
+  if (carimbo) mostrarCarimbo(...carimbo);
+  for (const key of casas) {
+    const td = body.querySelector(`[data-key="${key}"]`);
+    if (!td) continue;
+    td.classList.remove("brilhar");
+    void td.offsetWidth;
+    td.classList.add("brilhar");
+    setTimeout(() => td.classList.remove("brilhar"), 2000);
+  }
+}
+
+function mostrarCarimbo(grande, pequeno) {
+  document.querySelectorAll(".carimbo").forEach(c => c.remove());
+  const c = document.createElement("div");
+  c.className = "carimbo";
+  c.setAttribute("aria-hidden", "true"); // o aviso de baixo já fala o mesmo
+  const forte = document.createElement("strong");
+  forte.textContent = grande;
+  const sub = document.createElement("small");
+  sub.textContent = pequeno;
+  c.append(forte, sub);
+  document.body.appendChild(c);
+  setTimeout(() => c.remove(), 2000);
 }
 
 // Botão de baixo, conforme a situação: numa sala "Sair da sala"; com a partida
@@ -2139,7 +2174,7 @@ function atualizarBotaoTema() {
   const escuro = temaAtual() === "dark";
   document.getElementById("botao-tema").setAttribute("aria-checked", escuro);
   document.querySelectorAll('meta[name="theme-color"]').forEach(meta => {
-    meta.content = escuro ? "#121212" : "#f3f3f0";
+    meta.content = escuro ? "#121413" : "#f4ecd8";
   });
 }
 

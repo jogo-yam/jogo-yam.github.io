@@ -1,67 +1,95 @@
 /* ---------- cores (claro / escuro) ---------- */
-/* Poucas cores, cada uma com um papel: azul = estrutura e destaque,
-   cinza = calculado, amarelo = casa em edição, vermelho = erro. */
+/* Mesa de feltro: verde = a mesa (cabeçalho, barra da vez, botão principal),
+   creme = a folha de pontos, dourado = o que se mexe (casa em edição, dado
+   segurado, botão de rolar), vermelho = erro. */
 
 :root {
-  --fundo: #f3f3f0;
-  --superficie: #ffffff;
-  --texto: #1d1d1f;
-  --texto-suave: #66666a;
-  --borda-forte: #2b2b2b;
-  --borda: #c8c8c4;
-  --nome: #f7f7f5;            /* coluna com o nome das jogadas */
-  --calculado: #ebebe8;       /* linhas de total (não se digita) */
-  --calculado-forte: #dcdcd7;
-  --destaque: #1f3a5f;
-  --vez: #1f3a5f;             /* borda da casa da vez */
+  --fundo: #f4ecd8;           /* a sala em volta da mesa */
+  --superficie: #fffaf0;      /* papel da folha de pontos */
+  --texto: #3a2a17;
+  --texto-suave: #7a6649;
+  --borda-forte: #b9a275;     /* moldura da tabela e fim de seção */
+  --borda: #e3d4b0;
+  --nome: #fbf4e4;            /* coluna com o nome das jogadas */
+  --calculado: #f3e6c6;       /* linhas de total (não se digita) */
+  --calculado-forte: #ead8ad;
+  --destaque: #1f6b47;        /* feltro: cabeçalho, barra da vez, botão principal */
+  --destaque-borda: #124a30;
+  --destaque-suave: #cfe6d6;  /* texto secundário em cima do feltro */
+  --acento: #1f6b47;          /* ícones e textos de destaque em cima do papel */
+  --vez: #1f6b47;             /* borda da casa da vez */
   --destaque-texto: #ffffff;
-  --foco: #f2b134;            /* casa em que se está digitando */
-  --risco: #c4c4bf;           /* listras da casa riscada */
-  --riscado-texto: #8a8a86;
-  --perigo: #b00020;
+  --foco: #f2b53a;            /* dourado: casa em edição, dado segurado, botão de rolar */
+  --foco-sombra: #b37a12;
+  --foco-texto: #3a2a17;
+  --marfim: #fffdf6;          /* dados */
+  --marfim-sombra: #c9bfa5;
+  --pinta: #2a1d0e;
+  --sombra-botao: #cdbb92;    /* "chão" dos botões */
+  --risco: #d6c49c;           /* listras da casa riscada */
+  --riscado-texto: #9a8763;
+  --perigo: #b3261e;
   color-scheme: light;
 }
 
 /* Escuro: segue o celular, a menos que a pessoa tenha escolhido no botão do app. */
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
-    --fundo: #121212;
-    --superficie: #1e1e20;
-    --texto: #f2f2f2;
-    --texto-suave: #a0a0a6;
-    --borda-forte: #8d8d92;
-    --borda: #4a4a4f;
-    --nome: #19191b;
-    --calculado: #2b2b2f;
-    --calculado-forte: #36363b;
-    --destaque: #3d6ea8;
-    --vez: #8bb8f0;
+    --fundo: #121413;           /* sala escura: o feltro se destaca */
+    --superficie: #26221d;      /* papel à noite */
+    --texto: #f1e7cf;
+    --texto-suave: #b3a68c;
+    --borda-forte: #5c5142;
+    --borda: #3a332b;
+    --nome: #221f1a;
+    --calculado: #2f2a23;
+    --calculado-forte: #3a342b;
+    --destaque: #1f6644;
+    --destaque-borda: #144a31;
+    --destaque-suave: #bfe0cb;
+    --acento: #7fcf9f;
+    --vez: #7fcf9f;
     --destaque-texto: #ffffff;
-    --foco: #f2b134;
-    --risco: #4a4a4f;
-    --riscado-texto: #8a8a90;
-    --perigo: #ff6b6b;
+    --foco: #f0b840;
+    --foco-sombra: #9c6a0e;
+    --foco-texto: #2a1d0e;
+    --marfim: #fbf6e8;
+    --marfim-sombra: #8f866f;
+    --pinta: #2a1d0e;
+    --sombra-botao: #0a0b0a;
+    --risco: #3a332b;
+    --riscado-texto: #8a7f6a;
+    --perigo: #ff7b6b;
     color-scheme: dark;
   }
 }
 
 :root[data-theme="dark"] {
-  --fundo: #121212;
-  --superficie: #1e1e20;
-  --texto: #f2f2f2;
-  --texto-suave: #a0a0a6;
-  --borda-forte: #8d8d92;
-  --borda: #4a4a4f;
-  --nome: #19191b;
-  --calculado: #2b2b2f;
-  --calculado-forte: #36363b;
-  --destaque: #3d6ea8;
-  --vez: #8bb8f0;
+  --fundo: #121413;           /* sala escura: o feltro se destaca */
+  --superficie: #26221d;      /* papel à noite */
+  --texto: #f1e7cf;
+  --texto-suave: #b3a68c;
+  --borda-forte: #5c5142;
+  --borda: #3a332b;
+  --nome: #221f1a;
+  --calculado: #2f2a23;
+  --calculado-forte: #3a342b;
+  --destaque: #1f6644;
+  --destaque-borda: #144a31;
+  --destaque-suave: #bfe0cb;
+  --acento: #7fcf9f;
+  --vez: #7fcf9f;
   --destaque-texto: #ffffff;
-  --foco: #f2b134;
-  --risco: #4a4a4f;
-  --riscado-texto: #8a8a90;
-  --perigo: #ff6b6b;
+  --foco: #f0b840;
+  --foco-sombra: #9c6a0e;
+  --foco-texto: #2a1d0e;
+  --marfim: #fbf6e8;
+  --marfim-sombra: #8f866f;
+  --pinta: #2a1d0e;
+  --sombra-botao: #0a0b0a;
+  --risco: #3a332b;
+  --riscado-texto: #8a7f6a;
+  --perigo: #ff7b6b;
   color-scheme: dark;
 }
 
@@ -127,6 +155,17 @@
   font-weight: 400 900;
   font-display: swap;
   src: url("fontes/nunito.woff2") format("woff2");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308,
+                 U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+/* Fredoka (licença OFL, em fontes/): letra arredondada dos títulos, com cara de jogo */
+@font-face {
+  font-family: "Fredoka";
+  font-style: normal;
+  font-weight: 500 600;
+  font-display: swap;
+  src: url("fontes/fredoka.woff2") format("woff2");
   unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308,
                  U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
 }
@@ -230,7 +269,7 @@ body {
 
 /* ---------- sobre e privacidade ---------- */
 
-.bloco h2 .icone { color: var(--destaque); }
+.bloco h2 .icone { color: var(--acento); }
 
 .privacidade {
   margin: 8px 0 0;
@@ -337,7 +376,7 @@ body {
   margin-bottom: 10px;
   border-radius: 30px;
   background: color-mix(in srgb, var(--destaque) 14%, var(--superficie));
-  color: var(--destaque);
+  color: var(--acento);
 }
 
 .bv-figura .icone {
@@ -380,7 +419,7 @@ body {
 }
 
 .bv-slide input:focus {
-  border-color: var(--destaque);
+  border-color: var(--acento);
   box-shadow: none;
   background: var(--superficie);
 }
@@ -734,30 +773,61 @@ tr.fim-secao td {
 
 /* ---------- botões ---------- */
 
+/* botões "apertáveis": gordinhos, com um chão embaixo que some ao tocar */
 button {
   font: inherit;
   font-size: 16px;
+  font-weight: 700;
   padding: 10px 18px;
-  border: 2px solid var(--destaque);
-  border-radius: 10px;
+  border: 2px solid var(--borda);
+  border-radius: 12px;
   background: var(--superficie);
   color: var(--texto);
   cursor: pointer;
+  box-shadow: 0 3px 0 var(--sombra-botao);
+  transition: transform 0.08s, box-shadow 0.08s;
 }
 
 button:active {
-  transform: scale(0.97);
+  transform: translateY(2px);
+  box-shadow: 0 1px 0 var(--sombra-botao);
 }
 
 button.principal {
   background: var(--destaque);
+  border-color: var(--destaque-borda);
   color: var(--destaque-texto);
+  box-shadow: 0 3px 0 var(--destaque-borda);
 }
+
+button.principal:active { box-shadow: 0 1px 0 var(--destaque-borda); }
+
+/* rolar os dados: o botão dourado, o mais importante do jogo */
+button.botao-dados,
+#dados-rolar {
+  background: var(--foco);
+  border-color: var(--foco-sombra);
+  color: var(--foco-texto);
+  box-shadow: 0 4px 0 var(--foco-sombra);
+}
+
+button.botao-dados:active,
+#dados-rolar:active { box-shadow: 0 1px 0 var(--foco-sombra); }
 
 button.perigo {
   color: var(--perigo);
-  border-color: var(--perigo);
+  border-color: color-mix(in srgb, var(--perigo) 55%, var(--borda));
 }
+
+/* botões que são só texto ou ícone: sem chão */
+button:is(.link, .tema, .aviso-fechar, .acao-legenda, .link-dica, .podio-nome, .logo-inicio) { box-shadow: none; }
+button:is(.link, .tema, .aviso-fechar, .acao-legenda, .link-dica, .podio-nome, .logo-inicio):active {
+  box-shadow: none;
+  transform: scale(0.97);
+}
+
+button:disabled,
+button:disabled:active { box-shadow: none; transform: none; }
 
 .acoes {
   display: flex;
@@ -814,7 +884,7 @@ button.perigo {
   display: block;
   font-size: 26px;
   font-weight: bold;
-  color: var(--destaque);
+  color: var(--acento);
 }
 
 .resumo small {
@@ -981,7 +1051,7 @@ tbody tr td.piscar {
   width: 48px;
   height: 48px;
   margin: 0;
-  color: var(--destaque);
+  color: var(--acento);
 }
 
 .sala-info .icone,
@@ -1012,7 +1082,7 @@ tbody tr td.piscar {
   font-size: 56px;
   font-weight: bold;
   line-height: 1.1;
-  color: var(--destaque);
+  color: var(--acento);
 }
 
 .fim-de-jogo.recorde .fim-total span {
@@ -1090,18 +1160,10 @@ tr td.total-vazio {
   opacity: 0.6;
 }
 
+/* bônus garantido: a casa fica dourada */
 tr.total td.bonus-ok {
-  color: #2e7d32;
-}
-
-:root[data-theme="dark"] tr.total td.bonus-ok {
-  color: #7bd17f;
-}
-
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) tr.total td.bonus-ok {
-    color: #7bd17f;
-  }
+  color: var(--foco-texto);
+  background: color-mix(in srgb, var(--foco) 55%, var(--calculado));
 }
 
 /* ---------- backup ---------- */
@@ -1180,10 +1242,10 @@ button:disabled {
 
 /* ---------- estatísticas ---------- */
 
-:root { --grafico: #2a6fdb; }
-:root[data-theme="dark"] { --grafico: #4a8ae6; }
+:root { --grafico: #2f8a5c; }
+:root[data-theme="dark"] { --grafico: #5fbf88; }
 @media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) { --grafico: #4a8ae6; }
+  :root:not([data-theme="light"]) { --grafico: #5fbf88; }
 }
 
 .topo button.direita {
@@ -1460,7 +1522,7 @@ button:disabled {
   padding: 0;
   border: none;
   background: none;
-  color: var(--destaque);
+  color: var(--acento);
   font: inherit;
   font-weight: 600;
   text-decoration: underline;
@@ -1554,7 +1616,7 @@ button:disabled {
 .destaque-icone {
   font-size: 20px;
   line-height: 1.2;
-  color: var(--destaque);
+  color: var(--acento);
 }
 
 .destaque-icone .icone { margin-right: 0; }
@@ -1735,7 +1797,7 @@ button:disabled {
 }
 
 .janela-caixa input:focus {
-  border-color: var(--destaque);
+  border-color: var(--acento);
   box-shadow: none;
   background: var(--fundo);
 }
@@ -1905,7 +1967,7 @@ button:disabled {
   width: 22px;
   height: 22px;
   margin: 2px 0 0;
-  accent-color: var(--destaque);
+  accent-color: var(--acento);
 }
 
 .familia-so-dados strong { display: block; font-size: 15px; }
@@ -1931,7 +1993,7 @@ button:disabled {
 .familia-modo button small { display: block; font-size: 13px; color: var(--texto-suave); }
 
 .familia-modo button[aria-checked="true"] {
-  border-color: var(--destaque);
+  border-color: var(--acento);
   background: color-mix(in srgb, var(--destaque) 12%, var(--superficie));
 }
 
@@ -2140,7 +2202,7 @@ button.podio-nome {
 .degrau.pos-3 .bloco-degrau { height: 60px; }
 .degrau.vazio { visibility: hidden; }
 
-.degrau.eu .podio-nome { color: var(--destaque); }
+.degrau.eu .podio-nome { color: var(--acento); }
 
 .podio-lista {
   list-style: none;
@@ -2162,7 +2224,7 @@ button.podio-nome {
 .podio-lista .pos { width: 32px; font-weight: bold; color: var(--texto-suave); }
 .podio-lista .nome { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .podio-lista .pts { font-weight: bold; }
-.podio-lista li.eu .nome { color: var(--destaque); font-weight: bold; }
+.podio-lista li.eu .nome { color: var(--acento); font-weight: bold; }
 .podio-lista li.nao-terminou { color: var(--texto-suave); }
 .podio-lista li.nao-terminou .pts { font-weight: normal; font-size: 13px; }
 
@@ -2189,7 +2251,7 @@ button.podio-nome {
   margin: 0 auto 10px;
   border-radius: 18px;
   background: color-mix(in srgb, var(--destaque) 14%, var(--superficie));
-  color: var(--destaque);
+  color: var(--acento);
 }
 
 
@@ -2221,7 +2283,7 @@ button.podio-nome {
 }
 
 .instalar-sistema button[aria-checked="true"] {
-  border-color: var(--destaque);
+  border-color: var(--acento);
   background: color-mix(in srgb, var(--destaque) 12%, var(--superficie));
 }
 
@@ -2260,7 +2322,7 @@ button.podio-nome {
 
 .passos .icone-texto {
   margin: 0 0 0 1px;
-  color: var(--destaque);
+  color: var(--acento);
 }
 
 
@@ -2572,7 +2634,7 @@ button.podio-nome {
   font: inherit;
   font-size: 16px;
 }
-.chat-escrever input:focus { outline: none; border-color: var(--destaque); }
+.chat-escrever input:focus { outline: none; border-color: var(--acento); }
 .chat-escrever button { padding: 0 14px; }
 .chat-escrever button .icone { margin: 0; }
 
@@ -2656,7 +2718,7 @@ button.podio-nome {
   font-weight: 700;
   font-size: 15px;
 }
-.inicio-grade .icone { width: 26px; height: 26px; margin: 0; color: var(--destaque); }
+.inicio-grade .icone { width: 26px; height: 26px; margin: 0; color: var(--acento); }
 :root[data-theme="dark"] .inicio-grade .icone { color: var(--vez); }
 
 .inicio-resumo { width: 100%; margin: 4px 0 0; }
@@ -2728,3 +2790,171 @@ button.podio-nome {
 @media (prefers-reduced-motion: reduce) {
   .barra-vez.chamando { animation: none; box-shadow: 0 0 0 3px var(--foco); }
 }
+
+/* ---------- mesa de feltro ---------- */
+/* Letra arredondada nos títulos; os números da tabela continuam na Nunito. */
+:root { --letra-titulo: "Fredoka", "Nunito", system-ui, sans-serif; }
+
+h1, h2, h3, .logo, thead th, .total-geral td, tr.total td.mpb, .vez-info strong,
+.inicio-ola, .inicio-grande strong, .resumo span, .legenda strong, .bv-slide h2 {
+  font-family: var(--letra-titulo);
+  font-weight: 600;
+  letter-spacing: 0.2px;
+}
+
+.logo, .cabecalho-jogo h1 { letter-spacing: 1px; }
+
+/* logo: dadinho dourado com pintas escuras */
+.logo-dado rect { fill: var(--foco); }
+.logo-dado circle { fill: var(--pinta); }
+
+/* a folha de pontos: borda macia em vez da moldura preta */
+.tabela { border-color: var(--borda-forte); border-radius: 14px; }
+thead th { border-right-color: rgba(255, 255, 255, 0.18); font-size: 19px; }
+.total-geral td:not(.mpb) { color: var(--foco); } /* o total geral em dourado */
+
+/* a barra da vez é o feltro da mesa */
+.barra-vez {
+  border: none;
+  border-radius: 16px;
+  background: var(--destaque);
+  box-shadow: inset 0 0 0 3px var(--destaque-borda);
+  color: var(--destaque-texto);
+}
+
+.barra-vez .vez-info small { color: var(--destaque-suave); }
+
+/* na sua vez: a borda da mesa fica dourada */
+.barra-vez.minha {
+  background: var(--destaque);
+  box-shadow: inset 0 0 0 3px var(--foco);
+}
+
+.barra-vez .vez-reacoes button { border-color: var(--destaque-borda); }
+
+/* dadinhos de quem está jogando: marfim, com sombra de dado de verdade */
+.dado-mini rect { fill: var(--marfim); stroke: var(--marfim-sombra); stroke-width: 1; }
+.dado-mini circle { fill: var(--pinta); }
+.dado-mini.segurado rect { stroke: var(--foco); stroke-width: 3; }
+.vez-dados .dado-mini { filter: drop-shadow(0 3px 0 rgba(0, 0, 0, 0.28)); }
+
+/* dados virtuais: na mesa de feltro, de marfim e com relevo */
+.caixa-dados {
+  background: var(--destaque);
+  color: var(--destaque-texto);
+  box-shadow: inset 0 0 0 4px var(--destaque-borda), 0 10px 40px rgba(0, 0, 0, 0.4);
+}
+
+.caixa-dados .dica,
+.caixa-dados .dados-valem { color: var(--destaque-suave); }
+.caixa-dados button.link { color: var(--destaque-texto); }
+
+.caixa-dados #dados-marcar {
+  background: var(--marfim);
+  border-color: var(--marfim-sombra);
+  color: var(--pinta);
+  box-shadow: 0 3px 0 var(--marfim-sombra);
+}
+
+.dado {
+  border: none;
+  border-radius: 14px;
+  background: var(--marfim);
+  box-shadow: 0 4px 0 var(--marfim-sombra), inset 0 -3px 0 rgba(0, 0, 0, 0.06);
+}
+
+.dado:active { box-shadow: 0 2px 0 var(--marfim-sombra); }
+
+.dado i {
+  background: var(--pinta);
+  box-shadow: inset 0 1px 1px rgba(0, 0, 0, 0.5); /* pinta "afundada" */
+}
+
+.dado.segurado {
+  box-shadow: 0 0 0 3px var(--foco), 0 6px 0 var(--foco-sombra);
+}
+
+.dado.parado { opacity: 0.55; }
+
+/* avisos: festa no feltro, alerta no dourado */
+.legenda.festa { background: var(--destaque); color: var(--destaque-texto); box-shadow: inset 0 0 0 3px var(--foco), 0 6px 24px rgba(0, 0, 0, 0.3); }
+.legenda.aviso { background: var(--foco); color: var(--foco-texto); }
+
+/* início: o botão grande é o feltro; os ícones dos outros, verdes */
+.inicio-grande.principal { box-shadow: 0 4px 0 var(--destaque-borda); }
+
+/* ---------- bônus: barrinha até 60 ---------- */
+.dica-bonus .barra-bonus {
+  display: block;
+  height: 6px;
+  margin: 2px 4px 1px;
+  border-radius: 3px;
+  background: color-mix(in srgb, var(--texto-suave) 25%, transparent);
+  overflow: hidden;
+}
+
+.dica-bonus .barra-bonus i {
+  display: block;
+  height: 100%;
+  border-radius: 3px;
+  background: var(--acento);
+}
+
+.dica-bonus.perdido {
+  color: var(--texto-suave);
+  opacity: 0.75;
+}
+
+/* ---------- comemoração grande: YAM e bônus ---------- */
+.carimbo {
+  position: fixed;
+  left: 50%;
+  top: 42%;
+  z-index: 27;
+  pointer-events: none;
+  transform: translate(-50%, -50%);
+  padding: 14px 26px 16px;
+  border-radius: 22px;
+  background: var(--destaque);
+  box-shadow: inset 0 0 0 4px var(--foco), 0 8px 0 var(--destaque-borda), 0 16px 40px rgba(0, 0, 0, 0.35);
+  color: var(--foco);
+  text-align: center;
+  white-space: nowrap;
+  animation: carimbo 1.9s cubic-bezier(0.2, 0.9, 0.3, 1.3) forwards;
+}
+
+.carimbo strong {
+  display: block;
+  font-family: var(--letra-titulo);
+  font-weight: 600;
+  font-size: 46px;
+  line-height: 1.05;
+}
+
+.carimbo small {
+  display: block;
+  margin-top: 2px;
+  font-size: 16px;
+  font-weight: 800;
+  color: var(--destaque-texto);
+}
+
+@keyframes carimbo {
+  0%   { opacity: 0; transform: translate(-50%, -50%) scale(0.3) rotate(-12deg); }
+  18%  { opacity: 1; transform: translate(-50%, -50%) scale(1.12) rotate(3deg); }
+  28%  { transform: translate(-50%, -50%) scale(1) rotate(-2deg); }
+  80%  { opacity: 1; transform: translate(-50%, -50%) scale(1) rotate(-2deg); }
+  100% { opacity: 0; transform: translate(-50%, -62%) scale(0.95) rotate(-2deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .carimbo { animation: carimbo-calmo 1.9s ease forwards; }
+  @keyframes carimbo-calmo { 0%, 80% { opacity: 1; } 100% { opacity: 0; } }
+}
+
+/* a casa que garantiu o bônus ou fez YAM brilha em dourado */
+tbody td.brilhar { animation: brilhar 0.6s ease-in-out 3; }
+@keyframes brilhar {
+  50% { box-shadow: inset 0 0 0 4px var(--foco); background: color-mix(in srgb, var(--foco) 45%, var(--superficie)); }
+}
+@media (prefers-reduced-motion: reduce) { tbody td.brilhar { animation: none; } }

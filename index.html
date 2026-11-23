@@ -10,7 +10,7 @@
   <meta property="og:url" content="https://jogo-yam.github.io/">
   <meta property="og:title" content="YAM – Tabela de Pontuação">
   <meta property="og:description" content="Marque os pontos do YAM no celular ou no computador, jogue em sala com a família e os amigos e veja quem venceu.">
-  <meta property="og:image" content="https://jogo-yam.github.io/og-image.png">
+  <meta property="og:image" content="https://jogo-yam.github.io/og-mesa.png">
   <meta property="og:image:width" content="1200">
   <meta property="og:image:height" content="630">
   <meta property="og:locale" content="pt_BR">
@@ -18,15 +18,16 @@
 
   <!-- PWA -->
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <meta name="theme-color" content="#f3f3f0" media="(prefers-color-scheme: light)">
-  <meta name="theme-color" content="#121212" media="(prefers-color-scheme: dark)">
-  <link rel="manifest" href="manifest.json?v=83">
-  <link rel="icon" type="image/png" sizes="32x32" href="icone-dado-32.png">
-  <link rel="apple-touch-icon" href="apple-touch-icon.png">
+  <meta name="theme-color" content="#f4ecd8" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#121413" media="(prefers-color-scheme: dark)">
+  <link rel="manifest" href="manifest.json?v=84">
+  <link rel="icon" type="image/png" sizes="32x32" href="icone-mesa-32.png">
+  <link rel="apple-touch-icon" href="icone-mesa-apple-180.png">
 
   <link rel="preload" href="fontes/nunito.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="fontes/fredoka.woff2" as="font" type="font/woff2" crossorigin>
   <!-- ?v= é a versão do app (igual ao VERSAO do app.js; um teste confere): versão nova, endereço novo -->
-  <link rel="stylesheet" href="style.css?v=83">
+  <link rel="stylesheet" href="style.css?v=84">
 
   <!-- Aplica o tema escolhido antes de desenhar a página, para não piscar. -->
   <script>
@@ -707,7 +708,7 @@
   </div>
 </div>
 
-<script src="app.js?v=83"></script>
+<script src="app.js?v=84"></script>
 <script>
   // Rede de segurança: se o app.js não carregou (ex.: troca de versão no meio
   // do caminho), recarrega sozinho uma vez, em vez de ficar com a tabela vazia.
@@ -721,7 +722,7 @@
     setTimeout(function () { location.replace(location.pathname + "?atualizado=" + Date.now()); }, 1500);
   })();
 </script>
-<script type="module" src="familia.js?v=83"></script>
+<script type="module" src="familia.js?v=84"></script>
 
 <!-- Service Worker -->
 <script>
