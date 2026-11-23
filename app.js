@@ -8,7 +8,7 @@ const rows = [
 const COLUNAS = 4;
 
 // Versão do app: igual ao número do CACHE_NAME do service-worker.js (um teste confere).
-const VERSAO = 97;
+const VERSAO = 98;
 
 // Avisos da vez com o app fechado: servidor na Cloudflare (worker/avisos.mjs).
 // Sem o endereço, a opção "Avisar a minha vez" não aparece.
@@ -3162,6 +3162,33 @@ document.addEventListener("touchend", evento => {
   if (typeof alvo.click === "function") alvo.click(); // ...mas o toque conta
   else alvo.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true }));
 }, { passive: false });
+
+// ---------- a página sempre no lugar ----------
+// A página não rola, mas ao tocar numa casa o iPhone empurra tudo um pouco para
+// cima (para mostrar o teclado) e às vezes não devolve. Com a página "rolada",
+// o iPhone embaça a faixa logo abaixo da hora e da bateria, justo onde fica o
+// topo do jogo. Quando o teclado fecha (ou a página sai do lugar sem ninguém
+// digitando), ela volta para o lugar.
+function digitandoTexto() {
+  const ativo = document.activeElement;
+  return !!ativo && ativo.matches("input, textarea, select");
+}
+
+function voltarPaginaAoLugar() {
+  if (digitandoTexto()) return;
+  if (window.scrollY || window.scrollX || document.documentElement.scrollTop || document.body.scrollTop) {
+    window.scrollTo(0, 0);
+    document.documentElement.scrollTop = 0;
+    document.body.scrollTop = 0;
+  }
+}
+
+document.addEventListener("focusout", () => setTimeout(voltarPaginaAoLugar, 60));
+document.addEventListener("touchend", () => setTimeout(voltarPaginaAoLugar, 400), { passive: true });
+window.addEventListener("scroll", voltarPaginaAoLugar, { passive: true });
+if (window.visualViewport) window.visualViewport.addEventListener("resize", () => setTimeout(voltarPaginaAoLugar, 60));
+window.addEventListener("pageshow", voltarPaginaAoLugar);
+document.addEventListener("visibilitychange", () => { if (!document.hidden) voltarPaginaAoLugar(); });
 
 // Pede ao navegador para não apagar os dados do app por falta de espaço ou de uso.
 if (navigator.storage && navigator.storage.persist) {
