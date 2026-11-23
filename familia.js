@@ -1567,7 +1567,7 @@ function reagir(emoji) {
   if (agora - ultimaReacaoEnviada < 700) return; // sem metralhadora de reações
   ultimaReacaoEnviada = agora;
   const id = agora.toString(36) + Math.random().toString(36).slice(2, 6);
-  mostrarReacao(emoji, "Você");
+  mostrarReacao(emoji, "Você", minhaUid());
   update(ref(db, `partidas/${sessao.codigo}/jogadores/${minhaUid()}`), {
     reacao: { e: emoji, id, em: serverTimestamp() }
   }).catch(() => {});
@@ -1712,12 +1712,20 @@ function verReacoes() {
     reacoesVistas[uid] = r.id;
     const recente = typeof r.em !== "number" || Math.abs(Date.now() - r.em) < 60000;
     if (!primeira && recente && ehEmoji(r.e) && document.visibilityState !== "hidden") {
-      mostrarReacao(r.e, j.nome || "Alguém");
+      mostrarReacao(r.e, j.nome || "Alguém", uid);
     }
   }
 }
 
-function mostrarReacao(emoji, nome) {
+// A bolinha (foto ou inicial) de quem mandou uma reação ou mensagem que sobe na tela.
+function bolinhaDeQuemMandou(nome, uid) {
+  const minha = !!uid && uid === minhaUid();
+  const j = uid && partida && partida.jogadores && partida.jogadores[uid];
+  const nomeDaBolinha = minha ? ((lerUsuario() || {}).nome || nomeJogador || nome) : nome;
+  return avatar(nomeDaBolinha, minha ? mesaAtual() : j && j.corMesa, "avatar", minha ? "eu" : j && j.id);
+}
+
+function mostrarReacao(emoji, nome, uid = null) {
   const area = $("reacoes-voando");
   if (!area) return;
   const el = document.createElement("div");
@@ -1729,10 +1737,9 @@ function mostrarReacao(emoji, nome) {
   const simbolo = document.createElement("span");
   simbolo.className = `reacao-emoji${jeito ? ` reacao-${jeito}` : ""}`;
   simbolo.textContent = emoji;
-  const quem = document.createElement("span");
-  quem.className = "reacao-nome";
-  quem.textContent = nome;
-  el.append(simbolo, quem);
+  // embaixo do emoji, a bolinha de quem reagiu (no lugar do nome)
+  el.setAttribute("aria-label", `${nome}: ${emoji}`);
+  el.append(simbolo, bolinhaDeQuemMandou(nome, uid));
   area.appendChild(el);
   setTimeout(() => el.remove(), 2800);
   tocar(jeito === "festa" ? "festaReacao" : jeito || "reacao");
@@ -1751,10 +1758,7 @@ function mostrarMensagemNaTela(texto, nome, uid = null) {
   const balao = document.createElement("span");
   balao.className = "reacao-texto";
   balao.textContent = texto.length > 120 ? `${texto.slice(0, 117)}…` : texto;
-  const minha = !!uid && uid === minhaUid();
-  const j = uid && partida && partida.jogadores && partida.jogadores[uid];
-  const nomeDaBolinha = minha ? ((lerUsuario() || {}).nome || nomeJogador || nome) : nome;
-  const bolinha = avatar(nomeDaBolinha, minha ? mesaAtual() : j && j.corMesa, "avatar", minha ? "eu" : j && j.id);
+  const bolinha = bolinhaDeQuemMandou(nome, uid);
   const linha = document.createElement("span");
   linha.className = "reacao-linha";
   linha.append(bolinha, balao);

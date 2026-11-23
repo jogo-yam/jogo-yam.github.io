@@ -2576,20 +2576,6 @@ button.podio-nome {
   animation: reacao-subir 2.6s ease-out forwards;
 }
 .reacao-emoji { font-size: 44px; line-height: 1; filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.25)); }
-.reacao-nome {
-  max-width: 140px;
-  padding: 2px 8px;
-  overflow: hidden;
-  border-radius: 999px;
-  background: var(--superficie);
-  color: var(--texto);
-  font-size: 12px;
-  font-weight: 700;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.2);
-}
-
 @keyframes reacao-subir {
   0%   { opacity: 0; transform: translate(calc(-50% + var(--x, 0px)), 20px) scale(0.6); }
   12%  { opacity: 1; transform: translate(calc(-50% + var(--x, 0px)), 0) scale(1.1); }
@@ -3491,3 +3477,10 @@ button.bolinha-mesa:not(.bolinha-dado) {
   box-shadow: 0 0 0 2px var(--superficie), 0 2px 6px rgba(0, 0, 0, 0.25);
 }
 .reacao-linha .reacao-texto { text-align: left; }
+.reacao > .avatar {
+  width: 30px;
+  height: 30px;
+  margin: 0;
+  font-size: 14px;
+  box-shadow: 0 0 0 2px var(--superficie), 0 2px 6px rgba(0, 0, 0, 0.25);
+}
