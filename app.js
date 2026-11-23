@@ -8,7 +8,7 @@ const rows = [
 const COLUNAS = 4;
 
 // Versão do app: igual ao número do CACHE_NAME do service-worker.js (um teste confere).
-const VERSAO = 84;
+const VERSAO = 85;
 
 // Avisos da vez com o app fechado: servidor na Cloudflare (worker/avisos.mjs).
 // Sem o endereço, a opção "Avisar a minha vez" não aparece.
@@ -1040,7 +1040,7 @@ async function gerarImagemPodio(p, dataIso) {
   // chão do pódio
   ctx.fillStyle = FUNDO;
   ctx.fillRect(0, base, W, H - base);
-  ctx.fillStyle = "#c8c8c4";
+  ctx.fillStyle = "#d9c79d";
   ctx.fillRect(x0 - 20, base, 3 * larg + 2 * gap + 40, 6);
 
   // do 4º em diante e quem não terminou
@@ -1279,10 +1279,10 @@ async function gerarImagemResultado(valores, total, dataIso, selo, nome = "") {
   const caixa = 210, gap = 30, x0 = (W - (4 * caixa + 3 * gap)) / 2, y0 = 880;
   rotulos.forEach((rotulo, col) => {
     const x = x0 + col * (caixa + gap);
-    ctx.fillStyle = "#ffffff";
+    ctx.fillStyle = "#fffaf0";
     retanguloArredondado(ctx, x, y0, caixa, 210, 28);
     ctx.fill();
-    ctx.strokeStyle = "#c8c8c4";
+    ctx.strokeStyle = "#e3d4b0";
     ctx.lineWidth = 3;
     ctx.stroke();
     ctx.fillStyle = SUAVE;

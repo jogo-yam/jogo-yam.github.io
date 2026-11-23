@@ -33,14 +33,14 @@
   ],
   "screenshots": [
     {
-      "src": "tela-tabela.jpg",
+      "src": "tela-mesa-tabela.jpg",
       "sizes": "375x812",
       "type": "image/jpeg",
       "form_factor": "narrow",
       "label": "Tabela de pontuação do YAM"
     },
     {
-      "src": "tela-dados.jpg",
+      "src": "tela-mesa-dados.jpg",
       "sizes": "375x812",
       "type": "image/jpeg",
       "form_factor": "narrow",
