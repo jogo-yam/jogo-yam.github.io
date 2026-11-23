@@ -692,12 +692,17 @@ html {
   touch-action: manipulation;
 }
 
+/* iPhone com a Ilha Dinâmica (faixa de cima com 55pt ou mais): o sistema
+   embaça um bom pedaço logo abaixo da hora e da bateria, então o app começa
+   um pouco mais para baixo. Nos outros (faixa menor ou nenhuma) a folga é 0. */
+:root { --folga-ilha: clamp(0px, (env(safe-area-inset-top, 0px) - 54px) * 100, 40px); }
+
 body {
   margin: 0;
   height: 100%;
   height: 100dvh;
   overflow: hidden;
-  padding: calc(12px + env(safe-area-inset-top)) max(10px, env(safe-area-inset-right))
+  padding: calc(12px + env(safe-area-inset-top) + var(--folga-ilha)) max(10px, env(safe-area-inset-right))
            calc(8px + env(safe-area-inset-bottom)) max(10px, env(safe-area-inset-left));
   font-family: "Nunito", system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
   background: var(--fundo);
