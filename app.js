@@ -8,7 +8,7 @@ const rows = [
 const COLUNAS = 4;
 
 // Versão do app: igual ao número do CACHE_NAME do service-worker.js (um teste confere).
-const VERSAO = 96;
+const VERSAO = 97;
 
 // Avisos da vez com o app fechado: servidor na Cloudflare (worker/avisos.mjs).
 // Sem o endereço, a opção "Avisar a minha vez" não aparece.
@@ -1107,8 +1107,8 @@ async function gerarImagemPodio(p, dataIso) {
 
   // faixa do topo: o feltro da mesa, com dois dados
   pintarFeltro(ctx, 0, 0, W, 230, NAVY, textura);
-  desenharDadoNaImagem(ctx, W / 2 - 210, 92, 74, 6, -12);
-  desenharDadoNaImagem(ctx, W / 2 + 210, 96, 74, 6, 9);
+  desenharDadoNaImagem(ctx, W / 2 - 210, 94, 74, 6);
+  desenharDadoNaImagem(ctx, W / 2 + 210, 94, 74, 6);
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
   ctx.fillStyle = "#ffffff";
@@ -1366,8 +1366,8 @@ async function gerarImagemResultado(valores, total, dataIso, selo, nome = "") {
 
   // faixa do topo: o feltro da mesa, dois dados deitados e o nome
   pintarFeltro(ctx, 0, 0, W, 330, NAVY, textura);
-  desenharDadoNaImagem(ctx, W / 2 - 250, 140, 104, 5, -14);
-  desenharDadoNaImagem(ctx, W / 2 - 128, 150, 104, 6, 8);
+  desenharDadoNaImagem(ctx, W / 2 - 250, 145, 104, 5);
+  desenharDadoNaImagem(ctx, W / 2 - 128, 145, 104, 6);
   ctx.fillStyle = "#ffffff";
   ctx.textBaseline = "middle";
   ctx.textAlign = "left";
@@ -1793,17 +1793,20 @@ function abrirHistorico() {
       ficha.textContent = partida.sala && partida.sala.posicao ? `${partida.sala.posicao}º` : "";
       if (ehRecorde) ficha.innerHTML = icone("estrela");
 
-      // barrinha: quanto ficou acima ou abaixo da média
+      // embaixo: barrinha de quanto ficou acima ou abaixo da média, e a
+      // distância até o recorde
+      const sinal = n => `${n > 0 ? "+" : "−"}${Math.abs(n)}`;
       const diferenca = partida.total - media;
       const barra = elemento("span", `barra-media ${diferenca >= 0 ? "acima" : "abaixo"}`);
       const trilho = elemento("span", "trilho-media");
       const enche = elemento("span", "enche");
       enche.style.width = `${Math.round(50 * Math.min(1, Math.abs(diferenca) / maiorDiferenca))}%`;
       trilho.appendChild(enche);
-      barra.append(trilho, diferenca === 0 ? "na média" : `${diferenca > 0 ? "+" : "−"}${Math.abs(diferenca)}`);
-      barra.title = "Comparado com a sua média";
-      const pontos = elemento("span", "item-pontos");
-      pontos.append(total, barra);
+      barra.append(trilho, diferenca === 0 ? "na média" : `${sinal(diferenca)} da média`);
+      const doRecorde = elemento("span", ehRecorde ? "dif-recorde recorde" : "dif-recorde",
+        ehRecorde ? "seu recorde" : `${sinal(partida.total - recorde)} do recorde`);
+      const comparar = elemento("span", "item-comparar");
+      comparar.append(barra, doRecorde);
 
       const esquerda = elemento("span", "item-info");
       esquerda.appendChild(data);
@@ -1812,7 +1815,8 @@ function abrirHistorico() {
         mostrarTextoDaSala(infoSala, partida.sala);
         esquerda.appendChild(infoSala);
       }
-      botao.append(ficha, esquerda, pontos);
+      total.className = "item-total";
+      botao.append(ficha, esquerda, total, comparar);
       botao.addEventListener("click", () => abrirPartida(partida.id));
       li.appendChild(botao);
       lista.appendChild(li);
@@ -3072,32 +3076,19 @@ function sugestaoDeNumero(qtd) {
   return melhor;
 }
 
-// Como cada dado ficou deitado no feltro: um pouco torto e fora da linha,
-// sorteado a cada rolagem (o segurado fica como estava).
-const sortearPouso = () => ({
-  giro: (Math.random() < 0.5 ? -1 : 1) * (3 + Math.random() * 11),
-  x: Math.round(Math.random() * 6 - 3),
-  y: Math.round(Math.random() * 8 - 4)
-});
-const pousoDosDados = [0, 1, 2, 3, 4].map(sortearPouso);
-
 function desenharDados(rolando = [], assentaram = []) {
   const area = document.getElementById("dados-mesa");
   area.innerHTML = "";
-  rolando.forEach(i => { pousoDosDados[i] = sortearPouso(); });
   mesa.valores.forEach((valor, i) => {
     const dado = document.createElement("button");
     dado.className = "dado";
-    const pouso = pousoDosDados[i];
-    dado.style.setProperty("--pouso", `${pouso.giro.toFixed(1)}deg`);
-    dado.style.setProperty("--pouso-x", `${pouso.x}px`);
-    dado.style.setProperty("--pouso-y", `${pouso.y}px`);
     if (mesa.segurados[i]) dado.classList.add("segurado");
     if (rolando.includes(i)) {
       dado.classList.add("rolando");
-      // cada dado gira para um lado e um tanto (sempre volta reto)
+      // cada dado entra de um lado, gira um tanto e para reto
       const voltas = (Math.random() < 0.5 ? -1 : 1) * (Math.random() < 0.5 ? 360 : 720);
       dado.style.setProperty("--giro", `${voltas}deg`);
+      dado.style.setProperty("--de-x", `${Math.round(Math.random() * 60 - 30)}px`);
       dado.style.animationDelay = `${Math.floor(Math.random() * 40)}ms`;
     }
     if (assentaram.includes(i)) dado.classList.add("assentou");
