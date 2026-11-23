@@ -2907,7 +2907,13 @@ h1, h2, h3, .logo, thead th, .total-geral td, tr.total td.mpb, .vez-info strong,
 /* a folha de pontos: borda macia em vez da moldura preta */
 .tabela { border-color: var(--borda-forte); border-radius: 14px; }
 thead th { border-right-color: rgba(255, 255, 255, 0.18); font-size: 19px; }
-.total-geral td:not(.mpb) { color: var(--foco); } /* o total geral em dourado */
+/* o total geral: creme com contorno dourado e relevo, como número gravado numa ficha */
+.total-geral td:not(.mpb) {
+  color: #fffaf0;
+  -webkit-text-stroke: 2px var(--foco);
+  paint-order: stroke fill;
+  text-shadow: 0 2px 0 #7a4f08, 0 3px 0 #7a4f08, 0 4px 8px rgba(0, 0, 0, 0.4);
+}
 
 /* a barra da vez é o feltro da mesa */
 .barra-vez {
