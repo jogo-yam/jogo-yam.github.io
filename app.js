@@ -8,7 +8,7 @@ const rows = [
 const COLUNAS = 4;
 
 // Versão do app: igual ao número do CACHE_NAME do service-worker.js (um teste confere).
-const VERSAO = 103;
+const VERSAO = 104;
 
 // Avisos da vez com o app fechado: servidor na Cloudflare (worker/avisos.mjs).
 // Sem o endereço, a opção "Avisar a minha vez" não aparece.
@@ -1685,7 +1685,6 @@ function abrirMais() {
   conferirVersaoNova(); // quem abre o Mais costuma estar olhando a versão
   mostrarTela("tela-mais");
   document.querySelector("#tela-mais .mais").scrollTop = 0;
-  mostrarDiagnosticoDaTela();
 }
 
 // Início e jogo são as telas "principais": as outras voltam para a última delas.
@@ -3264,32 +3263,6 @@ try {
 } catch {}
 if (timerVersao && timerVersao.unref) timerVersao.unref();
 document.getElementById("versao-app").textContent = VERSAO;
-
-// Diagnóstico provisório (só no iPhone): as medidas da tela, para acertar o
-// topo embaçado do iOS 26. Aparece embaixo da versão, em Mais. Sai depois.
-function mostrarDiagnosticoDaTela() {
-  const linha = document.getElementById("diagnostico-tela");
-  if (!linha || !CSS.supports("-webkit-touch-callout", "none")) return;
-  const sonda = document.createElement("div");
-  sonda.style.cssText = "position:fixed;visibility:hidden;padding-top:env(safe-area-inset-top);padding-bottom:env(safe-area-inset-bottom)";
-  document.body.appendChild(sonda);
-  const cima = getComputedStyle(sonda).paddingTop, baixo = getComputedStyle(sonda).paddingBottom;
-  sonda.remove();
-  const vv = window.visualViewport;
-  linha.textContent = [
-    `faixa:${(() => { const f = document.querySelector(".faixa-topo-ios"); const c = f && getComputedStyle(f); return c && c.display !== "none" ? c.height : "-"; })()}`,
-    `ancora:${CSS.supports("anchor-name", "--a") ? 1 : 0}`,
-    `inst:${matchMedia("(display-mode: standalone)").matches ? 1 : 0}/${navigator.standalone ? 1 : 0}`,
-    `cover:${/cover/.test(document.querySelector('meta[name="viewport"]').content) ? 1 : 0}`,
-    `area:${cima}/${baixo}`,
-    `tela:${screen.width}x${screen.height}`,
-    `janela:${innerWidth}x${innerHeight}`,
-    `vv:${vv ? Math.round(vv.height) + "@" + Math.round(vv.offsetTop) : "-"}`,
-    `rolou:${Math.round(scrollY)}`,
-    `doc:${document.documentElement.scrollHeight}`
-  ].join(" ");
-  linha.hidden = false;
-}
 
 // ---------- instalar o app ----------
 // Android/Chrome: o navegador avisa que dá para instalar e o botão chama a
