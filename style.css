@@ -3484,3 +3484,70 @@ button.bolinha-mesa:not(.bolinha-dado) {
   font-size: 14px;
   box-shadow: 0 0 0 2px var(--superficie), 0 2px 6px rgba(0, 0, 0, 0.25);
 }
+
+/* ---------- ajustar a foto no círculo ---------- */
+.janela-foto .janela-caixa { max-width: 340px; }
+.recorte-area {
+  position: relative;
+  width: min(280px, 72vw);
+  aspect-ratio: 1;
+  margin: 10px auto 12px;
+  overflow: hidden;
+  border-radius: 14px;
+  background: #111;
+  cursor: grab;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.recorte-area, .recorte-area * { touch-action: none; }
+.recorte-area img {
+  position: absolute;
+  left: 0;
+  top: 0;
+  max-width: none;
+  transform-origin: 0 0;
+  pointer-events: none;
+}
+.recorte-circulo { /* o círculo: fora dele fica escurecido */
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  box-shadow: 0 0 0 999px rgba(0, 0, 0, 0.55);
+  outline: 2px solid rgba(255, 255, 255, 0.9);
+  outline-offset: -2px;
+  pointer-events: none;
+}
+.recorte-zoom-linha { display: flex; align-items: center; gap: 10px; margin: 0 4px 14px; color: var(--texto-suave); }
+.recorte-zoom-linha .icone { margin: 0; width: 16px; height: 16px; }
+.recorte-zoom-linha .icone.grande { width: 24px; height: 24px; }
+.recorte-zoom { flex: 1; accent-color: var(--destaque); }
+
+/* ---------- sua vez: bem chamativo ---------- */
+/* a borda da tela pisca em dourado quando a vez chega */
+.alerta-vez {
+  position: fixed;
+  inset: 0;
+  z-index: 26;
+  pointer-events: none;
+  animation: alerta-vez 0.85s ease-in-out 3;
+}
+@keyframes alerta-vez {
+  0%, 100% { box-shadow: inset 0 0 0 0 transparent; }
+  50% { box-shadow: inset 0 0 0 8px var(--foco), inset 0 0 70px 14px color-mix(in srgb, var(--foco) 55%, transparent); }
+}
+/* enquanto é a sua vez, a barra da vez brilha */
+.barra-vez.minha:not(.chamando) { animation: vez-brilho 1.8s ease-in-out infinite; }
+@keyframes vez-brilho {
+  50% { box-shadow: inset 0 0 0 3px var(--foco), 0 0 18px 2px color-mix(in srgb, var(--foco) 65%, transparent); }
+}
+/* e o botão dos dados pulsa até você rolar */
+button.botao-dados.sua-vez { animation: dados-chamando 1.1s ease-in-out infinite; }
+@keyframes dados-chamando {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.12); box-shadow: 0 3px 0 var(--foco-sombra), 0 0 0 8px color-mix(in srgb, var(--foco) 40%, transparent); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .alerta-vez { animation: none; box-shadow: inset 0 0 0 6px var(--foco); }
+  .barra-vez.minha:not(.chamando) { animation: none; box-shadow: inset 0 0 0 3px var(--foco); }
+  button.botao-dados.sua-vez { animation: none; box-shadow: 0 3px 0 var(--foco-sombra), 0 0 0 4px var(--foco); }
+}

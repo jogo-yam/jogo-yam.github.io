@@ -1367,6 +1367,7 @@ function sugerirAvisos() {
 // Ao rolar, vai já o resultado (sorteado no começo): os outros veem a rolagem
 // junto com quem rolou, não só depois que os dados param.
 function mesaMudou(valores = mesa.valores) {
+  atualizarPulsoDaVez(); // rolou: o botão dos dados para de pulsar
   if (!comVez() || daVez() !== minhaUid() || esperandoPassar()) return;
   update(ref(db, `partidas/${sessao.codigo}/jogadores/${minhaUid()}`), {
     mesa: { valores: [...valores], segurados: [...mesa.segurados], jogada: mesa.jogada }
@@ -1410,8 +1411,9 @@ function avisarDaVez() {
   pulosVistos = meusPulos;
 
   if (vez === uid && vezAnterior !== uid && !esperandoPassar()) {
-    vibrar([60, 50, 60]);
-    tocar("suaVez");
+    // a vez acabou de chegar: aviso grande (ao abrir o app, só o som)
+    if (vezAnterior !== undefined) chamarSuaVez();
+    else { vibrar([60, 50, 60]); tocar("suaVez"); }
     if (vezAnterior !== undefined && Date.now() - ultimoAviso > 800) {
       ultimoAviso = Date.now();
       mostrarLegenda(["Sua vez!", "Role os dados ou marque na tabela."]);
@@ -1436,6 +1438,7 @@ function atualizarBarraVez() {
   dados.innerHTML = "";
   acao.hidden = true;
   $("vez-avatar").replaceChildren(); // passando a vez: sem bolinha
+  atualizarPulsoDaVez();
 
   if (passando) {
     // quem vem depois de mim
@@ -1518,7 +1521,16 @@ const LEMBRAR_A_CADA = 30000;
 let paradoDesde = 0;
 let jeitoDaVez = "";
 
+// Enquanto é a sua vez e você ainda não rolou, o botão dos dados fica pulsando.
+function atualizarPulsoDaVez() {
+  const minha = !!(sessao && partida && comVez() && !antesDeComecar() && !partida.revelada &&
+    !partida.encerrada && daVez() === minhaUid() && !esperandoPassar());
+  const botao = document.querySelector(".botao-dados");
+  if (botao) botao.classList.toggle("sua-vez", minha && mesa.jogada === 0);
+}
+
 function conferirLembrete() {
+  atualizarPulsoDaVez();
   const minhaVezAgora = !!(sessao && partida && comVez() && !antesDeComecar() && !partida.revelada &&
     !partida.encerrada && daVez() === minhaUid() && !esperandoPassar());
   if (!minhaVezAgora) { paradoDesde = 0; return; }
@@ -1529,8 +1541,7 @@ function conferirLembrete() {
   paradoDesde = Date.now();
   ultimoAviso = Date.now();
   mostrarLegenda(["Ainda é a sua vez!", "Os outros estão esperando você jogar."]);
-  tocar("suaVez");
-  vibrar([80, 60, 80]);
+  chamarSuaVez("Ainda é a sua vez!", "Os outros estão esperando");
   const barra = $("barra-vez");
   barra.classList.remove("chamando");
   void barra.offsetWidth; // recomeça a animação

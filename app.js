@@ -8,7 +8,7 @@ const rows = [
 const COLUNAS = 4;
 
 // Versão do app: igual ao número do CACHE_NAME do service-worker.js (um teste confere).
-const VERSAO = 106;
+const VERSAO = 107;
 
 // Avisos da vez com o app fechado: servidor na Cloudflare (worker/avisos.mjs).
 // Sem o endereço, a opção "Avisar a minha vez" não aparece.
@@ -1625,6 +1625,20 @@ function festa(titulo, texto, carimbo = null, casas = []) {
   }
 }
 
+// Chegou a sua vez (ou ainda é, faz tempo): carimbo no meio da tela, a borda
+// da tela piscando em dourado, som de campainha e vibração.
+function chamarSuaVez(titulo = "Sua vez!", texto = "Toque nos dados para jogar") {
+  mostrarCarimbo(titulo, texto);
+  document.querySelectorAll(".alerta-vez").forEach(a => a.remove());
+  const borda = document.createElement("div");
+  borda.className = "alerta-vez";
+  borda.setAttribute("aria-hidden", "true");
+  document.body.appendChild(borda);
+  setTimeout(() => borda.remove(), 2700);
+  tocar("suaVez");
+  vibrar([220, 100, 220, 100, 360]);
+}
+
 function mostrarCarimbo(grande, pequeno) {
   document.querySelectorAll(".carimbo").forEach(c => c.remove());
   const c = document.createElement("div");
@@ -2685,36 +2699,138 @@ async function fotoEscolhida(campo) {
   campo.value = "";
   if (!arquivo) return;
   try {
-    guardarMinhaFoto(await reduzirFoto(arquivo));
+    await abrirRecorte(arquivo);
   } catch {
+    fecharRecorte();
     avisar("Não deu para abrir essa foto. Tente outra.", "Foto de perfil");
   }
 }
 
-// Recorta o meio da foto num quadrado e reduz para 128 x 128.
-async function reduzirFoto(arquivo) {
-  const url = URL.createObjectURL(arquivo);
-  try {
-    const img = new Image();
-    img.src = url;
-    await img.decode();
-    const lado = Math.min(img.naturalWidth, img.naturalHeight);
-    if (!lado) throw new Error("vazia");
-    const T = 128;
-    const tela = document.createElement("canvas");
-    tela.width = tela.height = T;
-    const ctx = tela.getContext("2d");
-    ctx.imageSmoothingQuality = "high";
-    ctx.drawImage(img, (img.naturalWidth - lado) / 2, (img.naturalHeight - lado) / 2, lado, lado, 0, 0, T, T);
-    for (const q of [0.82, 0.7, 0.55, 0.4]) {
-      const dados = tela.toDataURL("image/jpeg", q);
-      if (dados.length <= 18000) return dados;
-    }
-    throw new Error("grande");
-  } finally {
-    URL.revokeObjectURL(url);
-  }
+// ---------- ajustar a foto no círculo (como no WhatsApp) ----------
+// A foto aparece num quadrado com o círculo por cima: arrastar move, dois dedos
+// (ou a barrinha, ou a rodinha do mouse) aproximam. O que fica dentro do
+// círculo vira a foto de perfil (128 x 128).
+const recorte = { url: "", base: 1, zoom: 1, x: 0, y: 0, ponteiros: new Map(), pinca: null };
+const ZOOM_MAXIMO = 4;
+
+async function abrirRecorte(arquivo) {
+  const img = document.getElementById("recorte-img");
+  recorte.url = URL.createObjectURL(arquivo);
+  img.src = recorte.url;
+  await img.decode();
+  if (!img.naturalWidth || !img.naturalHeight) throw new Error("vazia");
+  document.getElementById("janela-foto").hidden = false;
+  const lado = document.getElementById("recorte-area").clientWidth;
+  recorte.base = Math.max(lado / img.naturalWidth, lado / img.naturalHeight); // a foto cobre o quadrado
+  recorte.zoom = 1;
+  recorte.x = (lado - img.naturalWidth * recorte.base) / 2; // começa centralizada
+  recorte.y = (lado - img.naturalHeight * recorte.base) / 2;
+  recorte.ponteiros.clear();
+  recorte.pinca = null;
+  document.getElementById("recorte-zoom").value = "1";
+  desenharRecorte();
 }
+
+function fecharRecorte() {
+  document.getElementById("janela-foto").hidden = true;
+  const img = document.getElementById("recorte-img");
+  img.removeAttribute("src");
+  if (recorte.url) URL.revokeObjectURL(recorte.url);
+  recorte.url = "";
+}
+
+// Mantém a foto cobrindo o círculo inteiro (sem sobrar canto vazio).
+function desenharRecorte() {
+  const img = document.getElementById("recorte-img");
+  const lado = document.getElementById("recorte-area").clientWidth;
+  const escala = recorte.base * recorte.zoom;
+  const largura = img.naturalWidth * escala, altura = img.naturalHeight * escala;
+  recorte.x = Math.min(0, Math.max(lado - largura, recorte.x));
+  recorte.y = Math.min(0, Math.max(lado - altura, recorte.y));
+  img.style.width = `${largura}px`;
+  img.style.height = `${altura}px`;
+  img.style.transform = `translate(${recorte.x}px, ${recorte.y}px)`;
+}
+
+// Aproxima ou afasta mantendo parado o ponto (cx, cy) do quadrado.
+function zoomRecorte(novo, cx, cy) {
+  const lado = document.getElementById("recorte-area").clientWidth;
+  if (cx === undefined) { cx = lado / 2; cy = lado / 2; }
+  novo = Math.min(ZOOM_MAXIMO, Math.max(1, novo));
+  const fator = novo / recorte.zoom;
+  recorte.x = cx - (cx - recorte.x) * fator;
+  recorte.y = cy - (cy - recorte.y) * fator;
+  recorte.zoom = novo;
+  document.getElementById("recorte-zoom").value = String(novo);
+  desenharRecorte();
+}
+
+function confirmarRecorte() {
+  const img = document.getElementById("recorte-img");
+  const lado = document.getElementById("recorte-area").clientWidth;
+  const escala = recorte.base * recorte.zoom;
+  const T = 128;
+  const tela = document.createElement("canvas");
+  tela.width = tela.height = T;
+  const ctx = tela.getContext("2d");
+  ctx.imageSmoothingQuality = "high";
+  ctx.drawImage(img, -recorte.x / escala, -recorte.y / escala, lado / escala, lado / escala, 0, 0, T, T);
+  let dados = "";
+  for (const q of [0.82, 0.7, 0.55, 0.4]) {
+    dados = tela.toDataURL("image/jpeg", q);
+    if (dados.length <= 18000) break;
+  }
+  fecharRecorte();
+  if (dados.length > 18000) { avisar("Não deu para usar essa foto. Tente outra.", "Foto de perfil"); return; }
+  guardarMinhaFoto(dados);
+}
+
+(function prepararRecorte() {
+  const area = document.getElementById("recorte-area");
+  if (!area) return;
+  const ponto = e => {
+    const r = area.getBoundingClientRect();
+    return { x: e.clientX - r.left, y: e.clientY - r.top };
+  };
+  area.addEventListener("pointerdown", e => {
+    area.setPointerCapture(e.pointerId);
+    recorte.ponteiros.set(e.pointerId, ponto(e));
+    recorte.pinca = null;
+  });
+  area.addEventListener("pointermove", e => {
+    if (!recorte.ponteiros.has(e.pointerId)) return;
+    const antes = recorte.ponteiros.get(e.pointerId);
+    const agora = ponto(e);
+    recorte.ponteiros.set(e.pointerId, agora);
+    if (recorte.ponteiros.size === 1) {
+      recorte.x += agora.x - antes.x; // arrastar move a foto
+      recorte.y += agora.y - antes.y;
+      desenharRecorte();
+    } else if (recorte.ponteiros.size === 2) {
+      const [a, b] = [...recorte.ponteiros.values()];
+      const distancia = Math.hypot(a.x - b.x, a.y - b.y);
+      const meio = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
+      if (recorte.pinca && recorte.pinca.distancia > 0) {
+        recorte.x += meio.x - recorte.pinca.meio.x; // os dois dedos também arrastam
+        recorte.y += meio.y - recorte.pinca.meio.y;
+        zoomRecorte(recorte.zoom * (distancia / recorte.pinca.distancia), meio.x, meio.y);
+      }
+      recorte.pinca = { distancia, meio };
+    }
+  });
+  const soltar = e => {
+    recorte.ponteiros.delete(e.pointerId);
+    recorte.pinca = null;
+  };
+  area.addEventListener("pointerup", soltar);
+  area.addEventListener("pointercancel", soltar);
+  area.addEventListener("wheel", e => {
+    e.preventDefault();
+    const p = ponto(e);
+    zoomRecorte(recorte.zoom * (1 - e.deltaY * 0.0015), p.x, p.y);
+  }, { passive: false });
+  document.getElementById("recorte-zoom").addEventListener("input", e => zoomRecorte(Number(e.target.value)));
+})();
 
 function guardarMinhaFoto(img) {
   try { localStorage.setItem(CHAVE_FOTO, JSON.stringify({ img, em: Date.now() })); } catch {}
@@ -3709,9 +3825,13 @@ const SONS = {
   festa(ctx) {
     [523.25, 659.25, 783.99, 1046.5].forEach((f, i) => nota(ctx, f, i * 0.09, 0.3));
   },
+  // campainha de três notas, duas vezes: dá para ouvir mesmo distraído
   suaVez(ctx) {
-    nota(ctx, 784, 0, 0.16, { tipo: "sine", volume: 0.16 });
-    nota(ctx, 1175, 0.14, 0.3, { tipo: "sine", volume: 0.14 });
+    for (const atraso of [0, 0.62]) {
+      nota(ctx, 784, atraso, 0.18, { tipo: "triangle", volume: 0.26 });
+      nota(ctx, 1046.5, atraso + 0.14, 0.18, { tipo: "triangle", volume: 0.26 });
+      nota(ctx, 1568, atraso + 0.28, 0.32, { tipo: "triangle", volume: 0.24 });
+    }
   },
   reacao(ctx) {
     nota(ctx, 880, 0, 0.07, { tipo: "sine", volume: 0.07 });
@@ -4330,6 +4450,7 @@ const FECHAR_COM_ESC = [
   ["vez-reacoes", () => window.familia && familia.alternarReacoes(false)],
   ["janela-chat", () => window.familia && familia.fecharChat()],
   ["janela-recuperar", () => fecharRecuperar()],
+  ["janela-foto", () => fecharRecorte()],
   ["janela-nome", () => fecharJanelaNome()],
   ["janela-instalar", () => fecharInstalar()],
   ["janela-familia", () => window.familia && familia.fecharJanela()],

@@ -20,14 +20,14 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="theme-color" content="#f4ecd8" media="(prefers-color-scheme: light)">
   <meta name="theme-color" content="#121413" media="(prefers-color-scheme: dark)">
-  <link rel="manifest" href="manifest.json?v=106">
+  <link rel="manifest" href="manifest.json?v=107">
   <link rel="icon" type="image/png" sizes="32x32" href="icone-mesa-32.png">
   <link rel="apple-touch-icon" href="icone-mesa-apple-180.png">
 
   <link rel="preload" href="fontes/nunito.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="preload" href="fontes/fredoka.woff2" as="font" type="font/woff2" crossorigin>
   <!-- ?v= é a versão do app (igual ao VERSAO do app.js; um teste confere): versão nova, endereço novo -->
-  <link rel="stylesheet" href="style.css?v=106">
+  <link rel="stylesheet" href="style.css?v=107">
 
   <!-- Aplica o tema escolhido antes de desenhar a página, para não piscar. -->
   <meta name="apple-mobile-web-app-capable" content="yes">
@@ -493,6 +493,27 @@
   </form>
 </div>
 
+<!-- Foto de perfil: ajustar o que fica dentro do círculo -->
+<div id="janela-foto" class="janela janela-foto" hidden>
+  <div class="janela-caixa" role="dialog" aria-modal="true" aria-labelledby="foto-titulo">
+    <h2 id="foto-titulo">Ajuste a foto</h2>
+    <p class="dica">Arraste para mover. Para aproximar, use dois dedos ou a barrinha.</p>
+    <div id="recorte-area" class="recorte-area">
+      <img id="recorte-img" alt="" draggable="false">
+      <div class="recorte-circulo" aria-hidden="true"></div>
+    </div>
+    <label class="recorte-zoom-linha">
+      <svg class="icone" aria-hidden="true"><use href="#i-pessoa"/></svg>
+      <input id="recorte-zoom" class="recorte-zoom" type="range" min="1" max="4" step="0.01" value="1" aria-label="Aproximar">
+      <svg class="icone grande" aria-hidden="true"><use href="#i-pessoa"/></svg>
+    </label>
+    <div class="fim-acoes">
+      <button class="principal" onclick="confirmarRecorte()">Usar foto</button>
+      <button onclick="fecharRecorte()">Cancelar</button>
+    </div>
+  </div>
+</div>
+
 <!-- Recuperar o nome de usuário em outro celular -->
 <div id="janela-recuperar" class="janela" hidden>
   <form class="janela-caixa" onsubmit="recuperarNome(event)">
@@ -764,7 +785,7 @@
   </div>
 </div>
 
-<script src="app.js?v=106"></script>
+<script src="app.js?v=107"></script>
 <script>
   // Rede de segurança: se o app.js não carregou (ex.: troca de versão no meio
   // do caminho), recarrega sozinho uma vez, em vez de ficar com a tabela vazia.
@@ -778,7 +799,7 @@
     setTimeout(function () { location.replace(location.pathname + "?atualizado=" + Date.now()); }, 1500);
   })();
 </script>
-<script type="module" src="familia.js?v=106"></script>
+<script type="module" src="familia.js?v=107"></script>
 
 <!-- Service Worker -->
 <script>
