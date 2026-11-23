@@ -3344,3 +3344,51 @@ td.mudou { animation: mudou 0.7s ease-out; }
 .barra-media.acima { color: var(--acento); }
 .barra-media.acima .enche { left: 50%; background: var(--acento); }
 .barra-media.abaixo .enche { right: 50%; background: var(--texto-suave); opacity: 0.6; }
+
+/* ---------- regras: exemplos com dadinhos ---------- */
+.exemplo-dados {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 6px 0 2px;
+}
+.exemplo-faces { display: inline-flex; gap: 4px; }
+.exemplo-dados .dado-mini { width: 26px; height: 26px; filter: drop-shadow(0 2px 0 rgba(0, 0, 0, 0.18)); }
+.exemplo-dados .dado-mini.nao-conta { opacity: 0.35; }
+.exemplo-vale { font-weight: 800; color: var(--texto); white-space: nowrap; }
+
+/* ---------- comemorações: fichas e dadinhos caindo junto com o confete ---------- */
+.confete .ficha-caindo,
+.confete .dado-caindo {
+  position: absolute;
+  top: -30px;
+  animation-name: cair;
+  animation-timing-function: ease-in;
+  animation-fill-mode: forwards;
+}
+.confete .ficha-caindo {
+  width: 22px;
+  height: 22px;
+  box-shadow: 0 2px 0 rgba(0, 0, 0, 0.3);
+}
+.confete .dado-caindo .dado-mini { display: block; width: 18px; height: 18px; }
+
+/* ---------- estatísticas: o gráfico em cima do feltro ---------- */
+.grafico {
+  padding: 8px 6px 4px;
+  border-radius: 14px;
+  background-color: var(--destaque);
+  background-image: var(--textura-mesa);
+  box-shadow: inset 0 0 0 3px var(--destaque-borda);
+}
+.grafico .grade { stroke: rgba(255, 255, 255, 0.14); }
+.grafico .eixo { fill: var(--destaque-suave); }
+.grafico .linha { stroke: #fffaf0; stroke-width: 2.5; }
+.grafico .area { fill: #fffaf0; opacity: 0.12; }
+.grafico .ponto { fill: #fffaf0; stroke: var(--destaque); }
+.grafico .rotulo-recorde { fill: #fffaf0; }
+.grafico .media { stroke: var(--foco); stroke-width: 1.5; stroke-dasharray: 5 4; opacity: 0.9; }
+.grafico .rotulo-media { fill: var(--foco); font-size: 10px; font-weight: 700; }
+.grafico .ficha-corpo { fill: #d99a12; stroke: rgba(0, 0, 0, 0.3); stroke-width: 1; }
+.grafico .ficha-listras { fill: none; stroke: #fff3cf; stroke-width: 3; stroke-dasharray: 2.2 3.69; }
+.grafico .ficha-anel { fill: none; stroke: #fff3cf; stroke-width: 1; }

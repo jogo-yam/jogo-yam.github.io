@@ -140,3 +140,9 @@ test("nenhuma função do app.js tem o nome repetido (a de baixo engoliria a de 
   const repetidos = nomes.filter((n, i) => nomes.indexOf(n) !== i);
   assert.deepEqual(repetidos, []);
 });
+
+test("telas de abertura do iPhone: cada uma que o index.html pede existe", () => {
+  const pedidas = [...html.matchAll(/rel="apple-touch-startup-image"[^>]*href="([^"]+)"/g)].map(m => m[1]);
+  assert.ok(pedidas.length >= 10);
+  for (const arquivo of pedidas) assert.ok(fs.existsSync(path.join(RAIZ, arquivo)), `falta ${arquivo}`);
+});

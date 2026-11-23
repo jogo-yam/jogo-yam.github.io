@@ -1015,7 +1015,9 @@ function mostrarPodio() {
 
   atualizarRevanche();
   $("podio").hidden = false;
-  confetePodio();
+  // as fichas caem na cor da mesa de quem venceu
+  const campeao = terminaram.find(j => posicao(j) === 1);
+  confetePodio(campeao && (campeao.uid === uid ? mesaAtual() : campeao.corMesa));
 }
 
 // ---------- revanche ----------
@@ -1088,8 +1090,8 @@ function registrarResultado() {
   if (resultadoSala) registrarResultadoSala({ ...resultadoSala });
 }
 
-function confetePodio() {
-  soltarConfete(80);
+function confetePodio(mesa) {
+  soltarConfete(80, mesa);
   vibrar([40, 60, 40, 60, 120]);
   tocar("podio");
 }

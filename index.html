@@ -20,16 +20,30 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="theme-color" content="#f4ecd8" media="(prefers-color-scheme: light)">
   <meta name="theme-color" content="#121413" media="(prefers-color-scheme: dark)">
-  <link rel="manifest" href="manifest.json?v=94">
+  <link rel="manifest" href="manifest.json?v=95">
   <link rel="icon" type="image/png" sizes="32x32" href="icone-mesa-32.png">
   <link rel="apple-touch-icon" href="icone-mesa-apple-180.png">
 
   <link rel="preload" href="fontes/nunito.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="preload" href="fontes/fredoka.woff2" as="font" type="font/woff2" crossorigin>
   <!-- ?v= é a versão do app (igual ao VERSAO do app.js; um teste confere): versão nova, endereço novo -->
-  <link rel="stylesheet" href="style.css?v=94">
+  <link rel="stylesheet" href="style.css?v=95">
 
   <!-- Aplica o tema escolhido antes de desenhar a página, para não piscar. -->
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <!-- tela de abertura do app instalado no iPhone (feltro com o logo), uma por tamanho de tela -->
+  <link rel="apple-touch-startup-image" media="screen and (device-width: 440px) and (device-height: 956px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)" href="abertura/abertura-1320x2868.png">
+  <link rel="apple-touch-startup-image" media="screen and (device-width: 402px) and (device-height: 874px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)" href="abertura/abertura-1206x2622.png">
+  <link rel="apple-touch-startup-image" media="screen and (device-width: 430px) and (device-height: 932px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)" href="abertura/abertura-1290x2796.png">
+  <link rel="apple-touch-startup-image" media="screen and (device-width: 393px) and (device-height: 852px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)" href="abertura/abertura-1179x2556.png">
+  <link rel="apple-touch-startup-image" media="screen and (device-width: 428px) and (device-height: 926px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)" href="abertura/abertura-1284x2778.png">
+  <link rel="apple-touch-startup-image" media="screen and (device-width: 390px) and (device-height: 844px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)" href="abertura/abertura-1170x2532.png">
+  <link rel="apple-touch-startup-image" media="screen and (device-width: 375px) and (device-height: 812px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)" href="abertura/abertura-1125x2436.png">
+  <link rel="apple-touch-startup-image" media="screen and (device-width: 414px) and (device-height: 896px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)" href="abertura/abertura-1242x2688.png">
+  <link rel="apple-touch-startup-image" media="screen and (device-width: 414px) and (device-height: 896px) and (-webkit-device-pixel-ratio: 2) and (orientation: portrait)" href="abertura/abertura-828x1792.png">
+  <link rel="apple-touch-startup-image" media="screen and (device-width: 414px) and (device-height: 736px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)" href="abertura/abertura-1242x2208.png">
+  <link rel="apple-touch-startup-image" media="screen and (device-width: 375px) and (device-height: 667px) and (-webkit-device-pixel-ratio: 2) and (orientation: portrait)" href="abertura/abertura-750x1334.png">
+  <link rel="apple-touch-startup-image" media="screen and (device-width: 320px) and (device-height: 568px) and (-webkit-device-pixel-ratio: 2) and (orientation: portrait)" href="abertura/abertura-640x1136.png">
   <script>
     try {
       const tema = localStorage.getItem("yam-tema");
@@ -263,6 +277,7 @@
     <div class="bloco">
       <h2>Números (1 a 6)</h2>
       <p>Some só os dados do número da linha. Ex.: três dados 5 = 15 na linha do 5.</p>
+      <span class="exemplo-dados" data-faces="5,5,3,5,1" data-conta="0,1,3" data-vale="15 na linha do 5"></span>
       <p>Se o <strong>1º total</strong> (soma dessas seis linhas) chegar a <strong>60</strong>,
         a coluna ganha <strong>+30 de bônus</strong>. A tabela mostra quanto falta.
         A referência de cada linha (2, 4, 9, 12, 15 e 18) soma exatamente 60.</p>
@@ -271,14 +286,14 @@
     <div class="bloco">
       <h2>Combinações</h2>
       <dl class="lista-regras">
-        <dt>Q Quadra</dt><dd>Exatamente 4 dados iguais: 20 + a soma dos quatro (ex.: quatro 5 = 40).</dd>
-        <dt>F Full</dt><dd>Uma trinca e um par (ex.: 3-3-3-5-5): 30 + a soma dos dados.</dd>
-        <dt>S- Sequência menor</dt><dd>1-2-3-4-5: vale 50.</dd>
-        <dt>S+ Sequência maior</dt><dd>2-3-4-5-6: vale 60.</dd>
-        <dt>MIN Mínimo</dt><dd>Soma dos 5 dados, tentando fazer o menor valor.</dd>
-        <dt>MAX Máximo</dt><dd>Soma dos 5 dados, tentando fazer o maior. Na mesma coluna, o MAX tem que ser maior que o MIN.</dd>
+        <dt>Q Quadra</dt><dd>Exatamente 4 dados iguais: 20 + a soma dos quatro (ex.: quatro 5 = 40).<span class="exemplo-dados" data-faces="5,5,2,5,5" data-conta="0,1,3,4" data-vale="40"></span></dd>
+        <dt>F Full</dt><dd>Uma trinca e um par (ex.: 3-3-3-5-5): 30 + a soma dos dados.<span class="exemplo-dados" data-faces="3,3,3,5,5" data-conta="0,1,2,3,4" data-vale="49"></span></dd>
+        <dt>S- Sequência menor</dt><dd>1-2-3-4-5: vale 50.<span class="exemplo-dados" data-faces="1,2,3,4,5" data-conta="0,1,2,3,4" data-vale="50"></span></dd>
+        <dt>S+ Sequência maior</dt><dd>2-3-4-5-6: vale 60.<span class="exemplo-dados" data-faces="2,3,4,5,6" data-conta="0,1,2,3,4" data-vale="60"></span></dd>
+        <dt>MIN Mínimo</dt><dd>Soma dos 5 dados, tentando fazer o menor valor.<span class="exemplo-dados" data-faces="1,2,1,1,3" data-conta="0,1,2,3,4" data-vale="8"></span></dd>
+        <dt>MAX Máximo</dt><dd>Soma dos 5 dados, tentando fazer o maior. Na mesma coluna, o MAX tem que ser maior que o MIN.<span class="exemplo-dados" data-faces="6,6,5,6,6" data-conta="0,1,2,3,4" data-vale="29"></span></dd>
         <dt>YAM</dt><dd>5 dados iguais: 50 + a soma dos dados (ex.: cinco 6 = 80).
-          Os 5 iguais também podem ir na linha do número (cinco 6 = 30) ou no MIN/MAX, mas não na Quadra.</dd>
+          Os 5 iguais também podem ir na linha do número (cinco 6 = 30) ou no MIN/MAX, mas não na Quadra.<span class="exemplo-dados" data-faces="6,6,6,6,6" data-conta="0,1,2,3,4" data-vale="80"></span></dd>
       </dl>
     </div>
 
@@ -730,7 +745,7 @@
   </div>
 </div>
 
-<script src="app.js?v=94"></script>
+<script src="app.js?v=95"></script>
 <script>
   // Rede de segurança: se o app.js não carregou (ex.: troca de versão no meio
   // do caminho), recarrega sozinho uma vez, em vez de ficar com a tabela vazia.
@@ -744,7 +759,7 @@
     setTimeout(function () { location.replace(location.pathname + "?atualizado=" + Date.now()); }, 1500);
   })();
 </script>
-<script type="module" src="familia.js?v=94"></script>
+<script type="module" src="familia.js?v=95"></script>
 
 <!-- Service Worker -->
 <script>

@@ -8,7 +8,7 @@ const rows = [
 const COLUNAS = 4;
 
 // Versão do app: igual ao número do CACHE_NAME do service-worker.js (um teste confere).
-const VERSAO = 94;
+const VERSAO = 95;
 
 // Avisos da vez com o app fechado: servidor na Cloudflare (worker/avisos.mjs).
 // Sem o endereço, a opção "Avisar a minha vez" não aparece.
@@ -1512,14 +1512,29 @@ async function fonteCarregada() {
 
 // Confete caindo pela tela toda (recorde, pódio, YAM, bônus).
 let timerConfete = null;
-function soltarConfete(quantos = 60) {
+// Confete de papel misturado com fichas de cassino (na cor da mesa de quem
+// está comemorando) e dadinhos (na cor de dados escolhida em Mais).
+function soltarConfete(quantos = 60, mesa = mesaAtual()) {
   const cores = ["#f2b53a", "#2f8a5c", "#fffdf6", "#e8604c", "#7fcf9f"];
+  const m = MESAS[mesaDoJogador("", mesa)];
   const area = document.getElementById("confete");
   area.innerHTML = "";
   for (let i = 0; i < quantos; i++) {
-    const p = document.createElement("i");
+    let p;
+    if (i % 5 === 1) {
+      p = document.createElement("span");
+      p.className = "ficha ficha-caindo";
+      p.style.setProperty("--cor-jogador", m.cor);
+      p.style.setProperty("--listra", i % 10 === 1 ? "#f2b53a" : "#fffaf0");
+    } else if (i % 8 === 3) {
+      p = document.createElement("span");
+      p.className = "dado-caindo";
+      p.innerHTML = dadoMini(1 + Math.floor(Math.random() * 6));
+    } else {
+      p = document.createElement("i");
+      p.style.background = cores[i % cores.length];
+    }
     p.style.left = Math.random() * 100 + "%";
-    p.style.background = cores[i % cores.length];
     p.style.animationDelay = Math.random() * 0.7 + "s";
     p.style.animationDuration = 1.8 + Math.random() * 1.4 + "s";
     area.appendChild(p);
@@ -1533,8 +1548,6 @@ function vibrar(padrao) {
   try { if (navigator.vibrate) navigator.vibrate(padrao); } catch {}
 }
 
-// Depois de anotar uma casa: comemora um YAM ou a coluna que acabou de
-// garantir o bônus de +30.
 // Reinicia uma animação de CSS (a mesma classe de novo).
 function reanimar(el, classe) {
   el.classList.remove(classe);
@@ -1542,6 +1555,8 @@ function reanimar(el, classe) {
   el.classList.add(classe);
 }
 
+// Depois de anotar uma casa: o número entra com um pulinho; comemora um YAM
+// ou a coluna que acabou de garantir o bônus de +30.
 function comemorarJogada(key, antes, depois) {
   const [linha, col] = key.split("-").map(Number);
   // o número entra na casa com um pulinho e os totais que mudaram piscam
@@ -1636,7 +1651,24 @@ const telas = ["tela-inicio", "tela-jogo", "tela-historico", "tela-partida", "te
 // "Como jogar" abre do jogo ou do Mais; o Voltar leva de volta para lá.
 let voltarDasRegrasPara = "tela-jogo";
 
+// Os exemplos das regras: dadinhos (na cor escolhida em Mais), os que não
+// contam mais apagados, e quanto vale.
+function desenharExemplosDasRegras() {
+  document.querySelectorAll("#tela-regras .exemplo-dados").forEach(caixa => {
+    if (caixa.childElementCount) return;
+    const faces = caixa.dataset.faces.split(",").map(Number);
+    const contam = caixa.dataset.conta.split(",").map(Number);
+    const dados = elemento("span", "exemplo-faces");
+    dados.innerHTML = faces.map(f => dadoMini(f)).join("");
+    dados.querySelectorAll(".dado-mini").forEach((d, i) => d.classList.toggle("nao-conta", !contam.includes(i)));
+    caixa.setAttribute("role", "img");
+    caixa.setAttribute("aria-label", `Exemplo: ${faces.join(", ")} = ${caixa.dataset.vale}`);
+    caixa.append(dados, elemento("span", "exemplo-vale", `= ${caixa.dataset.vale}`));
+  });
+}
+
 function abrirRegras() {
+  desenharExemplosDasRegras();
   const atual = telas.find(id => !document.getElementById(id).hidden);
   voltarDasRegrasPara = atual && atual !== "tela-regras" ? atual : telaPrincipal;
   mostrarTela("tela-regras");
@@ -2037,12 +2069,23 @@ function graficoEvolucao(partidas) {
   novo("polygon", { points: `${M.esq},${y(min)} ${pontos.join(" ")} ${x(partidas.length - 1)},${y(min)}`, class: "area" });
   novo("polyline", { points: pontos.join(" "), class: "linha" });
 
-  // pontos (o recorde em destaque, com rótulo)
+  // a média: linha tracejada dourada
+  const media = Math.round(totais.reduce((a, b) => a + b, 0) / totais.length);
+  novo("line", { x1: M.esq, x2: W - M.dir, y1: y(media), y2: y(media), class: "media" });
+  const textoMedia = novo("text", { x: W - M.dir, y: y(media) - 4, class: "rotulo-media", "text-anchor": "end" });
+  textoMedia.textContent = `média ${media}`;
+
+  // pontos; o recorde vira uma ficha dourada
   const recorde = Math.max(...totais);
   const iRecorde = totais.lastIndexOf(recorde);
   partidas.forEach((p, i) => {
-    novo("circle", { cx: x(i), cy: y(p.total), r: i === iRecorde ? 6 : 4, class: i === iRecorde ? "ponto recorde" : "ponto" });
+    if (i !== iRecorde) novo("circle", { cx: x(i), cy: y(p.total), r: 4, class: "ponto" });
   });
+  const ficha = document.createElementNS(NS, "g");
+  ficha.setAttribute("class", "ficha-recorde");
+  ficha.setAttribute("transform", `translate(${x(iRecorde)} ${y(recorde)})`);
+  ficha.innerHTML = '<circle r="9" class="ficha-corpo"/><circle r="7.5" class="ficha-listras"/><circle r="4.5" class="ficha-anel"/>';
+  svg.appendChild(ficha);
   const rotulo = novo("text", {
     x: Math.min(Math.max(x(iRecorde), M.esq + 30), W - M.dir - 30), y: y(recorde) - 10,
     class: "rotulo-recorde", "text-anchor": "middle"
