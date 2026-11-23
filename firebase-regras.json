@@ -36,6 +36,13 @@
         ".validate": "newData.hasChildren(['nome', 'total', 'data']) && newData.child('nome').isString() && newData.child('nome').val().length > 0 && newData.child('nome').val().length <= 20 && newData.child('total').isNumber() && newData.child('total').val() >= 0 && newData.child('total').val() <= 1948 && newData.child('data').isString() && newData.child('data').val().length <= 30"
       }
     },
+    "fotos": {
+      ".read": "auth != null",
+      "$id": {
+        ".write": "auth != null && newData.exists() && newData.child('chave').isString() && root.child('usuarios').child(newData.child('chave').val()).child('dono').val() === auth.uid && root.child('usuarios').child(newData.child('chave').val()).child('id').val() === $id",
+        ".validate": "newData.hasChildren(['chave', 'img', 'em']) && newData.child('img').isString() && newData.child('img').val().length <= 20000 && (newData.child('img').val() === '' || newData.child('img').val().beginsWith('data:image/jpeg;base64,')) && newData.child('em').isNumber()"
+      }
+    },
     "partidas": {
       ".indexOn": ["criadaEm"],
       ".read": "auth != null && query.orderByChild == 'criadaEm' && query.endAt <= now - 259200000 && query.limitToFirst <= 20",

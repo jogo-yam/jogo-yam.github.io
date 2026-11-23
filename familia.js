@@ -465,6 +465,7 @@ async function sincronizarCofre(cofre, u) {
   }
   if (Object.keys(enviar).length) await comLimite(update(ref(db, `historicos/${cofre}`), enviar));
   if (u) publicarIdentidade(u).catch(() => {});
+  if (u) sincronizarFoto(u).catch(() => {});
   return aplicarHistoricoDaNuvem(r);
 }
 
@@ -561,13 +562,13 @@ async function publicarRecorde(historicoCompleto) {
   await usuario();
   const atual = (await comLimite(lerDoBanco(`ranking/${u.chave}`))).val();
   const igual = atual && atual.total === melhor.total && atual.data === melhor.data && atual.nome === u.nome &&
-    atual.corMesa === mesaAtual(); // a cor da ficha no ranking acompanha a mesa
+    atual.corMesa === mesaAtual() && (!u.id || atual.id === u.id); // a cor da ficha (e a foto) acompanham
   const desceria = atual && typeof atual.total === "number" && atual.total > melhor.total;
   if (!igual && !(desceria && !historicoCompleto)) {
     // o nome precisa ser deste aparelho para gravar (com o código, ele volta para cá)
     await garantirUsuario(u.nome);
     await comLimite(set(ref(db, `ranking/${u.chave}`), {
-      nome: u.nome, total: melhor.total, data: melhor.data, corMesa: mesaAtual(), em: serverTimestamp()
+      nome: u.nome, total: melhor.total, data: melhor.data, corMesa: mesaAtual(), ...(u.id ? { id: u.id } : {}), em: serverTimestamp()
     }));
   }
   recordeConferido = chave;
@@ -579,7 +580,8 @@ async function lerRanking() {
   const snap = await comLimite(lerDoBanco("ranking"));
   return Object.entries(snap.val() || {})
     .filter(([, r]) => r && typeof r.nome === "string" && typeof r.total === "number")
-    .map(([chave, r]) => ({ chave, nome: r.nome, total: r.total, data: r.data, corMesa: mesaValida(r.corMesa) ? r.corMesa : null }));
+    .map(([chave, r]) => ({ chave, nome: r.nome, total: r.total, data: r.data, corMesa: mesaValida(r.corMesa) ? r.corMesa : null,
+      id: typeof r.id === "string" ? r.id : null }));
 }
 
 let timerHistorico = null;
@@ -783,7 +785,7 @@ function atualizarEsperaDaSala() {
     const li = document.createElement("li");
     const quem = document.createElement("span");
     quem.className = "jogador-sala";
-    quem.append(avatar(j.nome, j.uid === eu ? mesaAtual() : j.corMesa), j.nome + (j.uid === eu ? " (você)" : ""));
+    quem.append(avatar(j.nome, j.uid === eu ? mesaAtual() : j.corMesa, "avatar", j.uid === eu ? "eu" : j.id), j.nome + (j.uid === eu ? " (você)" : ""));
     li.appendChild(quem);
     if (j.uid === partida.criador) {
       const criou = document.createElement("small");
@@ -1444,7 +1446,7 @@ function atualizarBarraVez() {
     acao.onclick = () => desfazer();
   } else if (vez === uid) {
     quem.textContent = "Sua vez!";
-    $("vez-avatar").replaceChildren(avatar(nomeDe(uid), mesaAtual()));
+    $("vez-avatar").replaceChildren(avatar(nomeDe(uid), mesaAtual(), "avatar", "eu"));
     rolagemVista = { uid: vez, jogada: 0 };
   } else {
     const j = partida.jogadores[vez];
@@ -1462,7 +1464,7 @@ function atualizarBarraVez() {
     } else {
       rolagemVista = { uid: vez, jogada: 0 };
     }
-    $("vez-avatar").replaceChildren(avatar(nomeDe(vez), j && j.corMesa));
+    $("vez-avatar").replaceChildren(avatar(nomeDe(vez), j && j.corMesa, "avatar", j && j.id));
     if (partida.criador === uid) {
       acao.hidden = false;
       acao.textContent = "Pular";
@@ -1638,14 +1640,26 @@ function desenharChat(paraOFim = false) {
     lista.appendChild(vazio);
     return;
   }
-  for (const m of ms.slice(-150)) {
+  const ultimas = ms.slice(-150);
+  ultimas.forEach((m, i) => {
+    const minha = m.uid === eu;
+    const j = partida && partida.jogadores && partida.jogadores[m.uid];
     const li = document.createElement("li");
-    li.className = `chat-msg${m.uid === eu ? " eu" : ""}${m.emoji ? " so-emoji" : ""}`;
-    const quem = document.createElement("small");
-    quem.textContent = m.uid === eu ? "Você" : m.nome;
-    li.append(quem, document.createTextNode(m.emoji || m.texto));
+    li.className = `chat-msg${minha ? " eu" : ""}${m.emoji ? " so-emoji" : ""}`;
+    const texto = m.emoji || m.texto;
+    li.setAttribute("aria-label", `${minha ? "Você" : m.nome}: ${texto}`);
+    li.title = minha ? "Você" : m.nome;
+    // a bolinha (foto ou inicial) ao lado do balão; em mensagens seguidas da
+    // mesma pessoa, só na última
+    const bolinha = avatar(m.nome || "?", minha ? mesaAtual() : j && j.corMesa, "avatar", minha ? "eu" : j && j.id);
+    const proxima = ultimas[i + 1];
+    if (proxima && proxima.uid === m.uid) bolinha.classList.add("repetida");
+    const balao = document.createElement("span");
+    balao.className = "chat-balao";
+    balao.textContent = texto;
+    li.append(bolinha, balao);
     lista.appendChild(li);
-  }
+  });
   if (paraOFim || noFim) lista.scrollTop = lista.scrollHeight;
 }
 
@@ -1663,7 +1677,7 @@ function enviarMensagem() {
   ultimaMensagemEnviada = Date.now();
   campo.value = "";
   gravarMensagem({ t: texto });
-  mostrarMensagemNaTela(texto, "Você"); // quem mandou também vê subir
+  mostrarMensagemNaTela(texto, "Você", minhaUid()); // quem mandou também vê subir
 }
 
 // A cada retrato da sala: chat aberto, redesenha; fechado, avisa a mensagem nova
@@ -1678,7 +1692,7 @@ function verMensagens() {
     novas.forEach(m => mensagensVistas.add(m.chave));
     const deOutros = novas.filter(m => m.uid !== minhaUid() && m.texto);
     if (deOutros.length && !chatAberto && document.visibilityState !== "hidden") {
-      deOutros.slice(-3).forEach((m, i) => setTimeout(() => mostrarMensagemNaTela(m.texto, m.nome), i * 700));
+      deOutros.slice(-3).forEach((m, i) => setTimeout(() => mostrarMensagemNaTela(m.texto, m.nome, m.uid), i * 700));
     }
   }
   if (chatAberto) { desenharChat(); marcarLidas(); }
@@ -1725,8 +1739,9 @@ function mostrarReacao(emoji, nome) {
   if (jeito === "festa" && !matchMedia("(prefers-reduced-motion: reduce)").matches) soltarConfete(30);
 }
 
-// Mensagem do chat subindo na tela, como as reações (com o chat fechado).
-function mostrarMensagemNaTela(texto, nome) {
+// Mensagem do chat subindo na tela, como as reações (com o chat fechado), com a
+// bolinha de quem mandou (foto ou inicial) do lado.
+function mostrarMensagemNaTela(texto, nome, uid = null) {
   const area = $("reacoes-voando");
   if (!area) return;
   const el = document.createElement("div");
@@ -1736,16 +1751,47 @@ function mostrarMensagemNaTela(texto, nome) {
   const balao = document.createElement("span");
   balao.className = "reacao-texto";
   balao.textContent = texto.length > 120 ? `${texto.slice(0, 117)}…` : texto;
-  const quem = document.createElement("span");
-  quem.className = "reacao-nome";
-  quem.textContent = nome;
-  el.append(balao, quem);
+  const minha = !!uid && uid === minhaUid();
+  const j = uid && partida && partida.jogadores && partida.jogadores[uid];
+  const nomeDaBolinha = minha ? ((lerUsuario() || {}).nome || nomeJogador || nome) : nome;
+  const bolinha = avatar(nomeDaBolinha, minha ? mesaAtual() : j && j.corMesa, "avatar", minha ? "eu" : j && j.id);
+  const linha = document.createElement("span");
+  linha.className = "reacao-linha";
+  linha.append(bolinha, balao);
+  el.setAttribute("aria-label", `${nome}: ${texto}`);
+  el.append(linha);
   area.appendChild(el);
   setTimeout(() => el.remove(), 3500);
   tocar("reacao");
 }
 
 // ---------- ligação com o resto do app ----------
+
+// ---------- foto de perfil ----------
+// fotos/<identidade> = { chave, img, em }: todos leem; só o dono do nome grava.
+// Vale a mais recente entre os aparelhos com o mesmo nome (img "" = tirou a foto).
+async function sincronizarFoto(u) {
+  if (!u || !u.id) return;
+  await usuario();
+  const aqui = minhaFotoGuardada();
+  const la = (await comLimite(lerDoBanco(`fotos/${u.id}`))).val();
+  const emLa = Number(la && la.em) || 0;
+  if (la && emLa > aqui.em && typeof la.img === "string") aplicarMinhaFotoDaNuvem(la.img, emLa);
+  else if (aqui.em > emLa) await comLimite(set(ref(db, `fotos/${u.id}`), { chave: u.chave, img: aqui.img, em: aqui.em }));
+}
+
+function fotoMudou() {
+  const u = lerUsuario();
+  if (u) sincronizarFoto(u).catch(() => {});
+}
+
+// As fotos de todo mundo, ao vivo: quem troca a foto aparece na hora para os outros.
+let escutandoFotos = false;
+function escutarFotos() {
+  if (escutandoFotos) return;
+  escutandoFotos = true;
+  onValue(ref(db, "fotos"), snap => guardarFotos(snap.val()), () => { escutandoFotos = false; });
+}
 
 // Trocou a cor da mesa: quem está na sala já vê a bolinha e a ficha na cor nova.
 function corDaMesaMudou() {
@@ -1756,7 +1802,7 @@ function corDaMesaMudou() {
 }
 
 window.familia = {
-  abrir, corDaMesaMudou, fecharJanela, acaoJanela, sair, confirmarSair, compartilharCodigo,
+  abrir, corDaMesaMudou, fotoMudou, fecharJanela, acaoJanela, sair, confirmarSair, compartilharCodigo,
   aoTerminar, fecharEspera, fecharPodio, jogarDeNovo, limparSalasAntigas, sincronizar, registrarResultado,
   escolherModo, podeJogar, porQueNaoPode, podeDesfazer, mesaMudou, recuperar, trocarNome, avisosMudaram,
   historicoMudou, sincronizarHistorico, registrarNomeSePrecisar, alternarReacoes, reagir, lerRanking,
@@ -1776,3 +1822,4 @@ setTimeout(() => {
   else if (document.getElementById("boas-vindas").hidden) registrarNomeSePrecisar();
 }, 2500);
 if (sessao) usuario().then(escutar).catch(e => atualizarBarra(mensagemDeErro(e)));
+usuario().then(escutarFotos).catch(() => {});

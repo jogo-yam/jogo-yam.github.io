@@ -20,14 +20,14 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="theme-color" content="#f4ecd8" media="(prefers-color-scheme: light)">
   <meta name="theme-color" content="#121413" media="(prefers-color-scheme: dark)">
-  <link rel="manifest" href="manifest.json?v=104">
+  <link rel="manifest" href="manifest.json?v=105">
   <link rel="icon" type="image/png" sizes="32x32" href="icone-mesa-32.png">
   <link rel="apple-touch-icon" href="icone-mesa-apple-180.png">
 
   <link rel="preload" href="fontes/nunito.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="preload" href="fontes/fredoka.woff2" as="font" type="font/woff2" crossorigin>
   <!-- ?v= é a versão do app (igual ao VERSAO do app.js; um teste confere): versão nova, endereço novo -->
-  <link rel="stylesheet" href="style.css?v=104">
+  <link rel="stylesheet" href="style.css?v=105">
 
   <!-- Aplica o tema escolhido antes de desenhar a página, para não piscar. -->
   <meta name="apple-mobile-web-app-capable" content="yes">
@@ -325,6 +325,18 @@
   <div class="mais">
     <div class="bloco">
       <h2>Você</h2>
+      <div class="linha-foto">
+        <span id="minha-foto" class="minha-foto"></span>
+        <div class="foto-acoes">
+          <strong>Foto de perfil</strong>
+          <small>Aparece no lugar da sua inicial para quem joga com você.</small>
+          <div class="foto-botoes">
+            <button id="botao-foto" onclick="escolherFoto()">Escolher foto</button>
+            <button id="botao-tirar-foto" class="link" onclick="tirarFoto()" hidden>Tirar foto</button>
+          </div>
+        </div>
+        <input id="campo-foto" type="file" accept="image/*" hidden onchange="fotoEscolhida(this)">
+      </div>
       <button id="botao-nome" class="linha-mais nome-jogador" onclick="editarNome()"><svg class="icone" aria-hidden="true"><use href="#i-pessoa"/></svg>Seu nome</button>
       <div id="codigo-recuperacao" class="codigo-recuperacao" hidden>
         <div class="codigo-texto">
@@ -417,6 +429,8 @@
         <li>Suas partidas, seu nome e o histórico ficam guardados neste aparelho. Com nome de usuário, o histórico
           também fica na nuvem (Firebase), num lugar que só abre com o seu nome e o seu código.</li>
         <li>Sem cadastro, sem e-mail, sem anúncios. O app não coleta dados de uso.</li>
+        <li>Se você colocar uma foto de perfil, ela vai pequena para a nuvem (com nome de usuário) e quem usa o
+          YAM a vê no lugar da sua inicial. Para tirar, é só tocar em Tirar foto.</li>
         <li>No ranking geral, todos que usam o YAM veem seu nome de usuário e sua maior pontuação. Se você trocar
           de nome, quem jogou com você passa a ver o nome novo no histórico e nas estatísticas.</li>
       </ul>
@@ -750,7 +764,7 @@
   </div>
 </div>
 
-<script src="app.js?v=104"></script>
+<script src="app.js?v=105"></script>
 <script>
   // Rede de segurança: se o app.js não carregou (ex.: troca de versão no meio
   // do caminho), recarrega sozinho uma vez, em vez de ficar com a tabela vazia.
@@ -764,7 +778,7 @@
     setTimeout(function () { location.replace(location.pathname + "?atualizado=" + Date.now()); }, 1500);
   })();
 </script>
-<script type="module" src="familia.js?v=104"></script>
+<script type="module" src="familia.js?v=105"></script>
 
 <!-- Service Worker -->
 <script>

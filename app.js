@@ -8,7 +8,7 @@ const rows = [
 const COLUNAS = 4;
 
 // Versão do app: igual ao número do CACHE_NAME do service-worker.js (um teste confere).
-const VERSAO = 104;
+const VERSAO = 105;
 
 // Avisos da vez com o app fechado: servidor na Cloudflare (worker/avisos.mjs).
 // Sem o endereço, a opção "Avisar a minha vez" não aparece.
@@ -881,7 +881,7 @@ function desenharPodio(p, verTabela, partidaDoHistorico = null) {
     coluna.className = `degrau degrau-${i + 1}`;
     if (j) {
       // ficha de cassino na cor da mesa da pessoa, com a borda de ouro, prata ou bronze
-      const medalha = avatar(j.nome, corDaMesaNoPodio(j), `ficha ${medalhas[j.posicao] || ""}`);
+      const medalha = avatar(j.nome, corDaMesaNoPodio(j), `ficha ${medalhas[j.posicao] || ""}`, j.eu ? "eu" : j.id);
       const nome = document.createElement(podeVer(j) ? "button" : "div");
       nome.className = "podio-nome";
       nome.textContent = nomeCom(j);
@@ -912,7 +912,7 @@ function desenharPodio(p, verTabela, partidaDoHistorico = null) {
       const span = document.createElement("span");
       span.className = c;
       span.textContent = texto;
-      if (c === "nome") li.appendChild(avatar(j.nome, corDaMesaNoPodio(j))); // fora do nome: o corte do nome comprido não pega a bolinha
+      if (c === "nome") li.appendChild(avatar(j.nome, corDaMesaNoPodio(j), "avatar", j.eu ? "eu" : j.id)); // fora do nome: o corte do nome comprido não pega a bolinha
       li.appendChild(span);
     });
     lista.appendChild(li);
@@ -1018,8 +1018,32 @@ function pintarFeltro(ctx, x, y, w, h, cor, textura, raio = 0) {
   ctx.restore();
 }
 
-// Ficha de cassino vista de cima: listras na borda e a letra no meio.
-function desenharFichaNaImagem(ctx, cx, cy, r, cor, listra, letra) {
+// As fotos de quem está na imagem do pódio, já carregadas (null = sem foto).
+async function carregarFoto(id) {
+  const dados = fotoDe(id);
+  if (!dados) return null;
+  try {
+    const img = new Image();
+    img.src = dados;
+    await img.decode();
+    return img;
+  } catch {
+    return null;
+  }
+}
+
+// Foto redonda (no lugar da inicial).
+function desenharFotoRedonda(ctx, img, cx, cy, r) {
+  ctx.save();
+  ctx.beginPath();
+  ctx.arc(cx, cy, r, 0, 2 * Math.PI);
+  ctx.clip();
+  ctx.drawImage(img, cx - r, cy - r, 2 * r, 2 * r);
+  ctx.restore();
+}
+
+// Ficha de cassino vista de cima: listras na borda e a letra (ou a foto) no meio.
+function desenharFichaNaImagem(ctx, cx, cy, r, cor, listra, letra, foto = null) {
   ctx.save();
   ctx.fillStyle = "rgba(0,0,0,0.28)";
   ctx.beginPath();
@@ -1048,7 +1072,9 @@ function desenharFichaNaImagem(ctx, cx, cy, r, cor, listra, letra) {
   ctx.beginPath();
   ctx.arc(cx, cy, r, 0, 2 * Math.PI);
   ctx.stroke();
-  if (letra) {
+  if (foto) {
+    desenharFotoRedonda(ctx, foto, cx, cy, r * 0.56);
+  } else if (letra) {
     ctx.fillStyle = "#ffffff";
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
@@ -1099,6 +1125,8 @@ async function gerarImagemPodio(p, dataIso) {
   const NAVY = MESAS[mesaAtual()].cor, FUNDO = "#f4ecd8", TEXTO = "#3a2a17", SUAVE = "#7a6649", OURO = "#d99a12"; // feltro da mesa escolhida
   const data = new Date(dataIso).toLocaleDateString("pt-BR");
   const textura = await texturaParaImagem(ctx);
+  const todos = [...p.terminaram, ...p.naoTerminaram];
+  const fotos = new Map(await Promise.all(todos.map(async j => [j, await carregarFoto(j.eu ? "eu" : j.id)])));
 
   ctx.fillStyle = FUNDO;
   ctx.fillRect(0, 0, W, H);
@@ -1148,7 +1176,7 @@ async function gerarImagemPodio(p, dataIso) {
     ctx.fillText(`${j.posicao}º`, x + larg / 2, topo + 75);
     if (LISTRAS[j.posicao]) {
       const cor = MESAS[mesaDoJogador(j.nome, corDaMesaNoPodio(j))].cor;
-      desenharFichaNaImagem(ctx, x + larg / 2, topo - 190, j.posicao === 1 ? 62 : 50, cor, LISTRAS[j.posicao], inicialDe(j.nome));
+      desenharFichaNaImagem(ctx, x + larg / 2, topo - 190, j.posicao === 1 ? 62 : 50, cor, LISTRAS[j.posicao], inicialDe(j.nome), fotos.get(j));
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
     }
@@ -1177,10 +1205,14 @@ async function gerarImagemPodio(p, dataIso) {
     ctx.beginPath();
     ctx.arc(232, y, 21, 0, 2 * Math.PI);
     ctx.fill();
-    ctx.fillStyle = "#ffffff";
-    ctx.textAlign = "center";
-    ctx.font = fonteTitulo(24);
-    ctx.fillText(inicialDe(nome), 232, y + 1);
+    if (fotos.get(j)) {
+      desenharFotoRedonda(ctx, fotos.get(j), 232, y, 21);
+    } else {
+      ctx.fillStyle = "#ffffff";
+      ctx.textAlign = "center";
+      ctx.font = fonteTitulo(24);
+      ctx.fillText(inicialDe(nome), 232, y + 1);
+    }
     ctx.textAlign = "left";
     ctx.fillStyle = TEXTO;
     ctx.font = fonte(600, 38);
@@ -1276,14 +1308,15 @@ function guardarNomesAtuais(todos) {
     if (typeof alvo === "string" && alvo !== id && todos[alvo] && todos[alvo].unidos && todos[alvo].unidos[id] === true) unidos[id] = alvo;
   }
   const real = id => identidadeReal(id, unidos);
-  const porId = {}, antigos = {};
+  const porId = {}, antigos = {}, porChave = {};
   for (const [id, r] of Object.entries(todos)) {
     if (!r || typeof r.nome !== "string") continue;
     const dono = todos[real(id)];
     porId[id] = dono && typeof dono.nome === "string" ? dono.nome : r.nome;
     for (const chave of Object.keys(r.antigos || {})) antigos[chave] = real(id);
+    if (typeof r.chave === "string") porChave[r.chave] = real(id);
   }
-  const novos = { porId, antigos, unidos };
+  const novos = { porId, antigos, unidos, porChave };
   if (JSON.stringify(novos) === JSON.stringify(nomesAtuais)) return;
   nomesAtuais = novos;
   try { localStorage.setItem(CHAVE_NOMES, JSON.stringify(novos)); } catch {}
@@ -1685,6 +1718,7 @@ function abrirMais() {
   conferirVersaoNova(); // quem abre o Mais costuma estar olhando a versão
   mostrarTela("tela-mais");
   document.querySelector("#tela-mais .mais").scrollTop = 0;
+  desenharMinhaFoto();
 }
 
 // Início e jogo são as telas "principais": as outras voltam para a última delas.
@@ -2575,8 +2609,10 @@ function inicialDe(nome) {
   return primeira.toLocaleUpperCase("pt-BR");
 }
 
-// classe: "avatar" (bolinha) ou "ficha" (ficha de cassino, no pódio e no ranking)
-function avatar(nome, mesa, classe = "avatar") {
+// classe: "avatar" (bolinha) ou "ficha" (ficha de cassino, no pódio e no ranking).
+// id: a identidade da pessoa ("eu" = quem usa este aparelho): com foto de perfil,
+// a foto entra no lugar da inicial.
+function avatar(nome, mesa, classe = "avatar", id = null) {
   const m = MESAS[mesaDoJogador(nome, mesa)];
   const el = document.createElement("span");
   el.className = classe;
@@ -2584,7 +2620,119 @@ function avatar(nome, mesa, classe = "avatar") {
   el.style.setProperty("--cor-jogador", m.cor);
   el.style.setProperty("--borda-jogador", m.borda);
   el.textContent = inicialDe(nome);
+  if (id) {
+    el.dataset.fotoId = id;
+    aplicarFoto(el);
+  }
   return el;
+}
+
+// ---------- foto de perfil ----------
+// A foto vai pequena (128 x 128, JPEG) para a nuvem em fotos/<identidade>, e
+// todo mundo a vê no lugar da inicial. Sem nome de usuário, fica só aqui.
+const CHAVE_FOTO = "yam-foto";   // { img, em } deste aparelho (img "" = sem foto)
+const CHAVE_FOTOS = "yam-fotos"; // as dos outros (identidade -> img), para aparecer já ao abrir
+let fotosPorId = ler(CHAVE_FOTOS, {});
+
+function minhaFotoGuardada() {
+  const f = ler(CHAVE_FOTO, null);
+  return f && typeof f.img === "string" ? { img: f.img, em: Number(f.em) || 0 } : { img: "", em: 0 };
+}
+
+function fotoDe(id) {
+  if (!id) return "";
+  const u = lerUsuario();
+  if (id === "eu" || (u && id === u.id)) return minhaFotoGuardada().img;
+  return fotosPorId[identidadeReal(id)] || "";
+}
+
+function aplicarFoto(el) {
+  const img = fotoDe(el.dataset.fotoId);
+  el.classList.toggle("com-foto", !!img);
+  if (img) el.style.setProperty("--foto", `url("${img}")`);
+  else el.style.removeProperty("--foto");
+}
+
+function atualizarFotosNaTela() {
+  document.querySelectorAll("[data-foto-id]").forEach(aplicarFoto);
+  desenharMinhaFoto();
+}
+
+// Chegaram as fotos da nuvem (todas, de quem tem foto).
+function guardarFotos(todas) {
+  const novas = {};
+  for (const [id, f] of Object.entries(todas || {})) {
+    if (f && typeof f.img === "string" && f.img.startsWith("data:image/jpeg;base64,")) novas[id] = f.img;
+  }
+  if (JSON.stringify(novas) === JSON.stringify(fotosPorId)) return;
+  fotosPorId = novas;
+  try { localStorage.setItem(CHAVE_FOTOS, JSON.stringify(novas)); } catch {}
+  atualizarFotosNaTela();
+}
+
+// A foto de outro aparelho com o mesmo nome é mais nova: vale ela.
+function aplicarMinhaFotoDaNuvem(img, em) {
+  try { localStorage.setItem(CHAVE_FOTO, JSON.stringify({ img, em })); } catch {}
+  atualizarFotosNaTela();
+}
+
+function escolherFoto() {
+  document.getElementById("campo-foto").click();
+}
+
+async function fotoEscolhida(campo) {
+  const arquivo = campo.files && campo.files[0];
+  campo.value = "";
+  if (!arquivo) return;
+  try {
+    guardarMinhaFoto(await reduzirFoto(arquivo));
+  } catch {
+    avisar("Não deu para abrir essa foto. Tente outra.", "Foto de perfil");
+  }
+}
+
+// Recorta o meio da foto num quadrado e reduz para 128 x 128.
+async function reduzirFoto(arquivo) {
+  const url = URL.createObjectURL(arquivo);
+  try {
+    const img = new Image();
+    img.src = url;
+    await img.decode();
+    const lado = Math.min(img.naturalWidth, img.naturalHeight);
+    if (!lado) throw new Error("vazia");
+    const T = 128;
+    const tela = document.createElement("canvas");
+    tela.width = tela.height = T;
+    const ctx = tela.getContext("2d");
+    ctx.imageSmoothingQuality = "high";
+    ctx.drawImage(img, (img.naturalWidth - lado) / 2, (img.naturalHeight - lado) / 2, lado, lado, 0, 0, T, T);
+    for (const q of [0.82, 0.7, 0.55, 0.4]) {
+      const dados = tela.toDataURL("image/jpeg", q);
+      if (dados.length <= 18000) return dados;
+    }
+    throw new Error("grande");
+  } finally {
+    URL.revokeObjectURL(url);
+  }
+}
+
+function guardarMinhaFoto(img) {
+  try { localStorage.setItem(CHAVE_FOTO, JSON.stringify({ img, em: Date.now() })); } catch {}
+  atualizarFotosNaTela();
+  if (window.familia && lerUsuario()) familia.fotoMudou();
+}
+
+function tirarFoto() {
+  guardarMinhaFoto("");
+}
+
+function desenharMinhaFoto() {
+  const caixa = document.getElementById("minha-foto");
+  if (!caixa) return;
+  caixa.replaceChildren(avatar(nomeJogador || "?", mesaAtual(), "avatar avatar-grande", "eu"));
+  const tem = !!minhaFotoGuardada().img;
+  document.getElementById("botao-foto").textContent = tem ? "Trocar foto" : "Escolher foto";
+  document.getElementById("botao-tirar-foto").hidden = !tem;
 }
 
 // O número sobe de 0 até o total, como num placar (sem animação: já aparece pronto).
@@ -4140,7 +4288,7 @@ function desenharPilhasDoRanking(caixa, tres, minhaPosicao) {
       pilha.style.setProperty("--cor-jogador", m.cor);
       pilha.style.setProperty("--borda-jogador", m.borda);
       for (let k = 0; k < ALTURA[i]; k++) pilha.appendChild(elemento("span", "pilha-ficha"));
-      pilha.appendChild(avatar(r.nome, r.corMesa, "ficha"));
+      pilha.appendChild(avatar(r.nome, r.corMesa, "ficha", i === minhaPosicao ? "eu" : idDoRanking(r)));
       coluna.appendChild(elemento("span", "pilha-posicao", `${i + 1}º`));
       coluna.appendChild(pilha);
       coluna.appendChild(elemento("strong", "pilha-nome", i === minhaPosicao ? `${r.nome} (você)` : r.nome));
@@ -4152,10 +4300,14 @@ function desenharPilhasDoRanking(caixa, tres, minhaPosicao) {
   });
 }
 
+// A identidade de quem está no ranking (para a foto): os recordes novos já vêm
+// com ela; os antigos, pela chave do nome.
+const idDoRanking = r => r.id || ((nomesAtuais && nomesAtuais.porChave) || {})[r.chave] || null;
+
 function linhaDoRanking(r, i, eu) {
   const li = elemento("li", `item-ranking${eu ? " eu" : ""}${i < 3 ? ` podio-${i + 1}` : ""}`);
   li.appendChild(elemento("span", "ranking-posicao", `${i + 1}º`));
-  li.appendChild(avatar(r.nome, r.corMesa));
+  li.appendChild(avatar(r.nome, r.corMesa, "avatar", eu ? "eu" : idDoRanking(r)));
   const info = elemento("span", "ranking-info");
   info.appendChild(elemento("strong", "", eu ? `${r.nome} (você)` : r.nome));
   if (r.data) info.appendChild(elemento("small", "", new Date(r.data).toLocaleDateString("pt-BR")));

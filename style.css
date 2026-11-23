@@ -2732,26 +2732,31 @@ button.podio-nome {
 }
 .chat-vazio { margin: auto; color: var(--texto-suave); font-size: 14px; text-align: center; }
 
+/* cada mensagem: a bolinha da pessoa (foto ou inicial) ao lado do balão */
 .chat-msg {
   align-self: flex-start;
-  max-width: 82%;
+  display: flex;
+  align-items: flex-end;
+  gap: 6px;
+  max-width: 88%;
+}
+.chat-msg .avatar { margin: 0; font-size: 13px; }
+.chat-msg .avatar.repetida { visibility: hidden; }
+.chat-balao {
+  min-width: 0;
   padding: 7px 11px;
   border-radius: 14px 14px 14px 4px;
   background: var(--calculado);
   overflow-wrap: anywhere;
   line-height: 1.3;
 }
-.chat-msg small { display: block; margin-bottom: 1px; color: var(--texto-suave); font-size: 11.5px; font-weight: 700; }
-.chat-msg.eu {
-  align-self: flex-end;
+.chat-msg.eu { align-self: flex-end; flex-direction: row-reverse; }
+.chat-msg.eu .chat-balao {
   border-radius: 14px 14px 4px 14px;
   background: var(--destaque);
   color: var(--destaque-texto);
 }
-.chat-msg.eu small { color: rgba(255, 255, 255, 0.75); }
-.chat-msg.so-emoji { background: none; padding: 0 4px; font-size: 34px; line-height: 1.1; }
-.chat-msg.so-emoji small { font-size: 11.5px; }
-.chat-msg.eu.so-emoji small { color: var(--texto-suave); text-align: right; }
+.chat-msg.so-emoji .chat-balao { background: none; padding: 0 2px; font-size: 34px; line-height: 1.1; }
 
 .chat-reacoes { display: flex; gap: 4px; margin: 8px 0; }
 .chat-reacoes button {
@@ -3441,3 +3446,48 @@ button.bolinha-mesa:not(.bolinha-dado) {
     }
   }
 }
+
+/* ---------- foto de perfil ---------- */
+.avatar.com-foto {
+  background: var(--foto) center / cover no-repeat;
+  color: transparent;
+  text-shadow: none;
+}
+.ficha { position: relative; }
+.ficha.com-foto { color: transparent; text-shadow: none; }
+.ficha.com-foto::after { /* a foto no miolo da ficha, dentro do anel */
+  content: "";
+  position: absolute;
+  inset: 22%;
+  border-radius: 50%;
+  background: var(--foto) center / cover no-repeat;
+  box-shadow: 0 0 0 2px var(--listra);
+}
+.linha-foto {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin: 4px 0 12px;
+}
+.avatar.avatar-grande {
+  width: 64px;
+  height: 64px;
+  margin: 0;
+  font-size: 28px;
+  box-shadow: 0 0 0 3px var(--borda-jogador), 0 3px 0 4px var(--sombra-botao);
+}
+.foto-acoes { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.foto-acoes small { color: var(--texto-suave); font-size: 13px; line-height: 1.3; }
+.foto-botoes { display: flex; align-items: center; gap: 12px; margin-top: 6px; }
+.foto-botoes button:not(.link) { padding: 6px 14px; font-size: 15px; }
+
+/* mensagem do chat subindo na tela: a bolinha (foto ou inicial) do lado do texto */
+.reacao-linha { display: flex; align-items: center; gap: 8px; }
+.reacao-linha .avatar {
+  width: 34px;
+  height: 34px;
+  margin: 0;
+  font-size: 16px;
+  box-shadow: 0 0 0 2px var(--superficie), 0 2px 6px rgba(0, 0, 0, 0.25);
+}
+.reacao-linha .reacao-texto { text-align: left; }
