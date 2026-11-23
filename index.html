@@ -20,14 +20,14 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="theme-color" content="#f4ecd8" media="(prefers-color-scheme: light)">
   <meta name="theme-color" content="#121413" media="(prefers-color-scheme: dark)">
-  <link rel="manifest" href="manifest.json?v=90">
+  <link rel="manifest" href="manifest.json?v=91">
   <link rel="icon" type="image/png" sizes="32x32" href="icone-mesa-32.png">
   <link rel="apple-touch-icon" href="icone-mesa-apple-180.png">
 
   <link rel="preload" href="fontes/nunito.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="preload" href="fontes/fredoka.woff2" as="font" type="font/woff2" crossorigin>
   <!-- ?v= é a versão do app (igual ao VERSAO do app.js; um teste confere): versão nova, endereço novo -->
-  <link rel="stylesheet" href="style.css?v=90">
+  <link rel="stylesheet" href="style.css?v=91">
 
   <!-- Aplica o tema escolhido antes de desenhar a página, para não piscar. -->
   <script>
@@ -37,6 +37,7 @@
       if (localStorage.getItem("yam-letra") === "grande") document.documentElement.dataset.letra = "grande";
       const mesa = localStorage.getItem("yam-cor-mesa");
       if (/^(azul|vinho|roxo|madeira|preto)$/.test(mesa || "")) document.documentElement.dataset.mesa = mesa;
+      if (localStorage.getItem("yam-textura") === "0") document.documentElement.dataset.textura = "nao";
     } catch {}
   </script>
 </head>
@@ -323,6 +324,13 @@
       <div class="linha-mesa">
         <span id="rotulo-mesa">Mesa</span>
         <div id="escolha-mesa" class="escolha-mesa" role="radiogroup" aria-labelledby="rotulo-mesa"></div>
+      </div>
+      <div class="linha-tema">
+        <span>Textura na mesa</span>
+        <button id="botao-textura" class="tema" role="switch" aria-checked="true"
+                aria-label="Textura na mesa" onclick="alternarTextura()">
+          <span class="trilho"><span class="bolinha"></span></span>
+        </button>
       </div>
       <div class="linha-tema">
         <span>Letra maior</span>
@@ -714,7 +722,7 @@
   </div>
 </div>
 
-<script src="app.js?v=90"></script>
+<script src="app.js?v=91"></script>
 <script>
   // Rede de segurança: se o app.js não carregou (ex.: troca de versão no meio
   // do caminho), recarrega sozinho uma vez, em vez de ficar com a tabela vazia.
@@ -728,7 +736,7 @@
     setTimeout(function () { location.replace(location.pathname + "?atualizado=" + Date.now()); }, 1500);
   })();
 </script>
-<script type="module" src="familia.js?v=90"></script>
+<script type="module" src="familia.js?v=91"></script>
 
 <!-- Service Worker -->
 <script>

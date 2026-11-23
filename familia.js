@@ -454,9 +454,13 @@ async function sincronizarCofre(cofre, u) {
   // a mesa acompanha o nome: vale a escolhida por último, neste ou em outro aparelho
   if (u) {
     const aqui = mesaGuardada();
-    const la = { mesa: perfil && perfil.mesa, em: Number(perfil && perfil.mesaEm) || 0 };
-    if (la.em > aqui.em && mesaValida(la.mesa)) aplicarMesaDaNuvem(la.mesa, la.em);
-    else if (aqui.em > la.em) { enviar["perfil/mesa"] = aqui.mesa; enviar["perfil/mesaEm"] = aqui.em; }
+    const la = { mesa: perfil && perfil.mesa, textura: perfil && perfil.textura, em: Number(perfil && perfil.mesaEm) || 0 };
+    if (la.em > aqui.em && mesaValida(la.mesa)) aplicarMesaDaNuvem(la.mesa, la.em, la.textura);
+    else if (aqui.em > la.em) {
+      enviar["perfil/mesa"] = aqui.mesa;
+      enviar["perfil/textura"] = aqui.textura;
+      enviar["perfil/mesaEm"] = aqui.em;
+    }
   }
   if (Object.keys(enviar).length) await comLimite(update(ref(db, `historicos/${cofre}`), enviar));
   if (u) publicarIdentidade(u).catch(() => {});

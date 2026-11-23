@@ -8,7 +8,7 @@ const rows = [
 const COLUNAS = 4;
 
 // Versão do app: igual ao número do CACHE_NAME do service-worker.js (um teste confere).
-const VERSAO = 90;
+const VERSAO = 91;
 
 // Avisos da vez com o app fechado: servidor na Cloudflare (worker/avisos.mjs).
 // Sem o endereço, a opção "Avisar a minha vez" não aparece.
@@ -2210,11 +2210,33 @@ function mesaAtual() {
   return mesaValida(m) ? m : "verde";
 }
 
-// A mesa deste aparelho e quando foi escolhida (0 = nunca escolheu aqui).
+const CHAVE_TEXTURA = "yam-textura"; // "0" = feltro liso
+
+const texturaLigada = () => document.documentElement.dataset.textura !== "nao";
+
+// A mesa deste aparelho (cor e textura) e quando foi escolhida (0 = nunca escolheu aqui).
 function mesaGuardada() {
   let em = 0;
   try { em = Number(localStorage.getItem(CHAVE_COR_MESA_EM)) || 0; } catch {}
-  return { mesa: mesaAtual(), em };
+  return { mesa: mesaAtual(), textura: texturaLigada(), em };
+}
+
+function mostrarTextura(ligada) {
+  if (ligada) delete document.documentElement.dataset.textura;
+  else document.documentElement.dataset.textura = "nao";
+  const botao = document.getElementById("botao-textura");
+  if (botao) botao.setAttribute("aria-checked", ligada);
+}
+
+// Ligar ou desligar a textura do feltro: como a cor, acompanha o nome de usuário.
+function alternarTextura() {
+  const ligada = !texturaLigada();
+  mostrarTextura(ligada);
+  try {
+    localStorage.setItem(CHAVE_TEXTURA, ligada ? "1" : "0");
+    localStorage.setItem(CHAVE_COR_MESA_EM, String(Date.now()));
+  } catch {}
+  if (window.familia && lerUsuario()) familia.historicoMudou();
 }
 
 function mostrarMesa(nome) {
@@ -2239,10 +2261,14 @@ function escolherMesa(nome) {
 }
 
 // A nuvem tem uma escolha mais nova (feita em outro aparelho com o mesmo nome).
-function aplicarMesaDaNuvem(nome, em) {
+function aplicarMesaDaNuvem(nome, em, textura) {
   if (!mesaValida(nome)) return;
   mostrarMesa(nome);
   guardarCorDaMesa(nome, em);
+  if (typeof textura === "boolean") {
+    mostrarTextura(textura);
+    try { localStorage.setItem(CHAVE_TEXTURA, textura ? "1" : "0"); } catch {}
+  }
 }
 
 function desenharEscolhaMesa() {
@@ -2264,6 +2290,7 @@ function desenharEscolhaMesa() {
   }));
 }
 desenharEscolhaMesa();
+mostrarTextura(texturaLigada());
 atualizarBotaoDesfazer();
 mostrarNome();
 

@@ -3132,3 +3132,7 @@ tbody td.brilhar { animation: brilhar 0.6s ease-in-out 3; }
 .barra-vez, .barra-vez.minha, thead th, .total-geral td, .caixa-dados, button.principal:not(.botao-dados, #dados-rolar), .carimbo, .legenda.festa {
   background-image: var(--textura-mesa);
 }
+
+/* sem textura (escolha em Mais): o feltro fica liso */
+:root[data-textura="nao"],
+:root[data-textura="nao"][data-mesa] { --textura-mesa: none; }

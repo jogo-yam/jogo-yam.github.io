@@ -34,3 +34,8 @@ test("o script do começo da página aceita todas as mesas (e só elas)", () => 
   assert.ok(lista, "regex das mesas no index.html");
   assert.deepEqual(lista[1].split("|").sort(), mesas.filter(m => m !== "verde").sort());
 });
+
+test("sem textura: o CSS deixa o feltro liso e a página aplica a escolha antes de desenhar", () => {
+  assert.ok(css.includes(':root[data-textura="nao"][data-mesa] { --textura-mesa: none; }'));
+  assert.ok(html.includes('localStorage.getItem("yam-textura") === "0"'));
+});
