@@ -8,7 +8,7 @@ const rows = [
 const COLUNAS = 4;
 
 // Versão do app: igual ao número do CACHE_NAME do service-worker.js (um teste confere).
-const VERSAO = 87;
+const VERSAO = 88;
 
 // Avisos da vez com o app fechado: servidor na Cloudflare (worker/avisos.mjs).
 // Sem o endereço, a opção "Avisar a minha vez" não aparece.
@@ -968,7 +968,7 @@ async function gerarImagemPodio(p, dataIso) {
   canvas.height = H;
   const ctx = canvas.getContext("2d");
   const fonte = (peso, tam) => `${peso} ${tam}px "Nunito", system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif`;
-  const NAVY = "#1f6b47", FUNDO = "#f4ecd8", TEXTO = "#3a2a17", SUAVE = "#7a6649", OURO = "#b37a12"; // mesa de feltro
+  const NAVY = MESAS[mesaAtual()].cor, FUNDO = "#f4ecd8", TEXTO = "#3a2a17", SUAVE = "#7a6649", OURO = "#b37a12"; // feltro da mesa escolhida
   const data = new Date(dataIso).toLocaleDateString("pt-BR");
 
   ctx.fillStyle = FUNDO;
@@ -1226,7 +1226,7 @@ async function gerarImagemResultado(valores, total, dataIso, selo, nome = "") {
   canvas.height = H;
   const ctx = canvas.getContext("2d");
   const fonte = (peso, tam) => `${peso} ${tam}px "Nunito", system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif`;
-  const NAVY = "#1f6b47", FUNDO = "#f4ecd8", TEXTO = "#3a2a17", SUAVE = "#7a6649", AMBAR = "#f2b53a"; // mesa de feltro
+  const NAVY = MESAS[mesaAtual()].cor, FUNDO = "#f4ecd8", TEXTO = "#3a2a17", SUAVE = "#7a6649", AMBAR = "#f2b53a"; // feltro da mesa escolhida
 
   ctx.fillStyle = FUNDO;
   ctx.fillRect(0, 0, W, H);
@@ -2187,6 +2187,53 @@ function alternarTema() {
 
 sistemaEscuro.addEventListener("change", atualizarBotaoTema);
 atualizarBotaoTema();
+
+// ---------- mesas (skins) ----------
+// A cor do feltro que cada pessoa escolhe em Mais. Fica neste aparelho; as
+// cores de cada mesa (claro e escuro) estão no style.css. "cor" é o feltro do
+// modo claro, usado nas bolinhas de escolher e nas imagens de compartilhar.
+const MESAS = {
+  verde: { nome: "Feltro verde", cor: "#1f6b47", borda: "#124a30" },
+  azul: { nome: "Feltro azul", cor: "#1d5a8a", borda: "#123d61" },
+  vinho: { nome: "Feltro vinho", cor: "#7a1f33", borda: "#521423" },
+  roxo: { nome: "Feltro roxo", cor: "#5b2f86", borda: "#3d1f5c" },
+  madeira: { nome: "Madeira", cor: "#7a4a24", borda: "#533117" },
+  preto: { nome: "Preto e dourado", cor: "#1f1d1a", borda: "#b8871c" }
+};
+const CHAVE_COR_MESA = "yam-cor-mesa";
+
+function mesaAtual() {
+  const m = document.documentElement.dataset.mesa;
+  return MESAS[m] ? m : "verde";
+}
+
+function escolherMesa(nome) {
+  if (!MESAS[nome]) return;
+  if (nome === "verde") delete document.documentElement.dataset.mesa;
+  else document.documentElement.dataset.mesa = nome;
+  try { localStorage.setItem(CHAVE_COR_MESA, nome); } catch {}
+  desenharEscolhaMesa();
+}
+
+function desenharEscolhaMesa() {
+  const caixa = document.getElementById("escolha-mesa");
+  if (!caixa) return;
+  const atual = mesaAtual();
+  caixa.replaceChildren(...Object.entries(MESAS).map(([chave, m]) => {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.className = "bolinha-mesa";
+    b.setAttribute("role", "radio");
+    b.setAttribute("aria-checked", chave === atual);
+    b.setAttribute("aria-label", m.nome);
+    b.title = m.nome;
+    b.style.setProperty("--cor-mesa", m.cor);
+    b.style.setProperty("--borda-mesa", m.borda);
+    b.addEventListener("click", () => escolherMesa(chave));
+    return b;
+  }));
+}
+desenharEscolhaMesa();
 atualizarBotaoDesfazer();
 mostrarNome();
 
