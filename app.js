@@ -8,7 +8,7 @@ const rows = [
 const COLUNAS = 4;
 
 // Versão do app: igual ao número do CACHE_NAME do service-worker.js (um teste confere).
-const VERSAO = 109;
+const VERSAO = 110;
 
 // Avisos da vez com o app fechado: servidor na Cloudflare (worker/avisos.mjs).
 // Sem o endereço, a opção "Avisar a minha vez" não aparece.
@@ -260,11 +260,25 @@ function exibir(valor) {
 }
 
 // Marca as casas riscadas (valor 0) para ficarem com visual próprio.
+// Riscar (0): na tabela do jogo, a casa que acabou de ser riscada ganha o risco
+// "desenhado" da esquerda para a direita, com um som de risco (ao abrir o app,
+// as casas já riscadas só aparecem riscadas).
+let riscoAnimado = false;
+
 function marcarRiscados(tbody, valores) {
+  const doJogo = riscoAnimado && typeof body !== "undefined" && tbody === body;
+  let riscou = false;
   tbody.querySelectorAll("td[data-key]").forEach(td => {
     const v = valores[td.dataset.key];
-    td.classList.toggle("riscado", v !== undefined && v !== "" && Number(v) === 0);
+    const risco = v !== undefined && v !== "" && Number(v) === 0;
+    if (doJogo && risco && !td.classList.contains("riscado")) {
+      reanimar(td, "riscando");
+      riscou = true;
+    }
+    td.classList.toggle("riscado", risco);
+    if (!risco) td.classList.remove("riscando");
   });
+  if (riscou) tocar("riscar");
 }
 
 // Devolve a mensagem de erro, ou null se o valor pode ficar.
@@ -1738,13 +1752,43 @@ function abrirMais() {
 // Início e jogo são as telas "principais": as outras voltam para a última delas.
 let telaPrincipal = "tela-inicio";
 
+// Quão "funda" é cada tela: indo para uma mais funda, ela entra deslizando da
+// direita; voltando, da esquerda (como num aplicativo de celular). Entre telas
+// do mesmo nível, só aparece.
+const PROFUNDIDADE_DA_TELA = {
+  "tela-inicio": 0, "tela-jogo": 0, "tela-mais": 1, "tela-historico": 1,
+  "tela-ranking": 2, "tela-regras": 2, "tela-estatisticas": 2, "tela-partida": 2
+};
+
 function mostrarTela(id) {
   if (id !== "tela-jogo") sairDoModoMarcar();
   if (id === "tela-inicio" || id === "tela-jogo") telaPrincipal = id;
   if (id === "tela-inicio") atualizarInicio();
-  telas.forEach(t => { document.getElementById(t).hidden = t !== id; });
+  const antes = telas.find(t => !document.getElementById(t).hidden);
+  telas.forEach(t => {
+    const el = document.getElementById(t);
+    el.hidden = t !== id;
+    if (t !== id) el.classList.remove("entra-da-direita", "entra-da-esquerda"); // saiu no meio: não guarda o deslize
+  });
+  const nova = document.getElementById(id);
+  if (antes && antes !== id) {
+    const de = PROFUNDIDADE_DA_TELA[antes] ?? 0, para = PROFUNDIDADE_DA_TELA[id] ?? 0;
+    nova.classList.remove("entra-da-direita", "entra-da-esquerda");
+    if (para !== de) {
+      void nova.offsetWidth; // recomeça a animação
+      nova.classList.add(para > de ? "entra-da-direita" : "entra-da-esquerda");
+    }
+  }
   window.scrollTo(0, 0);
 }
+
+// terminou de deslizar: tira a classe (a tela fica sem transform, como sempre)
+document.addEventListener("animationend", evento => {
+  const el = evento.target;
+  if (el && el.classList && (el.classList.contains("entra-da-direita") || el.classList.contains("entra-da-esquerda")) && el.matches("section")) {
+    el.classList.remove("entra-da-direita", "entra-da-esquerda");
+  }
+});
 
 function voltarParaPrincipal() {
   mostrarTela(telaPrincipal);
@@ -4027,6 +4071,11 @@ const SONS = {
       nota(ctx, 1568, atraso + 0.28, 0.32, { tipo: "triangle", volume: 0.24 });
     }
   },
+  // caneta riscando o papel: dois traços rápidos
+  riscar(ctx) {
+    ruido(ctx, { inicio: 0, dur: 0.13, volume: 0.32, freq: 2600, q: 0.7 });
+    ruido(ctx, { inicio: 0.11, dur: 0.16, volume: 0.26, freq: 1900, q: 0.7 });
+  },
   reacao(ctx) {
     nota(ctx, 880, 0, 0.07, { tipo: "sine", volume: 0.07 });
     nota(ctx, 1320, 0.05, 0.1, { tipo: "sine", volume: 0.05 });
@@ -4307,14 +4356,15 @@ function confrontos(partidas) {
       const chave = identidadeReal(outro.id) || identidadeDoNome.get(normalizarNome(outro.nome)) ||
         identidadeReal(((nomesAtuais && nomesAtuais.antigos) || {})[chaveDeNome(outro.nome || "")]) || `nome:${normalizarNome(outro.nome)}`;
       const c = porPessoa.get(chave) ||
-        { nome: outro.nome, partidas: 0, vitorias: 0, derrotas: 0, empates: 0, meus: 0, deles: 0, data: "" };
+        { nome: outro.nome, partidas: 0, vitorias: 0, derrotas: 0, empates: 0, meus: 0, deles: 0, data: "",
+          id: chave.startsWith("nome:") ? null : chave, corMesa: null };
       c.partidas++;
       c.meus += eu.total;
       c.deles += outro.total;
       if (eu.total > outro.total) c.vitorias++;
       else if (eu.total < outro.total) c.derrotas++;
       else c.empates++;
-      if ((p.data || "") >= c.data) { c.nome = outro.nome; c.data = p.data || ""; } // nome mais recente
+      if ((p.data || "") >= c.data) { c.nome = outro.nome; c.data = p.data || ""; c.corMesa = outro.corMesa || c.corMesa; } // o mais recente
       porPessoa.set(chave, c);
     }
   }
@@ -4329,21 +4379,28 @@ function blocoConfrontos(partidas) {
   caixa.appendChild(elemento("h2", "", "Você contra cada um"));
   caixa.appendChild(elemento("p", "subtitulo", "Nas partidas em sala deste aparelho. Placar: você × a pessoa."));
   const ul = elemento("ul", "lista-confrontos");
+  const meuNome = (lerUsuario() || {}).nome || nomeJogador || "Você";
   for (const c of lista) {
-    const li = elemento("li");
-    const info = elemento("div", "confronto-info");
-    info.appendChild(elemento("strong", "", c.nome));
-    const media = n => Math.round(n / c.partidas);
-    info.appendChild(elemento("small", "",
-      `${c.partidas} partida${c.partidas === 1 ? "" : "s"}${c.empates ? ` · ${c.empates} empate${c.empates === 1 ? "" : "s"}` : ""}` +
-      ` · média ${media(c.meus)} × ${media(c.deles)}`));
-    li.appendChild(info);
+    // você (ficha à esquerda) × a pessoa (ficha à direita), o placar no meio
+    const li = elemento("li", "confronto");
+    const lado = (nome, mesa, id, rotulo, vencendo) => {
+      const el = elemento("span", `confronto-lado${vencendo ? " vencendo" : ""}`);
+      el.appendChild(avatar(nome, mesa, "ficha", id));
+      el.appendChild(elemento("strong", "", rotulo));
+      return el;
+    };
+    li.appendChild(lado(meuNome, mesaAtual(), "eu", "Você", c.vitorias > c.derrotas));
     const placar = elemento("span", "placar" + (c.vitorias > c.derrotas ? " ganhando" : c.vitorias < c.derrotas ? " perdendo" : ""));
     placar.appendChild(elemento("b", "", String(c.vitorias)));
-    placar.appendChild(elemento("span", "", " × "));
+    placar.appendChild(elemento("span", "", "×"));
     placar.appendChild(elemento("b", "", String(c.derrotas)));
     placar.setAttribute("aria-label", `Você ${c.vitorias}, ${c.nome} ${c.derrotas}`);
     li.appendChild(placar);
+    li.appendChild(lado(c.nome, c.corMesa, c.id, c.nome, c.derrotas > c.vitorias));
+    const media = n => Math.round(n / c.partidas);
+    li.appendChild(elemento("small", "confronto-info",
+      `${c.partidas} partida${c.partidas === 1 ? "" : "s"}${c.empates ? ` · ${c.empates} empate${c.empates === 1 ? "" : "s"}` : ""}` +
+      ` · média ${media(c.meus)} × ${media(c.deles)}`));
     ul.appendChild(li);
   }
   caixa.appendChild(ul);
@@ -4668,3 +4725,4 @@ document.addEventListener("keydown", evento => {
 
 // chegou até aqui: o app carregou inteiro (o index.html confere)
 window.yamCarregado = true;
+riscoAnimado = true; // daqui em diante, riscar uma casa desenha o risco

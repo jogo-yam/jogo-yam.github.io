@@ -602,22 +602,6 @@ body {
 
 .lista-confrontos li:first-child { border-top: none; }
 
-.confronto-info {
-  display: flex;
-  flex: 1;
-  flex-direction: column;
-  min-width: 0;
-}
-
-.confronto-info strong,
-.confronto-info small {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.confronto-info small { font-size: 13px; color: var(--texto-suave); }
-
 .placar {
   flex-shrink: 0;
   font-size: 20px;
@@ -657,7 +641,7 @@ body {
 :root[data-letra="grande"] .sala-info { font-size: 14.5px; }
 :root[data-letra="grande"] .destaques strong { font-size: 17px; }
 :root[data-letra="grande"] .destaques small,
-:root[data-letra="grande"] .confronto-info small { font-size: 15px; }
+:root[data-letra="grande"] .lista-confrontos li.confronto .confronto-info { font-size: 15px; }
 :root[data-letra="grande"] .familia-info strong { font-size: 16px; }
 :root[data-letra="grande"] .familia-info small { font-size: 13.5px; }
 :root[data-letra="grande"] .privacidade { font-size: 16px; }
@@ -3601,4 +3585,95 @@ button.botao-dados.sua-vez { animation: dados-chamando 1.1s ease-in-out infinite
 }
 @media (prefers-reduced-motion: reduce) {
   .dado.rolando .dado-pulo, .dado.rolando .dado-sombra, .dado.quicando { animation: none; }
+}
+
+/* ---------- telas deslizando ---------- */
+@media (prefers-reduced-motion: no-preference) {
+  section.entra-da-direita:not([hidden]) { animation: entra-da-direita 0.26s cubic-bezier(0.2, 0.8, 0.2, 1); }
+  section.entra-da-esquerda:not([hidden]) { animation: entra-da-esquerda 0.26s cubic-bezier(0.2, 0.8, 0.2, 1); }
+}
+@keyframes entra-da-direita { from { transform: translateX(32%); opacity: 0.3; } }
+@keyframes entra-da-esquerda { from { transform: translateX(-32%); opacity: 0.3; } }
+
+/* ---------- riscar: o risco é desenhado da esquerda para a direita ---------- */
+tbody td.riscando::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: var(--superficie);
+  transform-origin: 100% 50%;
+  animation: riscando 0.34s cubic-bezier(0.5, 0, 0.6, 1) forwards;
+  pointer-events: none;
+}
+@keyframes riscando {
+  from { transform: scaleX(1); }
+  to { transform: scaleX(0); }
+}
+@media (prefers-reduced-motion: reduce) { tbody td.riscando::after { display: none; } }
+
+/* ---------- sala de espera: código grande e quem chega com um pulinho ---------- */
+.codigo-sala { margin: 2px 0 10px; }
+#sala-espera-codigo {
+  display: inline-block;
+  padding: 6px 18px 4px;
+  border-radius: 14px;
+  background-color: var(--destaque);
+  background-image: var(--textura-mesa);
+  box-shadow: inset 0 0 0 3px var(--foco), 0 3px 0 var(--destaque-borda);
+  color: #fffaf0;
+  font: 600 34px/1.1 var(--letra-titulo);
+  letter-spacing: 5px;
+  -webkit-text-stroke: 1.5px var(--foco);
+  paint-order: stroke fill;
+  text-shadow: 0 2px 0 #7a4f08;
+  user-select: all;
+  -webkit-user-select: all;
+}
+.sala-espera-jogadores li.chegou { animation: chegou 0.45s cubic-bezier(0.2, 1.5, 0.4, 1) both; }
+.sala-espera-jogadores li.chegou .avatar { animation: chegou-bolinha 0.5s cubic-bezier(0.2, 1.6, 0.4, 1) 0.05s both; }
+@keyframes chegou { from { opacity: 0; transform: translateY(10px) scale(0.96); } }
+@keyframes chegou-bolinha { from { transform: scale(0.2); } }
+@media (prefers-reduced-motion: reduce) { .sala-espera-jogadores li.chegou, .sala-espera-jogadores li.chegou .avatar { animation: none; } }
+
+/* ---------- confrontos: você × a pessoa, com as fichas e o placar no meio ---------- */
+.lista-confrontos li.confronto {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  grid-template-areas: "eu placar outro" "info info info";
+  align-items: center;
+  row-gap: 6px;
+  column-gap: 8px;
+}
+.confronto-lado {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+}
+.confronto-lado:first-child { grid-area: eu; }
+.confronto-lado:last-of-type { grid-area: outro; }
+.confronto-lado .ficha { width: 42px; height: 42px; font-size: 17px; }
+.confronto-lado.vencendo .ficha { box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.3), 0 0 0 3px var(--foco), 0 3px 0 rgba(0, 0, 0, 0.3); }
+.confronto-lado strong {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 14px;
+}
+.lista-confrontos li.confronto .placar {
+  grid-area: placar;
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  font: 600 30px/1 var(--letra-titulo);
+}
+.lista-confrontos li.confronto .placar span { font-size: 18px; color: var(--texto-suave); }
+.lista-confrontos li.confronto .confronto-info {
+  grid-area: info;
+  display: block;
+  text-align: center;
+  font-size: 13px;
+  color: var(--texto-suave);
 }

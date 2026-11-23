@@ -758,6 +758,7 @@ function atualizarBarra(erro) {
 // ninguém marca nem rola: todos veem quem já entrou, convidam e conversam.
 
 let estavaEsperando = false;
+const chegaramNaEspera = new Set(); // quem já apareceu na lista (só os novos dão o pulinho)
 
 function atualizarEsperaDaSala() {
   const caixa = $("sala-espera");
@@ -771,11 +772,12 @@ function atualizarEsperaDaSala() {
   }
   estavaEsperando = esperando;
   caixa.hidden = !esperando;
-  if (!esperando) return;
+  if (!esperando) { chegaramNaEspera.clear(); return; }
 
   const eu = minhaUid();
   const souCriador = partida.criador === eu;
-  $("sala-espera-titulo").textContent = `Sala ${sessao.codigo}`;
+  $("sala-espera-titulo").textContent = "Sala";
+  $("sala-espera-codigo").textContent = sessao.codigo; // grande, como uma ficha, para ler em voz alta
   $("sala-espera-modo").textContent = [comVez() ? "Cada um na sua vez" : "Todos ao mesmo tempo",
     soDadosDaSala() ? "só os dados do app" : ""].filter(Boolean).join(" · ");
   const jogadores = jogadoresDe(partida).sort((a, b) => (a.entrouEm || 0) - (b.entrouEm || 0));
@@ -783,6 +785,7 @@ function atualizarEsperaDaSala() {
   lista.innerHTML = "";
   for (const j of jogadores) {
     const li = document.createElement("li");
+    if (!chegaramNaEspera.has(j.uid)) { li.classList.add("chegou"); chegaramNaEspera.add(j.uid); } // entra com um pulinho
     const quem = document.createElement("span");
     quem.className = "jogador-sala";
     quem.append(avatar(j.nome, j.uid === eu ? mesaAtual() : j.corMesa, "avatar", j.uid === eu ? "eu" : j.id), j.nome + (j.uid === eu ? " (você)" : ""));
