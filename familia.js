@@ -31,6 +31,7 @@ let pararEscuta = null;
 let ultimoEnvio = "";
 let podioMostrado = false;
 let resultadoSala = null;              // colocação deste jogador no último pódio
+let bolinhaNoIcone = -1;               // número mostrado no ícone do app (-1: ainda não conferido)
 const CHAVE_MODO = "yam-modo-sala";    // última escolha ao criar: "livre" ou "vez"
 let modoEscolhido = localStorage.getItem(CHAVE_MODO) === "vez" ? "vez" : "livre";
 const CHAVE_SO_DADOS = "yam-so-dados"; // última escolha de "só os dados do app" ("0" = desmarcado)
@@ -693,7 +694,26 @@ function verificarRevelacao() {
 
 // ---------- barra da partida em família (acima da tabela) ----------
 
+// A bolinha no ícone do app (na tela de início do celular): mensagens novas do
+// chat + 1 se é a sua vez. Fora de sala, sem bolinha. (No iPhone, só aparece no
+// app instalado e com as notificações permitidas; onde não dá, não faz nada.)
+function atualizarBolinhaDoIcone() {
+  let n = 0;
+  if (sessao && partida && partida.jogadores) {
+    n = naoLidas();
+    if (comVez() && !antesDeComecar() && !partida.revelada && !partida.encerrada &&
+      daVez() === minhaUid() && !esperandoPassar()) n += 1;
+  }
+  if (n === bolinhaNoIcone) return;
+  bolinhaNoIcone = n;
+  try {
+    if (n > 0 && navigator.setAppBadge) navigator.setAppBadge(n).catch(() => {});
+    else if (navigator.clearAppBadge) navigator.clearAppBadge().catch(() => {});
+  } catch { /* sem bolinha neste aparelho */ }
+}
+
 function atualizarBarra(erro) {
+  try { atualizarBolinhaDoIcone(); } catch {}
   const barra = $("familia-barra");
   if (!barra) return;
   barra.innerHTML = "";
@@ -1534,6 +1554,7 @@ function atualizarPulsoDaVez() {
 
 function conferirLembrete() {
   atualizarPulsoDaVez();
+  try { atualizarBolinhaDoIcone(); } catch {}
   const minhaVezAgora = !!(sessao && partida && comVez() && !antesDeComecar() && !partida.revelada &&
     !partida.encerrada && daVez() === minhaUid() && !esperandoPassar());
   if (!minhaVezAgora) { paradoDesde = 0; return; }
@@ -1622,6 +1643,7 @@ function naoLidas() {
 function marcarLidas() {
   const ms = mensagensDaSala();
   try { localStorage.setItem(chaveChatVisto(), String(ms.length ? ms[ms.length - 1].em : Date.now())); } catch {}
+  try { atualizarBolinhaDoIcone(); } catch {}
 }
 
 function abrirChat() {

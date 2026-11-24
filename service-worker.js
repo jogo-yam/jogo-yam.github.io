@@ -1,5 +1,5 @@
 // Ao publicar mudanças, aumente a versão para limpar o cache antigo.
-const CACHE_NAME = "yam-cache-v112";
+const CACHE_NAME = "yam-cache-v113";
 const FILES_TO_CACHE = [
   "./",
   "./index.html",
@@ -45,6 +45,8 @@ self.addEventListener("activate", event => {
 self.addEventListener("push", event => {
   let dados = {};
   try { dados = event.data ? event.data.json() : {}; } catch {}
+  // a bolinha no ícone do app (o app, ao abrir, recalcula: chat novo + sua vez)
+  try { if (self.navigator.setAppBadge) self.navigator.setAppBadge(1).catch(() => {}); } catch {}
   event.waitUntil(self.registration.showNotification(dados.titulo || "Sua vez no YAM!", {
     body: dados.texto ? `${dados.texto}\nAgora é a sua vez.` : "Toque para jogar.",
     icon: "icone-mesa-192.png",

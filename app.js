@@ -8,7 +8,7 @@ const rows = [
 const COLUNAS = 4;
 
 // Versão do app: igual ao número do CACHE_NAME do service-worker.js (um teste confere).
-const VERSAO = 112;
+const VERSAO = 113;
 
 // Avisos da vez com o app fechado: servidor na Cloudflare (worker/avisos.mjs).
 // Sem o endereço, a opção "Avisar a minha vez" não aparece.
@@ -103,8 +103,9 @@ function mostrarLegenda([titulo, texto, exemplo], tipo = "", acao = null) {
   caixa.querySelector("span").textContent = texto;
   const lugar = caixa.querySelector(".exemplo-dados");
   lugar.replaceChildren();
-  lugar.hidden = !exemplo;
-  if (exemplo) desenharExemplo(lugar, exemplo);
+  const comExemplo = !!exemplo && typeof exemplo === "object"; // (no aviso de ordem, o 3º item é a casa certa)
+  lugar.hidden = !comExemplo;
+  if (comExemplo) desenharExemplo(lugar, exemplo);
   const botao = caixa.querySelector("button");
   botao.hidden = !acao;
   botao.onclick = acao ? () => { caixa.hidden = true; acao.fazer(); } : null;
@@ -298,7 +299,8 @@ function validar(key, texto) {
   if (!Number.isInteger(valor) || !possiveis.includes(valor)) {
     let msg = `Valores possíveis: ${descreverValores(possiveis)}.`;
     if (linha === 10) msg = `Valores possíveis: 0 ou um destes: ${SOMAS_FULL.join(", ")}.`;
-    return [`${valor} não vale em ${nome}`, msg];
+    // com um exemplo em dadinhos de uma jogada que vale ali (o mesmo da explicação da linha)
+    return [`${valor} não vale em ${nome}`, msg, LEGENDA_LINHAS[linha] && LEGENDA_LINHAS[linha][2]];
   }
 
   if (valor !== 0) {
@@ -590,7 +592,7 @@ function montarTabela(tbody, valores, editavel) {
             avisarSala();
             ultimoAviso = Date.now();
             mostrarLegenda(erro, "erro");
-            if (erro[2]) piscarCasa(erro[2]);
+            if (typeof erro[2] === "string") piscarCasa(erro[2]); // a casa certa (no aviso de ordem)
             return;
           }
           if (input.value === "") {
@@ -947,11 +949,85 @@ function desenharPodio(p, verTabela, partidaDoHistorico = null) {
   p.naoTerminaram.forEach(j => linha(j, "–", "não terminou", "nao-terminou"));
   lista.hidden = lista.children.length === 0;
   el("podio-dica").hidden = !p.terminaram.some(podeVer);
+  desenharDestaquesDoPodio(p.terminaram);
 
   // revanche só na sala ao vivo
   el("podio-revanche").hidden = !!partidaDoHistorico;
   if (partidaDoHistorico) el("podio-revanche-info").hidden = true;
   el("podio-fechar").className = partidaDoHistorico ? "principal" : "";
+}
+
+// ---------- destaques da partida (no pódio) ----------
+// Curiosidades tiradas das tabelas de quem terminou: quem fez mais YAMs, a
+// maior jogada, quem pegou mais bônus, o menor MIN e quem mais riscou.
+const NOME_DA_JOGADA = { 9: "Quadra", 10: "Full", 11: "Sequência menor", 12: "Sequência maior", 13: "MIN", 14: "MAX", 15: "YAM" };
+
+function destaquesDaPartida(terminaram) {
+  const com = terminaram.filter(j => j.valores && typeof j.valores === "object");
+  if (com.length < 2) return [];
+  const valor = (j, l, c) => {
+    const v = j.valores[`${l}-${c}`];
+    return v === undefined || v === null || v === "" || !Number.isFinite(Number(v)) ? null : Number(v);
+  };
+  const casas = j => LINHAS_JOGO.flatMap(l => [0, 1, 2, 3].map(c => ({ l, v: valor(j, l, c) }))).filter(x => x.v !== null);
+  const quemMais = conta => {
+    const n = com.map(conta), max = Math.max(...n);
+    const quem = com.filter((_, i) => n[i] === max);
+    // todo mundo empatado não é destaque
+    return { max: quem.length === com.length ? 0 : max, quem };
+  };
+  const nomes = quem => {
+    const ns = [...quem].sort((a, b) => !!b.eu - !!a.eu).map(j => (j.eu ? "Você" : j.nome)); // "Você" vem primeiro
+    return ns.length === 1 ? ns[0] : `${ns.slice(0, -1).join(", ")} e ${ns[ns.length - 1]}`;
+  };
+  const plural = (n, um, varios) => `${n} ${n === 1 ? um : varios}`;
+  const lista = [];
+
+  const yams = quemMais(j => casas(j).filter(x => x.l === 15 && x.v > 0).length);
+  if (yams.max > 0) lista.push({ titulo: "Mais YAMs", texto: `${nomes(yams.quem)} · ${plural(yams.max, "YAM", "YAMs")}`, quem: yams.quem });
+
+  // a maior jogada de baixo (sem o MIN, em que o bom é ser pequeno)
+  let maior = null;
+  for (const j of com) for (const x of casas(j)) {
+    if (x.l < 9 || x.l === 13 || x.v <= 0) continue;
+    if (!maior || x.v > maior.v) maior = { v: x.v, l: x.l, quem: [j] };
+    else if (x.v === maior.v && !maior.quem.includes(j)) maior.quem.push(j);
+  }
+  if (maior) lista.push({ titulo: "Maior jogada", texto: `${nomes(maior.quem)} · ${NOME_DA_JOGADA[maior.l]} de ${maior.v}`, quem: maior.quem });
+
+  const bonus = quemMais(j => { const t = calcularTotais(j.valores).calculados; return [0, 1, 2, 3].filter(c => t[`7-${c}`] > 0).length; });
+  if (bonus.max > 0) lista.push({ titulo: "Mais bônus", texto: `${nomes(bonus.quem)} · bônus em ${plural(bonus.max, "coluna", "colunas")}`, quem: bonus.quem });
+
+  let menor = null;
+  for (const j of com) for (const x of casas(j)) {
+    if (x.l !== 13 || x.v <= 0) continue;
+    if (!menor || x.v < menor.v) menor = { v: x.v, quem: [j] };
+    else if (x.v === menor.v && !menor.quem.includes(j)) menor.quem.push(j);
+  }
+  if (menor) lista.push({ titulo: "Menor MIN", texto: `${nomes(menor.quem)} · ${menor.v}`, quem: menor.quem });
+
+  const riscos = quemMais(j => casas(j).filter(x => x.v === 0).length);
+  if (riscos.max > 0) lista.push({ titulo: "Quem mais riscou", texto: `${nomes(riscos.quem)} · ${plural(riscos.max, "casa", "casas")}`, quem: riscos.quem });
+
+  return lista;
+}
+
+function desenharDestaquesDoPodio(terminaram) {
+  const caixa = document.getElementById("podio-destaques");
+  const lista = caixa.querySelector("ul");
+  lista.innerHTML = "";
+  const destaques = destaquesDaPartida(terminaram);
+  caixa.hidden = destaques.length === 0;
+  destaques.forEach(d => {
+    const li = elemento("li");
+    const fichas = elemento("span", "destaque-fichas");
+    [...d.quem].sort((a, b) => !!b.eu - !!a.eu).slice(0, 3).forEach(j => fichas.appendChild(avatar(j.nome, corDaMesaNoPodio(j), "avatar", j.eu ? "eu" : j.id)));
+    const texto = elemento("span", "destaque-texto");
+    texto.append(elemento("strong", "", d.titulo), elemento("small", "", d.texto));
+    li.append(fichas, texto);
+    if (d.quem.some(j => j.eu)) li.classList.add("eu");
+    lista.appendChild(li);
+  });
 }
 
 // Pódio de uma partida em sala, aberto no histórico.

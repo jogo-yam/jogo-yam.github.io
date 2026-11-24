@@ -3295,6 +3295,40 @@ td.mudou { animation: mudou 0.7s ease-out; }
 .legenda .exemplo-dados .dado-mini { filter: none; }
 .legenda .exemplo-dados .dado-mini.nao-conta { opacity: 0.3; }
 
+/* ---------- pódio: destaques da partida ---------- */
+.podio-destaques {
+  margin: 14px 0 4px;
+  padding: 12px 12px 4px;
+  border-radius: 12px;
+  background: var(--fundo);
+  text-align: left;
+}
+.podio-destaques h3 { margin: 0 0 8px; font-size: 15px; text-align: center; }
+.podio-destaques ul { list-style: none; margin: 0; padding: 0; }
+.podio-destaques li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 0;
+  border-top: 1px solid var(--borda);
+}
+.podio-destaques li:first-child { border-top: none; }
+.destaque-fichas { display: flex; flex-shrink: 0; min-width: 28px; }
+.destaque-fichas .avatar + .avatar { margin-left: -10px; box-shadow: 0 0 0 2px var(--fundo); }
+.destaque-texto { min-width: 0; display: flex; flex-direction: column; line-height: 1.25; }
+.destaque-texto strong { font-size: 13px; color: var(--texto-suave); font-weight: 700; }
+.destaque-texto small { font-size: 15px; font-weight: 700; color: var(--texto); overflow-wrap: anywhere; }
+.podio-destaques li.eu .destaque-texto small { color: var(--acento); }
+:root[data-letra="grande"] .destaque-texto strong { font-size: 15px; }
+:root[data-letra="grande"] .destaque-texto small { font-size: 17px; }
+
+/* Letra maior: o número do total fica um pouco maior que o normal (antes ficava
+   menor, 21px, e o contorno pesava), com o contorno um tico mais fino */
+:root[data-letra="grande"] .total-geral td:not(.mpb) {
+  font-size: 28px;
+  -webkit-text-stroke-width: 1.75px;
+}
+
 /* ---------- comemorações: fichas e dadinhos caindo junto com o confete ---------- */
 .confete .ficha-caindo,
 .confete .dado-caindo {

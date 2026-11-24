@@ -20,14 +20,14 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="theme-color" content="#f4ecd8" media="(prefers-color-scheme: light)">
   <meta name="theme-color" content="#121413" media="(prefers-color-scheme: dark)">
-  <link rel="manifest" href="manifest.json?v=112">
+  <link rel="manifest" href="manifest.json?v=113">
   <link rel="icon" type="image/png" sizes="32x32" href="icone-mesa-32.png">
   <link rel="apple-touch-icon" href="icone-mesa-apple-180.png">
 
   <link rel="preload" href="fontes/nunito.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="preload" href="fontes/fredoka.woff2" as="font" type="font/woff2" crossorigin>
   <!-- ?v= é a versão do app (igual ao VERSAO do app.js; um teste confere): versão nova, endereço novo -->
-  <link rel="stylesheet" href="style.css?v=112">
+  <link rel="stylesheet" href="style.css?v=113">
 
   <!-- Aplica o tema escolhido antes de desenhar a página, para não piscar. -->
   <meta name="apple-mobile-web-app-capable" content="yes">
@@ -629,6 +629,10 @@
     <div id="podio-degraus" class="podio"></div>
     <ol id="podio-lista" class="podio-lista"></ol>
     <p id="podio-dica" class="podio-dica" hidden>Toque num nome para ver a tabela da pessoa.</p>
+    <div id="podio-destaques" class="podio-destaques" hidden>
+      <h3>Destaques da partida</h3>
+      <ul></ul>
+    </div>
     <p id="podio-revanche-info" class="podio-revanche-info" hidden></p>
     <div class="fim-acoes">
       <button id="podio-revanche" class="principal" onclick="familia.jogarDeNovo()"><svg class="icone" aria-hidden="true"><use href="#i-repetir"/></svg>Jogar de novo</button>
@@ -787,7 +791,7 @@
   </div>
 </div>
 
-<script src="app.js?v=112"></script>
+<script src="app.js?v=113"></script>
 <script>
   // Rede de segurança: se o app.js não carregou (ex.: troca de versão no meio
   // do caminho), recarrega sozinho uma vez, em vez de ficar com a tabela vazia.
@@ -801,7 +805,7 @@
     setTimeout(function () { location.replace(location.pathname + "?atualizado=" + Date.now()); }, 1500);
   })();
 </script>
-<script type="module" src="familia.js?v=112"></script>
+<script type="module" src="familia.js?v=113"></script>
 
 <!-- Service Worker -->
 <script>
