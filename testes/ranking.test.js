@@ -85,6 +85,23 @@ test("ranking do mês: a melhor partida em sala do mês; recorde antigo fica de 
   assert.deepEqual(doMes.map(r => [r.chave, r.total, r.data]), [["a", 300, "2026-11-02"]]);
 });
 
+test("quem venceu o mês passado: do campo do mês ou do mês passado; empate mostra todos", () => {
+  const { app } = carregarApp();
+  assert.equal(app.mesAnterior("2026-11"), "2026-10");
+  assert.equal(app.mesAnterior("2026-01"), "2025-12");
+  const lista = [
+    { chave: "a", nome: "Ana", total: 900, mes: "2026-10", totalMes: 800, dataMes: "2026-10-05" }, // não jogou em novembro
+    { chave: "b", nome: "Bia", total: 950, mes: "2026-11", totalMes: 300, dataMes: "2026-11-02",
+      mesPassado: "2026-10", totalMesPassado: 800, dataMesPassado: "2026-10-01" },
+    { chave: "c", nome: "Caio", total: 990, mes: "2026-11", totalMes: 990, dataMes: "2026-11-03" }, // não jogou em outubro
+    { chave: "d", nome: "Duda", total: 999, mesPassado: "2026-10", totalMesPassado: 5000, dataMesPassado: "2026-10-09" } // impossível
+  ];
+  const campeoes = mes => JSON.parse(JSON.stringify(app.campeoesDoMes(lista, mes))).map(r => [r.nome, r.total]);
+  assert.deepEqual(campeoes("2026-10"), [["Bia", 800], ["Ana", 800]], "empate: os dois (quem fez antes primeiro)");
+  assert.deepEqual(campeoes("2026-11"), [["Caio", 990]]);
+  assert.deepEqual(campeoes("2026-09"), []);
+});
+
 test("ordem do ranking: mais pontos primeiro; empate, quem fez antes", () => {
   const { app } = carregarApp();
   const ordem = JSON.parse(JSON.stringify(app.ordenarRanking([

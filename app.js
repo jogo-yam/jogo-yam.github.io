@@ -8,7 +8,7 @@ const rows = [
 const COLUNAS = 4;
 
 // Versão do app: igual ao número do CACHE_NAME do service-worker.js (um teste confere).
-const VERSAO = 123;
+const VERSAO = 124;
 
 // Avisos da vez com o app fechado: servidor na Cloudflare (worker/avisos.mjs).
 // Sem o endereço, a opção "Avisar a minha vez" não aparece.
@@ -4565,7 +4565,8 @@ if (typeof ResizeObserver === "function") {
 // Quem já usava o app vê uma janelinha com o que mudou; quem está chegando agora
 // vê as boas-vindas (e as novidades ficam marcadas como vistas).
 const CHAVE_NOVIDADES = "yam-novidades";
-const NOVIDADES = "sala-pausa-2026-11"; // trocar quando houver novidades novas para mostrar
+const NOVIDADES = "ranking-2026-11"; // trocar quando houver novidades novas para mostrar
+const NOVIDADES_ANTERIORES = "sala-pausa-2026-11"; // quem já viu estas não vê de novo os itens antigos
 
 function fecharNovidades() {
   try { localStorage.setItem(CHAVE_NOVIDADES, NOVIDADES); } catch {}
@@ -4583,6 +4584,7 @@ function mostrarNovidadesSePrecisar(tentativa = 0) {
     if (tentativa < 12) { const t = setTimeout(() => mostrarNovidadesSePrecisar(tentativa + 1), 5000); if (t && t.unref) t.unref(); }
     return;
   }
+  document.querySelectorAll("#janela-novidades .novidade-antiga").forEach(li => { li.hidden = vistas === NOVIDADES_ANTERIORES; });
   document.getElementById("janela-novidades").hidden = false;
 }
 
@@ -5015,11 +5017,32 @@ function melhorPartidaDoMes(lista, mes) {
   return melhorPartida((lista || []).filter(p => p && mesDe(p.data) === mes));
 }
 
-// Ranking do mês: quem tem partida em sala neste mês, com a melhor delas.
+// "2026-10" para "2026-11"; "2025-12" para "2026-01".
+function mesAnterior(mes) {
+  const [a, m] = String(mes).split("-").map(Number);
+  return m === 1 ? `${a - 1}-12` : `${a}-${String(m - 1).padStart(2, "0")}`;
+}
+
+// A melhor partida em sala de um mês guardada no recorde: no campo do mês
+// (mes/totalMes) ou do mês passado (mesPassado/totalMesPassado).
+function doMesNoRecorde(r, mes) {
+  const ok = (total, data) => typeof total === "number" && total >= 0 && total <= MAIOR_PONTUACAO && typeof data === "string";
+  if (!r || !mes) return null;
+  if (r.mes === mes && ok(r.totalMes, r.dataMes)) return { total: r.totalMes, data: r.dataMes };
+  if (r.mesPassado === mes && ok(r.totalMesPassado, r.dataMesPassado)) return { total: r.totalMesPassado, data: r.dataMesPassado };
+  return null;
+}
+
+// Ranking de um mês: quem tem partida em sala nele, com a melhor delas.
 function rankingDoMes(lista, mes) {
-  return (lista || [])
-    .filter(r => r.mes === mes && typeof r.totalMes === "number" && r.totalMes >= 0 && r.totalMes <= MAIOR_PONTUACAO)
-    .map(r => ({ ...r, total: r.totalMes, data: r.dataMes }));
+  return (lista || []).map(r => ({ r, m: doMesNoRecorde(r, mes) })).filter(x => x.m)
+    .map(({ r, m }) => ({ ...r, total: m.total, data: m.data }));
+}
+
+// Quem venceu um mês (empate: todos com a maior pontuação).
+function campeoesDoMes(lista, mes) {
+  const ranking = ordenarRanking(rankingDoMes(lista, mes));
+  return ranking.filter(r => r.total === (ranking[0] && ranking[0].total));
 }
 
 // Ordem do ranking: mais pontos primeiro; empate, quem chegou antes.
@@ -5061,6 +5084,7 @@ async function abrirRanking(de = "tela-mais") {
   podio.replaceChildren();
   podio.hidden = true;
   meu.hidden = true;
+  document.getElementById("ranking-campeao").hidden = true;
   rankingCarregado = null;
   mostrarPeriodoRanking();
   status.textContent = "Carregando o ranking…";
@@ -5090,6 +5114,7 @@ function desenharRanking() {
   const doMes = periodoRanking === "mes";
   const mes = mesDe(new Date());
   const todos = ordenarRanking(doMes ? rankingDoMes(rankingCarregado, mes) : rankingCarregado || []);
+  desenharCampeaoDoMes(doMes ? campeoesDoMes(rankingCarregado, mesAnterior(mes)) : [], mesAnterior(mes));
 
   const u = lerUsuario();
   const minhaPosicao = u ? todos.findIndex(r => r.chave === u.chave) : -1;
@@ -5110,6 +5135,24 @@ function desenharRanking() {
     : tenho ? "Sua pontuação entra no ranking assim que a internet ajudar."
     : doMes ? `Termine uma partida em sala em ${nomeDoMes(mes)}, com mais alguém, para entrar.`
     : "Termine uma partida em sala, com mais alguém, para entrar no ranking.";
+}
+
+// Aba "Este mês": quem venceu o mês passado, numa faixa em cima.
+function desenharCampeaoDoMes(campeoes, mes) {
+  const caixa = document.getElementById("ranking-campeao");
+  caixa.replaceChildren();
+  caixa.hidden = !campeoes.length;
+  if (!campeoes.length) return;
+  const u = lerUsuario();
+  const ehEu = r => !!u && r.chave === u.chave;
+  caixa.insertAdjacentHTML("beforeend", '<svg class="icone" aria-hidden="true"><use href="#i-trofeu"/></svg>');
+  const bolinhas = elemento("span", "campeao-avatares");
+  campeoes.slice(0, 3).forEach(r => bolinhas.appendChild(avatar(r.nome, r.corMesa, "avatar", ehEu(r) ? "eu" : idDoRanking(r))));
+  const nomes = campeoes.map(r => (ehEu(r) ? `${r.nome} (você)` : r.nome));
+  const texto = elemento("span", "campeao-texto");
+  texto.appendChild(elemento("small", "", `${campeoes.length > 1 ? "Empataram" : "Venceu"} em ${nomeDoMes(mes)}`));
+  texto.appendChild(elemento("strong", "", nomes.length > 1 ? `${nomes.slice(0, -1).join(", ")} e ${nomes[nomes.length - 1]}` : nomes[0]));
+  caixa.append(bolinhas, texto, elemento("span", "campeao-pontos", `${campeoes[0].total} pts`));
 }
 
 // Os três primeiros: pilhas de fichas de cassino na cor de cada um (a do 1º
