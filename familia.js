@@ -128,7 +128,7 @@ async function entrar(codigo, nome, modo = null, soDados = null) {
   const raiz = `partidas/${codigo}`;
   const snap = await lerDoBanco(raiz);
   if (!snap.exists() || !snap.child("criador").exists()) throw new Error("Não existe sala com esse código.");
-  if (snap.child("revelada").val()) throw new Error("A partida dessa sala já terminou.");
+  if (snap.child("revelada").val() || snap.child("encerrada").val()) throw new Error("A partida dessa sala já terminou.");
 
   const chave = chaveDoNome(nome);
   const resultado = await runTransaction(ref(db, `${raiz}/nomes/${chave}`),
@@ -605,8 +605,20 @@ let recordeConferido = null; // "total|data" já publicado por este aparelho
 
 async function publicarRecorde(historicoCompleto) {
   const u = lerUsuario();
+  if (!u || navigator.onLine === false) return;
   const melhor = melhorPartida(historico);
-  if (!u || !melhor || navigator.onLine === false) return;
+  if (!melhor) {
+    // nenhuma partida em sala com mais gente: sai do ranking (só com o histórico inteiro em mãos)
+    const nenhum = `${u.chave}|nenhum`;
+    if (!historicoCompleto || recordeConferido === nenhum) return;
+    await usuario();
+    if ((await comLimite(lerDoBanco(`ranking/${u.chave}`))).val()) {
+      await garantirUsuario(u.nome);
+      await comLimite(remove(ref(db, `ranking/${u.chave}`)));
+    }
+    recordeConferido = nenhum;
+    return;
+  }
   const chave = `${u.chave}|${melhor.total}|${melhor.data}|${mesaAtual()}`;
   if (recordeConferido === chave) return;
   await usuario();
@@ -945,7 +957,8 @@ async function compartilharCodigo() {
 }
 
 async function encerrarPartida() {
-  const faltam = jogadoresDe(partida).filter(j => !j.terminou).map(j => j.nome);
+  const dispensados = dispensadosDe(partida);
+  const faltam = jogadoresDe(partida).filter(j => !j.terminou && !dispensados[j.uid]).map(j => j.nome);
   if (!await confirmar("Encerrar a partida?",
     `O resultado aparece agora. Quem ainda não terminou (${faltam.join(", ")}) fica fora do pódio.`, "Encerrar")) return;
   try { await update(ref(db, `partidas/${sessao.codigo}`), { encerrada: true }); }
@@ -1132,7 +1145,10 @@ function atualizarEspera() {
   if (!caixa || caixa.hidden || !partida) return;
   const { geral } = calcularTotais(state);
   $("espera-total").textContent = geral;
-  const faltam = jogadoresDe(partida).filter(j => !j.terminou).map(j => j.nome);
+  // sem quem foi dispensado; quem pausou aparece como "(pausou)"
+  const dispensados = dispensadosDe(partida);
+  const faltam = jogadoresDe(partida).filter(j => !j.terminou && !dispensados[j.uid])
+    .map(j => (j.fora ? `${j.nome} (pausou)` : j.nome));
   $("espera-faltam").textContent = faltam.length
     ? `Esperando: ${faltam.join(", ")}`
     : "Todos terminaram!";
@@ -2066,6 +2082,7 @@ window.familia = {
   escolherModo, podeJogar, porQueNaoPode, podeDesfazer, mesaMudou, recuperar, trocarNome, avisosMudaram,
   historicoMudou, sincronizarHistorico, registrarNomeSePrecisar, alternarReacoes, reagir, lerRanking,
   abrirChat, fecharChat, enviarMensagem, comecarPartida, voltarParaSala, continuarSemQuemFalta,
+  jogadoresNaSala: () => (partida ? jogadoresDe(partida).filter(j => !dispensadosDe(partida)[j.uid]).length : 0),
   soDadosDoApp: () => !!(sessao && partida && !partida.revelada && !partida.encerrada && soDadosDaSala()),
   ativa: () => !!sessao,
   revelada: () => !!(partida && (partida.revelada || partida.encerrada))

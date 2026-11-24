@@ -8,7 +8,7 @@ const rows = [
 const COLUNAS = 4;
 
 // Versão do app: igual ao número do CACHE_NAME do service-worker.js (um teste confere).
-const VERSAO = 121;
+const VERSAO = 122;
 
 // Avisos da vez com o app fechado: servidor na Cloudflare (worker/avisos.mjs).
 // Sem o endereço, a opção "Avisar a minha vez" não aparece.
@@ -20,9 +20,13 @@ function icone(nome, classe = "") {
   return `<svg class="icone${classe ? " " + classe : ""}" aria-hidden="true"><use href="#i-${nome}"/></svg>`;
 }
 
+// Face de dado válida (1 a 6); qualquer outra coisa (de um celular com defeito, ou
+// alguém mexendo no banco) vira 1, em vez de quebrar a tela.
+const faceValida = f => (Number.isInteger(Number(f)) && Number(f) >= 1 && Number(f) <= 6 ? Number(f) : 1);
+
 // Dadinho desenhado com os pontos da face (barra de marcar).
 function dadoMini(face, segurado = false) {
-  const pontos = PONTOS_DO_DADO[face].map(p =>
+  const pontos = PONTOS_DO_DADO[faceValida(face)].map(p =>
     `<circle cx="${5.5 + (p % 3) * 6.5}" cy="${5.5 + Math.floor(p / 3) * 6.5}" r="2"/>`).join("");
   return `<svg class="dado-mini${segurado ? " segurado" : ""}" viewBox="0 0 24 24" aria-hidden="true">` +
     `<rect x="1" y="1" width="22" height="22" rx="5"/>${pontos}</svg>`;
@@ -31,7 +35,7 @@ function dadoMini(face, segurado = false) {
 // Troca os pontos de um dadinho já desenhado (animação dos dados de quem está jogando).
 function trocarFaceMini(svg, face) {
   svg.querySelectorAll("circle").forEach(c => c.remove());
-  svg.insertAdjacentHTML("beforeend", PONTOS_DO_DADO[face].map(p =>
+  svg.insertAdjacentHTML("beforeend", PONTOS_DO_DADO[faceValida(face)].map(p =>
     `<circle cx="${5.5 + (p % 3) * 6.5}" cy="${5.5 + Math.floor(p / 3) * 6.5}" r="2"/>`).join(""));
 }
 
@@ -848,6 +852,7 @@ function verificarFimDeJogo() {
   // depois do pódio (ao fechar o pódio, ver aposPodio).
   if (window.familia && familia.ativa()) {
     salvarPartidaAtual();
+    marcarPartidaEmSala(familia.jogadoresNaSala ? familia.jogadoresNaSala() : 0);
     if (!familia.revelada()) familia.aoTerminar();
     else familia.registrarResultado();
     return;
@@ -1409,6 +1414,15 @@ async function gerarImagemPodio(p, dataIso) {
     final.getContext("2d").drawImage(canvas, 0, 0);
     return new Promise(resolve => final.toBlob(resolve, "image/png"));
   }
+}
+
+// Terminou numa sala: guarda na partida com quantos jogadores (o ranking geral só
+// conta partidas em sala com mais gente; vale mesmo para quem sai antes do pódio).
+function marcarPartidaEmSala(jogadores) {
+  const entrada = entradaDaPartidaAtual();
+  if (!entrada || !(jogadores >= 2) || entrada.emSala === jogadores) return;
+  entrada.emSala = jogadores;
+  salvarHistorico();
 }
 
 // Guarda na partida do histórico como foi o resultado da sala.
@@ -3020,8 +3034,13 @@ function fotoDe(id) {
   return fotosPorId[identidadeReal(id)] || "";
 }
 
+// Foto de perfil aceita: JPEG em base64, só com os caracteres do base64.
+function fotoValida(img) {
+  return typeof img === "string" && img.length <= 20000 && /^data:image\/jpeg;base64,[A-Za-z0-9+/]+=*$/.test(img);
+}
+
 function aplicarFoto(el) {
-  const img = fotoDe(el.dataset.fotoId);
+  const img = fotoValida(fotoDe(el.dataset.fotoId)) ? fotoDe(el.dataset.fotoId) : "";
   el.classList.toggle("com-foto", !!img);
   if (img) el.style.setProperty("--foto", `url("${img}")`);
   else el.style.removeProperty("--foto");
@@ -3036,7 +3055,7 @@ function atualizarFotosNaTela() {
 function guardarFotos(todas) {
   const novas = {};
   for (const [id, f] of Object.entries(todas || {})) {
-    if (f && typeof f.img === "string" && f.img.startsWith("data:image/jpeg;base64,")) novas[id] = f.img;
+    if (f && fotoValida(f.img)) novas[id] = f.img;
   }
   if (JSON.stringify(novas) === JSON.stringify(fotosPorId)) return;
   fotosPorId = novas;
@@ -4644,7 +4663,8 @@ function vezDaSala(jogadores, pulos = {}) {
   const naRoda = jogadores.filter(j => !j.terminou)
     .sort((a, b) => (a.entrouEm || 0) - (b.entrouEm || 0) || String(a.uid).localeCompare(String(b.uid)));
   if (!naRoda.length) return null;
-  const vezes = j => (j.casas || 0) + (j.base || 0) + ((pulos || {})[j.uid] || 0);
+  const n = v => (typeof v === "number" && Number.isFinite(v) ? v : 0);
+  const vezes = j => Math.max(0, n(j.casas)) + Math.max(0, n(j.base)) + Math.max(0, n((pulos || {})[j.uid]));
   const menor = Math.min(...naRoda.map(vezes));
   return naRoda.find(j => vezes(j) === menor).uid;
 }
@@ -4960,11 +4980,17 @@ function partidaTerminada(p) {
   return !!(p && p.valores && LINHAS_JOGO.every(l => [0, 1, 2, 3].every(c => (p.valores[`${l}-${c}`] ?? "") !== "")));
 }
 
+// Só partida jogada numa sala com mais alguém vale para o ranking (sozinho, dá
+// para digitar qualquer ponto; fica no histórico e no recorde pessoal).
+function valeParaRanking(p) {
+  return !!p && ((p.sala && p.sala.jogadores >= 2) || p.emSala >= 2);
+}
+
 // A partida que vai para o ranking: a de maior total; empate, a mais antiga.
 function melhorPartida(lista) {
   let melhor = null;
   for (const p of lista || []) {
-    if (!partidaTerminada(p)) continue;
+    if (!partidaTerminada(p) || !valeParaRanking(p)) continue;
     const total = calcularTotais(p.valores).geral;
     if (!Number.isFinite(total) || total < 0 || total > MAIOR_PONTUACAO) continue;
     if (!melhor || total > melhor.total || (total === melhor.total && p.data < melhor.data)) {
@@ -5014,11 +5040,11 @@ async function abrirRanking(de = "tela-mais") {
     meu.hidden = false;
     meu.textContent = `Você está em ${minhaPosicao + 1}º, com ${todos[minhaPosicao].total} pontos.`;
   }
-  status.textContent = !todos.length ? "Ninguém entrou no ranking ainda. Termine uma partida para ser o primeiro!"
+  status.textContent = !todos.length ? "Ninguém entrou no ranking ainda. Termine uma partida em sala para ser o primeiro!"
     : minhaPosicao >= 0 ? ""
-    : !u ? "Para entrar no ranking, coloque seu nome em Mais e termine uma partida."
+    : !u ? "Para entrar no ranking, coloque seu nome em Mais e termine uma partida em sala."
     : melhorPartida(historico) ? "Sua pontuação entra no ranking assim que a internet ajudar."
-    : "Termine uma partida para entrar no ranking.";
+    : "Termine uma partida em sala, com mais alguém, para entrar no ranking.";
 }
 
 // Os três primeiros: pilhas de fichas de cassino na cor de cada um (a do 1º

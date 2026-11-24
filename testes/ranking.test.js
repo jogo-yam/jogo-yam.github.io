@@ -31,15 +31,33 @@ test("recorde: só partida terminada, a de maior total; empate fica a mais antig
   const meio = { ...cheia };
   delete meio["15-3"]; // falta uma casa: não terminou
   const melhor = lista => JSON.parse(JSON.stringify(app.melhorPartida(lista)));
+  const sala = { sala: { jogadores: 2, posicao: 1 } };
   assert.equal(melhor([]), null);
-  assert.equal(melhor([{ id: 1, data: "2026-11-01T10:00:00Z", total: 9999, valores: meio }]), null, "não terminada não conta");
+  assert.equal(melhor([{ id: 1, data: "2026-11-01T10:00:00Z", total: 9999, valores: meio, ...sala }]), null, "não terminada não conta");
   const r = melhor([
-    { id: 1, data: "2026-11-02T10:00:00Z", total: 5, valores: baixa },
-    { id: 2, data: "2026-11-03T10:00:00Z", total: 0, valores: cheia }, // o total vem da tabela, não do campo
-    { id: 3, data: "2026-11-01T10:00:00Z", total: 0, valores: cheia }
+    { id: 1, data: "2026-11-02T10:00:00Z", total: 5, valores: baixa, ...sala },
+    { id: 2, data: "2026-11-03T10:00:00Z", total: 0, valores: cheia, ...sala }, // o total vem da tabela, não do campo
+    { id: 3, data: "2026-11-01T10:00:00Z", total: 0, valores: cheia, emSala: 3 }
   ]);
   assert.equal(r.total, app.MAIOR_PONTUACAO);
   assert.equal(r.data, "2026-11-01T10:00:00Z", "empate: a mais antiga");
+});
+
+test("ranking: só partida em sala com mais alguém (sozinho não conta)", () => {
+  const { app, rodar } = carregarApp();
+  const cheia = tabela(rodar, "max");
+  const baixa = tabela(rodar, "min");
+  const melhor = lista => JSON.parse(JSON.stringify(app.melhorPartida(lista)));
+  assert.equal(melhor([{ id: 1, data: "2026-11-01T10:00:00Z", total: 0, valores: cheia }]), null, "sozinho não conta");
+  assert.equal(melhor([{ id: 1, data: "2026-11-01T10:00:00Z", total: 0, valores: cheia, sala: { jogadores: 1 } }]), null,
+    "sala só com a pessoa não conta");
+  assert.equal(melhor([{ id: 1, data: "2026-11-01T10:00:00Z", total: 0, valores: cheia, emSala: 1 }]), null);
+  const r = melhor([
+    { id: 1, data: "2026-11-01T10:00:00Z", total: 0, valores: cheia }, // sozinho, maior: fica de fora
+    { id: 2, data: "2026-11-02T10:00:00Z", total: 0, valores: baixa, emSala: 2 } // saiu antes do pódio: conta
+  ]);
+  assert.equal(r.data, "2026-11-02T10:00:00Z");
+  assert.ok(r.total < app.MAIOR_PONTUACAO);
 });
 
 test("ordem do ranking: mais pontos primeiro; empate, quem fez antes", () => {

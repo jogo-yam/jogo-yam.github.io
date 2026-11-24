@@ -164,3 +164,16 @@ test("nomes juntados: as duas identidades viram uma pessoa só, com o nome de ag
   assert.equal(app.nomeAtual("Maria", "jmaria"), "Giovana", "pela identidade antiga");
   assert.equal(app.nomeAtual("Maria"), "Giovana", "partida antiga, só com o nome");
 });
+
+test("vez: base ou casas negativas (mexendo no banco) não dão a vez para sempre", () => {
+  const { app } = require("./carregar-app.js").carregarApp();
+  const jogadores = [
+    { uid: "a", entrouEm: 1, casas: 5, base: 0 },
+    { uid: "b", entrouEm: 2, casas: 4, base: -100 }
+  ];
+  // b conta como 4 casas (a base negativa vira 0): a vez é de b, mas por estar
+  // mesmo atrás; depois de jogar, a vez volta a andar normalmente
+  assert.equal(app.vezDaSala(jogadores), "b");
+  jogadores[1].casas = 6;
+  assert.equal(app.vezDaSala(jogadores), "a");
+});
