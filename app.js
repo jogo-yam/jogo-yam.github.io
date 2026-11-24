@@ -8,7 +8,7 @@ const rows = [
 const COLUNAS = 4;
 
 // Versão do app: igual ao número do CACHE_NAME do service-worker.js (um teste confere).
-const VERSAO = 118;
+const VERSAO = 119;
 
 // Avisos da vez com o app fechado: servidor na Cloudflare (worker/avisos.mjs).
 // Sem o endereço, a opção "Avisar a minha vez" não aparece.
@@ -2181,10 +2181,21 @@ function abrirHistorico() {
       const doRecorde = elemento("span", ehRecorde ? "dif-recorde recorde" : "dif-recorde",
         ehRecorde ? "seu recorde" : `${sinal(partida.total - recorde)} do recorde`);
       const comparar = elemento("span", "item-comparar");
-      comparar.append(barra, doRecorde);
+      // pela metade: no lugar da média e do recorde, quantas casas já foram
+      const terminada = partidaTerminada(partida);
+      if (terminada) comparar.append(barra, doRecorde);
+      else comparar.append(elemento("span", "casas-feitas", `${casasMarcadas(partida.valores)} de ${LINHAS_JOGO.length * 4} casas`));
 
       const esquerda = elemento("span", "item-info");
       esquerda.appendChild(data);
+      if (!terminada) {
+        // etiqueta: dá para continuar (e voltar para a sala, se ela ainda está aberta)
+        const prazo = partida.codigoSala && textoDoPrazo(partida.jeitoSala && partida.jeitoSala.prazo);
+        const etiqueta = elemento("small", "pela-metade");
+        etiqueta.innerHTML = icone("ampulheta");
+        etiqueta.append(prazo ? `pela metade · ${prazo}` : "pela metade"); // (o código da sala aparece ao abrir)
+        esquerda.appendChild(etiqueta);
+      }
       if (partida.sala) {
         const infoSala = elemento("small", partida.sala.posicao === 1 ? "sala-info venceu" : "sala-info");
         mostrarTextoDaSala(infoSala, partida.sala);

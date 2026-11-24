@@ -875,7 +875,7 @@ function atualizarEsperaDaSala() {
   // na pausa: quanto falta para a sala fechar (dias; no último dia, horas)
   const prazo = pausadaAgora && textoDoPrazo(prazoDaSala());
   $("sala-espera-prazo").hidden = !prazo;
-  if (prazo) $("sala-espera-prazo").textContent = `⏳ ${prazo[0].toUpperCase() + prazo.slice(1)} para terminar`;
+  if (prazo) $("sala-espera-prazo").innerHTML = `${icone("ampulheta")}${prazo[0].toUpperCase() + prazo.slice(1)} para terminar`;
   $("sala-espera-rotulo").textContent = pausadaAgora ? "Quem está na partida" : "Quem já entrou";
   const dispensados = dispensadosDe(partida);
   const jogadores = jogadoresDe(partida).filter(j => !dispensados[j.uid]).sort((a, b) => (a.entrouEm || 0) - (b.entrouEm || 0));
