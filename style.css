@@ -3295,6 +3295,28 @@ td.mudou { animation: mudou 0.7s ease-out; }
 .legenda .exemplo-dados .dado-mini { filter: none; }
 .legenda .exemplo-dados .dado-mini.nao-conta { opacity: 0.3; }
 
+/* início: a partida em sala que ficou pela metade */
+.inicio-terminar { border: 2px dashed var(--foco); }
+/* partida pela metade no histórico: Continuar numa linha só, acima das outras ações */
+.continuar-partida { display: flex; width: 100%; justify-content: center; margin: 12px 0 0; }
+.continuar-partida[hidden] { display: none; }
+.prazo-partida { margin: 12px 0 0; text-align: center; font-size: 14px; font-weight: 700; color: var(--acento); }
+.prazo-partida[hidden] { display: none; }
+
+/* sala pausada: quanto falta para a sala fechar, e quem ainda não voltou */
+.sala-espera-prazo {
+  display: inline-flex; align-items: center; gap: 6px;
+  margin: 2px auto 10px; padding: 5px 12px; border-radius: 999px;
+  background: var(--foco); color: var(--foco-texto); font-weight: 800; font-size: 14px;
+}
+.sala-espera-prazo[hidden] { display: none; }
+.sala-espera-jogadores li.fora .jogador-sala { opacity: 0.45; }
+.sala-espera-jogadores li.fora small { color: var(--erro, #c0392b); font-weight: 700; }
+#sala-espera-sem-eles { margin-top: 8px; }
+#sala-espera-sem-eles[hidden] { display: none; }
+#pergunta-outro { display: block; margin: 12px auto 0; }
+#pergunta-outro[hidden] { display: none; }
+
 /* ---------- pódio: destaques da partida ---------- */
 .podio-destaques {
   margin: 14px 0 4px;

@@ -143,23 +143,38 @@ async function entrar(codigo, nome, modo = null, soDados = null) {
 
   // sala com vez: o modo vem de quem criou; quem entra no meio começa na rodada atual
   const sala = snap.val();
-  const modoDaSalaAgora = modo || modoDaSala(sala);
-  const soDadosAgora = soDados === null ? soDadosDaSala(sala) : soDados;
+  // sala que todos deixaram para terminar depois: sem ninguém dentro, o jeito dela
+  // (com vez, só dados) vem do que este celular guardou junto com a tabela
+  const daTabela = salaDaTabela();
+  const lembrado = !jogadoresDe(sala).length && daTabela && daTabela.codigo === codigo && daTabela.jeito;
+  const modoDaSalaAgora = modo || (lembrado && (lembrado.modo === "vez" ? "vez" : "livre")) || modoDaSala(sala);
+  const soDadosAgora = soDados !== null ? soDados : lembrado ? !!lembrado.soDados : soDadosDaSala(sala);
   const outros = jogadoresDe(sala).filter(j => j.uid !== user.uid && !j.terminou);
   const pulos = pulosDe(sala);
-  const base = outros.length
+  // quem entra começa na rodada de agora. Quem volta com a tabela começada (para
+  // terminar a partida) já tem casas marcadas: elas contam como as rodadas que jogou.
+  const minhasCasas = casasMarcadas(), meusPulos = pulos[user.uid] || 0;
+  const rodadaAgora = outros.length
     ? Math.min(...outros.map(j => (j.casas || 0) + (j.base || 0) + (pulos[j.uid] || 0)))
     : 0;
+  const base = minhasCasas > 0 ? Math.max(0, rodadaAgora - minhasCasas - meusPulos - 1) : rodadaAgora;
   const jaEstava = snap.child(`jogadores/${user.uid}/entrouEm`).exists();
+  if (jaEstava && dispensadosDe(sala)[user.uid]) {
+    esquecerSala(codigo);
+    throw new Error("A partida dessa sala continuou sem você (quem criou a sala seguiu com quem estava lá).");
+  }
 
   const identidade = (lerUsuario() || {}).id || null; // as estatísticas dos outros acham a pessoa por ela
   await update(ref(db, `${raiz}/jogadores/${user.uid}`), {
     nome, chave, id: identidade, corMesa: mesaAtual(), terminou: false, total: null, colunas: null, valores: null,
-    modo: modoDaSalaAgora, soDados: soDadosAgora,
+    modo: modoDaSalaAgora, soDados: soDadosAgora, fora: null, // (voltou da pausa)
     casas: casasMarcadas(), base: jaEstava ? (sala.jogadores[user.uid].base || 0) : base,
     ...(jaEstava ? {} : { entrouEm: serverTimestamp() }) // a ordem da vez não muda se entrar de novo
   });
   guardarSessao({ codigo, chave });
+  // a tabela é desta sala (se sair, dá para voltar e terminar enquanto ela não fechar)
+  const prazo = typeof sala.criadaEm === "number" ? sala.criadaEm + PRAZO_DA_SALA : null;
+  marcarSalaDaTabela(codigo, { modo: modoDaSalaAgora, soDados: !!soDadosAgora, ...(prazo ? { prazo } : {}) });
   ultimoEnvio = "";
   podioMostrado = false;
   reiniciarVez();
@@ -244,6 +259,39 @@ async function sair() {
       await remove(ref(db, `partidas/${codigo}/nomes/${chave}`));
     } catch { /* sem conexão: tudo bem, a partida segue sem este jogador */ }
   }
+}
+
+// Continuar uma partida pela metade que era desta sala: se ela ainda está aberta,
+// abre "Entrar em sala" com o código (e entra direto, com nome de usuário).
+async function voltarParaSala(codigo) {
+  let sala = null;
+  try {
+    await usuario();
+    sala = (await comLimite(lerDoBanco(`partidas/${codigo}`))).val();
+  } catch {
+    ultimoAviso = Date.now();
+    mostrarLegenda(["Sem conexão com a sala", `Continue aqui; para voltar para a sala ${codigo}, entre de novo com o código quando tiver internet.`]);
+    return;
+  }
+  const uid = minhaUid();
+  if (sala && uid && sala.jogadores && sala.jogadores[uid] && dispensadosDe(sala)[uid]) {
+    esquecerSala(codigo);
+    ultimoAviso = Date.now();
+    mostrarLegenda(["A partida continuou sem você", "Quem criou a sala seguiu com quem estava lá. Você pode terminar a sua tabela aqui, sozinho."]);
+    return;
+  }
+  if (!sala || !sala.criador || sala.revelada || sala.encerrada) {
+    esquecerSala(codigo);
+    ultimoAviso = Date.now();
+    mostrarLegenda([`A sala ${codigo} já fechou`,
+      sala && (sala.revelada || sala.encerrada) ? "Os outros já terminaram. Você pode terminar a sua tabela aqui, sozinho." : "Você pode terminar a sua tabela aqui, sozinho."]);
+    return;
+  }
+  abrir("entrar");
+  $("familia-titulo").textContent = "Voltar para a sala";
+  $("familia-explica").textContent = `Sua tabela continua de onde parou, na sala ${codigo}.`;
+  $("familia-codigo").value = codigo;
+  if ($("familia-nome").value && lerUsuario()) acaoJanela("entrar");
 }
 
 // ---------- nome de usuário ----------
@@ -684,7 +732,8 @@ function sincronizar() {
 }
 
 function verificarRevelacao() {
-  const jogadores = jogadoresDe(partida);
+  const dispensados = dispensadosDe(partida);
+  const jogadores = jogadoresDe(partida).filter(j => !dispensados[j.uid]);
   const todosTerminaram = jogadores.length > 0 && jogadores.every(j => j.terminou);
   const revelar = partida.revelada || partida.encerrada || todosTerminaram;
   if (!revelar) return;
@@ -701,7 +750,7 @@ function atualizarBolinhaDoIcone() {
   let n = 0;
   if (sessao && partida && partida.jogadores) {
     n = naoLidas();
-    if (comVez() && !antesDeComecar() && !partida.revelada && !partida.encerrada &&
+    if (comVez() && !antesDeComecar() && !pausada() && !partida.revelada && !partida.encerrada &&
       daVez() === minhaUid() && !esperandoPassar()) n += 1;
   }
   if (n === bolinhaNoIcone) return;
@@ -778,12 +827,30 @@ function atualizarBarra(erro) {
 // ninguém marca nem rola: todos veem quem já entrou, convidam e conversam.
 
 let estavaEsperando = false;
+let estavaPausada = false;
+let jogandoSemPausa = false; // eu estava jogando (para avisar quando outro pausar)
 const chegaramNaEspera = new Set(); // quem já apareceu na lista (só os novos dão o pulinho)
 
 function atualizarEsperaDaSala() {
   const caixa = $("sala-espera");
   if (!caixa) return;
-  const esperando = !!sessao && antesDeComecar();
+  const pausadaAgora = !!sessao && pausada();
+  const esperando = !!sessao && (antesDeComecar() || pausadaAgora);
+  // a pausa acabou: todos voltaram
+  if (estavaPausada && !pausadaAgora && sessao && partida && !partida.revelada && !partida.encerrada) {
+    ultimoAviso = Date.now();
+    const minha = comVez() && daVez() === minhaUid();
+    mostrarLegenda(["Todos voltaram!", comVez() ? (minha ? "A partida continua, e é a sua vez." : `A partida continua. Vez de ${nomeDe(daVez())}.`) : "A partida continua de onde parou."]);
+    tocar("suaVez");
+    estavaEsperando = esperando;
+  }
+  // alguém pausou agora (eu estava jogando)
+  if (!estavaPausada && pausadaAgora && jogandoSemPausa) {
+    ultimoAviso = Date.now();
+    mostrarLegenda(["Partida pausada", `${juntarNomes(quemEstaFora().map(j => j.nome))} saiu. A partida continua quando todos voltarem.`]);
+  }
+  estavaPausada = pausadaAgora;
+  jogandoSemPausa = !!sessao && !!partida && !esperando;
   // começou agora: quem estava esperando vê o aviso
   if (estavaEsperando && !esperando && sessao && partida && partida.iniciada === true) {
     ultimoAviso = Date.now();
@@ -796,11 +863,19 @@ function atualizarEsperaDaSala() {
 
   const eu = minhaUid();
   const souCriador = partida.criador === eu;
-  $("sala-espera-titulo").textContent = "Sala";
+  const fora = pausadaAgora ? quemEstaFora() : [];
+  const foraUids = new Set(fora.map(j => j.uid));
+  $("sala-espera-titulo").textContent = pausadaAgora ? "Partida pausada" : "Sala";
   $("sala-espera-codigo").textContent = sessao.codigo; // grande, como uma ficha, para ler em voz alta
   $("sala-espera-modo").textContent = [comVez() ? "Cada um na sua vez" : "Todos ao mesmo tempo",
     soDadosDaSala() ? "só os dados do app" : ""].filter(Boolean).join(" · ");
-  const jogadores = jogadoresDe(partida).sort((a, b) => (a.entrouEm || 0) - (b.entrouEm || 0));
+  // na pausa: quanto falta para a sala fechar (dias; no último dia, horas)
+  const prazo = pausadaAgora && textoDoPrazo(prazoDaSala());
+  $("sala-espera-prazo").hidden = !prazo;
+  if (prazo) $("sala-espera-prazo").textContent = `⏳ ${prazo[0].toUpperCase() + prazo.slice(1)} para terminar`;
+  $("sala-espera-rotulo").textContent = pausadaAgora ? "Quem está na partida" : "Quem já entrou";
+  const dispensados = dispensadosDe(partida);
+  const jogadores = jogadoresDe(partida).filter(j => !dispensados[j.uid]).sort((a, b) => (a.entrouEm || 0) - (b.entrouEm || 0));
   const lista = $("sala-espera-jogadores");
   lista.innerHTML = "";
   for (const j of jogadores) {
@@ -810,12 +885,26 @@ function atualizarEsperaDaSala() {
     quem.className = "jogador-sala";
     quem.append(avatar(j.nome, j.uid === eu ? mesaAtual() : j.corMesa, "avatar", j.uid === eu ? "eu" : j.id), j.nome + (j.uid === eu ? " (você)" : ""));
     li.appendChild(quem);
-    if (j.uid === partida.criador) {
+    if (foraUids.has(j.uid)) {
+      li.classList.add("fora");
+      const falta = document.createElement("small");
+      falta.textContent = "ainda não voltou";
+      li.appendChild(falta);
+    } else if (j.uid === partida.criador) {
       const criou = document.createElement("small");
       criou.textContent = "criou a sala";
       li.appendChild(criou);
     }
     lista.appendChild(li);
+  }
+  $("sala-espera-sem-eles").hidden = !(pausadaAgora && souCriador);
+  if (pausadaAgora) {
+    $("sala-espera-dica").textContent = `Esperando ${juntarNomes(fora.map(j => j.nome))} voltar. ` +
+      "Para voltar, é só abrir o app e tocar em “Voltar para a sala” na tela inicial. A partida continua quando todos estiverem aqui.";
+    $("sala-espera-comecar").hidden = true;
+    const novasP = naoLidas();
+    $("sala-espera-novas").textContent = novasP > 9 ? "9+" : novasP || "";
+    return;
   }
   // quem criou saiu antes de começar: só ele podia começar, então a sala não anda
   const criadorSaiu = !partida.jogadores[partida.criador];
@@ -842,9 +931,9 @@ async function comecarPartida() {
 
 async function compartilharCodigo() {
   const codigo = sessao.codigo;
-  const texto = `Vem jogar YAM comigo! Código da sala: ${codigo}\n` +
-    "No app: Jogar em sala → Entrar em sala.\n" +
-    `Ou toque no link: ${ENDERECO_APP}?sala=${codigo}`;
+  // só o código (sem link): fácil de copiar e colar em "Entrar em sala" (o campo
+  // aceita colar a mensagem inteira, pega só os números)
+  const texto = `Vem jogar YAM comigo! Código da sala: ${codigo}`;
   try {
     if (navigator.share) { await navigator.share({ text: texto }); return; }
   } catch (e) { if (e && e.name === "AbortError") return; }
@@ -860,10 +949,74 @@ async function encerrarPartida() {
 }
 
 async function confirmarSair() {
-  if (!await confirmar("Sair da sala?", "Sua tabela continua aqui, mas você sai do resultado da sala.", "Sair")) return;
-  await sair();
+  const emAndamento = partida && !antesDeComecar() && !partida.revelada && !partida.encerrada;
+  const eu = partida && partida.jogadores && partida.jogadores[minhaUid()];
+  if (emAndamento && eu && eu.terminou) {
+    // já terminei: saio, mas meu resultado continua na sala (e no pódio)
+    if (!await confirmar("Sair da sala?", "Seu resultado continua na sala e aparece no pódio quando todos terminarem.", "Sair")) return;
+    await pausar();
+  } else if (emAndamento) {
+    const prazo = textoDoPrazo(prazoDaSala());
+    const resposta = await perguntar({
+      titulo: "Sair da partida?",
+      texto: "Pausar: a partida para para todos e continua quando todo mundo voltar para a sala " +
+        `(pela tela inicial)${prazo ? `. A sala fecha em ${prazo.replace(/^faltam? /, "")}` : ""}.\n\n` +
+        "Desistir: você sai de vez e os outros seguem sem você.",
+      sim: "Pausar", nao: "Cancelar", outro: "Desistir da partida"
+    });
+    if (resposta === "outro") {
+      if (!await confirmar("Desistir da partida?", "Você sai do resultado da sala e não dá para voltar a esta partida. Sua tabela continua aqui.", "Desistir", true)) return;
+      await sair();
+      marcarSalaDaTabela(null);
+    } else if (resposta === true) {
+      await pausar();
+    } else return;
+  } else {
+    if (!await confirmar("Sair da sala?", "Sua tabela continua aqui, mas você sai do resultado da sala.", "Sair")) return;
+    await sair();
+  }
   mostrarTela("tela-inicio"); // fora da sala, volta para o começo
 }
+
+// Pausar: sai da sala mas guarda o lugar (fora: true). Enquanto alguém está fora,
+// ninguém joga; quando todos voltam, a partida segue de onde parou.
+async function pausar() {
+  if (!sessao) return;
+  const { codigo } = sessao;
+  const uid = minhaUid();
+  const casas = casasMarcadas();
+  pararDeEscutar();
+  guardarSessao(null);
+  partida = null;
+  reiniciarVez();
+  atualizarBarra();
+  fecharEspera();
+  if (uid) {
+    // vai junto o que já marquei (se a vez ainda não tinha passado)
+    try { await update(ref(db, `partidas/${codigo}/jogadores/${uid}`), { fora: true, visivel: false, casas, mesa: null }); }
+    catch { /* sem conexão: a sala não fica sabendo que pausei */ }
+  }
+}
+
+// Quem criou a sala segue sem quem não voltou: eles ficam fora do pódio (e da vez).
+async function continuarSemQuemFalta() {
+  if (!sessao || !partida || partida.criador !== minhaUid()) return;
+  const fora = quemEstaFora();
+  if (!fora.length) return;
+  const nomes = juntarNomes(fora.map(j => j.nome));
+  if (!await confirmar(`Continuar sem ${nomes}?`,
+    `${nomes} fica${fora.length === 1 ? "" : "m"} fora da partida e do pódio, e não dá para voltar.`, "Continuar sem", true)) return;
+  const mudar = {};
+  for (const j of fora) {
+    mudar[`dispensados/${j.uid}`] = true;
+    mudar[`pulos/${j.uid}`] = 100000; // na vez, nunca mais chega a vez de quem foi dispensado
+  }
+  try { await update(ref(db, `partidas/${sessao.codigo}/jogadores/${minhaUid()}`), mudar); }
+  catch (e) { avisar(mensagemDeErro(e), "Não deu para continuar"); }
+}
+
+const juntarNomes = ns => (ns.length <= 1 ? ns.join("") : `${ns.slice(0, -1).join(", ")} e ${ns[ns.length - 1]}`);
+const prazoDaSala = (p = partida) => (p && typeof p.criadaEm === "number" ? p.criadaEm + PRAZO_DA_SALA : null);
 
 // ---------- janela de criar / entrar ----------
 
@@ -901,8 +1054,11 @@ function fecharJanela() {
 }
 
 // A partida em família começa com a tabela zerada.
-async function prepararTabela() {
+async function prepararTabela(codigo = null) {
   if (!partidaTemValores(state)) return true;
+  // voltando para terminar a partida desta mesma sala: a tabela fica como está
+  const daSala = salaDaTabela();
+  if (codigo && daSala && daSala.codigo === codigo && !partidaCompleta()) return true;
   if (!await confirmar("Começar com a tabela zerada?",
     "Para jogar em sala, sua tabela começa zerada. A partida atual vai para o histórico.", "Continuar")) return false;
   salvarPartidaAtual();
@@ -931,7 +1087,7 @@ async function acaoJanela(tipo = modoJanela) {
     $("familia-recuperar").hidden = !e.tomado;
     return;
   }
-  if (!await prepararTabela()) { erro.textContent = ""; return; }
+  if (!await prepararTabela(tipo === "entrar" ? codigo : null)) { erro.textContent = ""; return; }
 
   erro.textContent = tipo === "criar" ? "Criando a sala…" : "Entrando na sala…";
   document.querySelectorAll("#janela-familia button").forEach(b => { b.disabled = true; });
@@ -1173,6 +1329,20 @@ function soDadosDaSala(p = partida) {
   return jogadoresDe(p).some(j => j.soDados === true);
 }
 
+// Quem quem criou a sala dispensou (seguiu sem eles).
+function dispensadosDe(p) {
+  const criador = p && p.jogadores && p.jogadores[p.criador];
+  return (criador && criador.dispensados) || {};
+}
+
+// Quem pausou e ainda não voltou (com a partida em andamento).
+function quemEstaFora(p = partida) {
+  if (!p || !p.jogadores || p.iniciada === false || p.revelada || p.encerrada) return [];
+  const dispensados = dispensadosDe(p);
+  return jogadoresDe(p).filter(j => j.fora === true && !j.terminou && !dispensados[j.uid]);
+}
+const pausada = () => !!(sessao && partida) && quemEstaFora().length > 0;
+
 function pulosDe(p) {
   const criador = p && p.jogadores && p.jogadores[p.criador];
   return (criador && criador.pulos) || {};
@@ -1208,7 +1378,7 @@ function reiniciarVez() {
 const antesDeComecar = () => !!(partida && partida.iniciada === false && !partida.revelada && !partida.encerrada);
 
 function podeJogar() {
-  if (antesDeComecar()) return false;
+  if (antesDeComecar() || pausada()) return false;
   return !comVez() || (daVez() === minhaUid() && !esperandoPassar());
 }
 
@@ -1217,6 +1387,9 @@ function porQueNaoPode() {
     return partida.criador === minhaUid()
       ? ["A partida ainda não começou", "Toque em Começar partida quando todos estiverem na sala."]
       : ["A partida ainda não começou", `Espere ${nomeDe(partida.criador)} tocar em Começar.`];
+  }
+  if (pausada()) {
+    return ["Partida pausada", `Esperando ${juntarNomes(quemEstaFora().map(j => j.nome))} voltar para a sala.`];
   }
   if (esperandoPassar()) return ["Você já jogou", "A vez está passando para o próximo. Para trocar, use Desfazer."];
   return ["Não é a sua vez", `Agora é a vez de ${nomeDe(daVez())}. Avisamos quando chegar a sua.`];
@@ -1433,6 +1606,7 @@ function avisarDaVez() {
   }
   pulosVistos = meusPulos;
 
+  if (pausada()) return; // pausada: ninguém joga (o aviso vem quando todos voltarem)
   if (vez === uid && vezAnterior !== uid && !esperandoPassar()) {
     // a vez acabou de chegar: aviso grande (ao abrir o app, só o som)
     if (vezAnterior !== undefined) chamarSuaVez();
@@ -1546,7 +1720,7 @@ let jeitoDaVez = "";
 
 // Enquanto é a sua vez e você ainda não rolou, o botão dos dados fica pulsando.
 function atualizarPulsoDaVez() {
-  const minha = !!(sessao && partida && comVez() && !antesDeComecar() && !partida.revelada &&
+  const minha = !!(sessao && partida && comVez() && !antesDeComecar() && !pausada() && !partida.revelada &&
     !partida.encerrada && daVez() === minhaUid() && !esperandoPassar());
   const botao = document.querySelector(".botao-dados");
   if (botao) botao.classList.toggle("sua-vez", minha && mesa.jogada === 0);
@@ -1555,7 +1729,7 @@ function atualizarPulsoDaVez() {
 function conferirLembrete() {
   atualizarPulsoDaVez();
   try { atualizarBolinhaDoIcone(); } catch {}
-  const minhaVezAgora = !!(sessao && partida && comVez() && !antesDeComecar() && !partida.revelada &&
+  const minhaVezAgora = !!(sessao && partida && comVez() && !antesDeComecar() && !pausada() && !partida.revelada &&
     !partida.encerrada && daVez() === minhaUid() && !esperandoPassar());
   if (!minhaVezAgora) { paradoDesde = 0; return; }
   // qualquer jogada (rolar, segurar, marcar) recomeça a contagem
@@ -1779,7 +1953,9 @@ function mostrarReacao(emoji, nome, uid = null) {
   area.appendChild(el);
   setTimeout(() => el.remove(), 2800);
   tocar(jeito === "festa" ? "festaReacao" : jeito || "reacao");
-  if (jeito === "festa" && !matchMedia("(prefers-reduced-motion: reduce)").matches) soltarConfete(30);
+  // 🎉: solta confete só se o anterior já acabou de cair (mandar vários seguidos
+  // não deixa a tela com confete sem parar)
+  if (jeito === "festa" && !matchMedia("(prefers-reduced-motion: reduce)").matches && confeteCaindo() < 8) soltarConfete(30);
 }
 
 // Mensagem do chat subindo na tela, como as reações (com o chat fechado), com a
@@ -1846,7 +2022,7 @@ window.familia = {
   aoTerminar, fecharEspera, fecharPodio, jogarDeNovo, limparSalasAntigas, sincronizar, registrarResultado,
   escolherModo, podeJogar, porQueNaoPode, podeDesfazer, mesaMudou, recuperar, trocarNome, avisosMudaram,
   historicoMudou, sincronizarHistorico, registrarNomeSePrecisar, alternarReacoes, reagir, lerRanking,
-  abrirChat, fecharChat, enviarMensagem, comecarPartida,
+  abrirChat, fecharChat, enviarMensagem, comecarPartida, voltarParaSala, continuarSemQuemFalta,
   soDadosDoApp: () => !!(sessao && partida && !partida.revelada && !partida.encerrada && soDadosDaSala()),
   ativa: () => !!sessao,
   revelada: () => !!(partida && (partida.revelada || partida.encerrada))

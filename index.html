@@ -20,14 +20,14 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="theme-color" content="#f4ecd8" media="(prefers-color-scheme: light)">
   <meta name="theme-color" content="#121413" media="(prefers-color-scheme: dark)">
-  <link rel="manifest" href="manifest.json?v=114">
+  <link rel="manifest" href="manifest.json?v=115">
   <link rel="icon" type="image/png" sizes="32x32" href="icone-mesa-32.png">
   <link rel="apple-touch-icon" href="icone-mesa-apple-180.png">
 
   <link rel="preload" href="fontes/nunito.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="preload" href="fontes/fredoka.woff2" as="font" type="font/woff2" crossorigin>
   <!-- ?v= é a versão do app (igual ao VERSAO do app.js; um teste confere): versão nova, endereço novo -->
-  <link rel="stylesheet" href="style.css?v=114">
+  <link rel="stylesheet" href="style.css?v=115">
 
   <!-- Aplica o tema escolhido antes de desenhar a página, para não piscar. -->
   <meta name="apple-mobile-web-app-capable" content="yes">
@@ -119,6 +119,11 @@
     <button id="inicio-sala" class="inicio-grande" onclick="irParaSala()">
       <svg class="icone" aria-hidden="true"><use href="#i-sala"/></svg>
       <span><strong id="inicio-sala-titulo">Jogar em sala</strong><small id="inicio-sala-sub">Cada um no seu aparelho, com pódio no final</small></span>
+    </button>
+
+    <button id="inicio-terminar" class="inicio-grande inicio-terminar" hidden>
+      <svg class="icone" aria-hidden="true"><use href="#i-ampulheta"/></svg>
+      <span><strong id="inicio-terminar-titulo">Terminar a partida</strong><small id="inicio-terminar-sub"></small></span>
     </button>
 
     <div class="inicio-grade">
@@ -471,6 +476,8 @@
   </table>
   </div>
 
+  <p id="prazo-partida" class="prazo-partida" hidden></p>
+  <button id="continuar-partida" class="principal continuar-partida" onclick="continuarPartidaAberta()" hidden><svg class="icone" aria-hidden="true"><use href="#i-dado"/></svg>Continuar esta partida</button>
   <div id="acoes-partida" class="acoes">
     <button id="ver-podio-partida" class="principal" onclick="abrirPodioDaPartida()" hidden><svg class="icone" aria-hidden="true"><use href="#i-trofeu"/></svg>Pódio</button>
     <button onclick="compartilharPartidaAberta()"><svg class="icone" aria-hidden="true"><use href="#i-compartilhar"/></svg>Compartilhar</button>
@@ -594,10 +601,12 @@
     <h2 id="sala-espera-titulo">Sala</h2>
     <p class="codigo-sala" aria-label="Código da sala"><span id="sala-espera-codigo"></span></p>
     <p id="sala-espera-modo" class="sala-espera-modo"></p>
-    <p class="sala-espera-rotulo">Quem já entrou</p>
+    <p id="sala-espera-prazo" class="sala-espera-prazo" hidden></p>
+    <p id="sala-espera-rotulo" class="sala-espera-rotulo">Quem já entrou</p>
     <ul id="sala-espera-jogadores" class="sala-espera-jogadores"></ul>
     <p id="sala-espera-dica" class="sala-espera-dica"></p>
     <button id="sala-espera-comecar" class="principal largo" onclick="familia.comecarPartida()"><svg class="icone" aria-hidden="true"><use href="#i-dado"/></svg>Começar partida</button>
+    <button id="sala-espera-sem-eles" class="largo" onclick="familia.continuarSemQuemFalta()" hidden>Continuar sem quem falta</button>
     <div class="fim-acoes">
       <button onclick="familia.compartilharCodigo()"><svg class="icone" aria-hidden="true"><use href="#i-enviar"/></svg>Convidar</button>
       <button class="botao-conversa" onclick="familia.abrirChat()"><svg class="icone" aria-hidden="true"><use href="#i-chat"/></svg>Conversa<span id="sala-espera-novas" class="chat-contador"></span></button>
@@ -788,10 +797,11 @@
       <button id="pergunta-sim" class="principal" onclick="responder(true)">OK</button>
       <button id="pergunta-nao" onclick="responder(false)">Cancelar</button>
     </div>
+    <button id="pergunta-outro" class="link" onclick="responder('outro')" hidden></button>
   </div>
 </div>
 
-<script src="app.js?v=114"></script>
+<script src="app.js?v=115"></script>
 <script>
   // Rede de segurança: se o app.js não carregou (ex.: troca de versão no meio
   // do caminho), recarrega sozinho uma vez, em vez de ficar com a tabela vazia.
@@ -805,7 +815,7 @@
     setTimeout(function () { location.replace(location.pathname + "?atualizado=" + Date.now()); }, 1500);
   })();
 </script>
-<script type="module" src="familia.js?v=114"></script>
+<script type="module" src="familia.js?v=115"></script>
 
 <!-- Service Worker -->
 <script>
