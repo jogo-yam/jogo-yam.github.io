@@ -8,7 +8,7 @@ const rows = [
 const COLUNAS = 4;
 
 // Versão do app: igual ao número do CACHE_NAME do service-worker.js (um teste confere).
-const VERSAO = 117;
+const VERSAO = 118;
 
 // Avisos da vez com o app fechado: servidor na Cloudflare (worker/avisos.mjs).
 // Sem o endereço, a opção "Avisar a minha vez" não aparece.
@@ -971,7 +971,8 @@ function desenharPodio(p, verTabela, partidaDoHistorico = null) {
 // maior jogada, quem pegou mais bônus, o menor MIN e quem mais riscou.
 const NOME_DA_JOGADA = { 9: "Quadra", 10: "Full", 11: "Sequência menor", 12: "Sequência maior", 13: "MIN", 14: "MAX", 15: "YAM" };
 
-function destaquesDaPartida(terminaram) {
+// comVoce: na tela, a pessoa se vê como "Você"; na imagem para o grupo, pelo nome.
+function destaquesDaPartida(terminaram, comVoce = true) {
   const com = terminaram.filter(j => j.valores && typeof j.valores === "object");
   if (com.length < 2) return [];
   const valor = (j, l, c) => {
@@ -986,7 +987,9 @@ function destaquesDaPartida(terminaram) {
     return { max: quem.length === com.length ? 0 : max, quem };
   };
   const nomes = quem => {
-    const ns = [...quem].sort((a, b) => !!b.eu - !!a.eu).map(j => (j.eu ? "Você" : j.nome)); // "Você" vem primeiro
+    const ns = comVoce
+      ? [...quem].sort((a, b) => !!b.eu - !!a.eu).map(j => (j.eu ? "Você" : j.nome)) // "Você" vem primeiro
+      : quem.map(j => j.nome);
     return ns.length === 1 ? ns[0] : `${ns.slice(0, -1).join(", ")} e ${ns[ns.length - 1]}`;
   };
   const plural = (n, um, varios) => `${n} ${n === 1 ? um : varios}`;
@@ -1220,7 +1223,11 @@ function desenharDadoNaImagem(ctx, cx, cy, t, face, giro = 0) {
 // Imagem do pódio (1080 x 1350), no mesmo estilo do cartão de resultado.
 async function gerarImagemPodio(p, dataIso) {
   await fonteCarregada();
-  const W = 1080, H = 1350;
+  // com destaques da partida, a imagem fica mais comprida (um painel embaixo)
+  const destaques = destaquesDaPartida(p.terminaram, false);
+  // (desenha numa tela alta o bastante e no fim corta no tamanho usado)
+  const ALTURA_DESTAQUES = destaques.length ? 150 + destaques.length * 130 : 0;
+  const W = 1080, H = 1350 + ALTURA_DESTAQUES;
   const canvas = document.createElement("canvas");
   canvas.width = W;
   canvas.height = H;
@@ -1258,7 +1265,8 @@ async function gerarImagemPodio(p, dataIso) {
   const cabem = linhas.length > 5 ? 4 : 5;
   const alturaLista = (Math.min(linhas.length, cabem) + (linhas.length > cabem ? 1 : 0)) * 54;
   // com lista curta (ou nenhuma), desce título e pódio para não sobrar espaço embaixo
-  const desce = Math.round((5 * 54 - alturaLista) / 2);
+  // (com destaques não precisa: eles vêm logo depois da lista)
+  const desce = destaques.length ? 0 : Math.round((5 * 54 - alturaLista) / 2);
 
   // quem venceu
   ctx.fillStyle = TEXTO;
@@ -1333,7 +1341,72 @@ async function gerarImagemPodio(p, dataIso) {
     ctx.fillText(`e mais ${linhas.length - cabem}`, W / 2, base + 55 + cabem * 54);
   }
 
-  return new Promise(resolve => canvas.toBlob(resolve, "image/png"));
+  // destaques da partida: num painel embaixo, com a bolinha (foto ou inicial) de quem fez
+  if (!destaques.length) return new Promise(resolve => canvas.toBlob(resolve, "image/png"));
+  {
+    const x = 80, w = W - 160;
+    const y = base + 55 + (Math.min(linhas.length, cabem) + (linhas.length > cabem ? 1 : 0)) * 54 + (linhas.length ? 20 : -10);
+    // cada destaque: o título pequeno e o texto (que, se não couber, vai em duas linhas)
+    const textoX = n => x + 64 + (n - 1) * 34 + 50;
+    const largura = n => x + w - 36 - textoX(n);
+    ctx.font = fonte(800, 38);
+    const linhasDe = d => {
+      const n = Math.min(d.quem.length, 3);
+      if (ctx.measureText(d.texto).width <= largura(n)) return [d.texto];
+      const [nomes, ...resto] = d.texto.split(" · ");
+      return [caber(ctx, nomes, largura(n)), caber(ctx, resto.join(" · "), largura(n))];
+    };
+    const blocos = destaques.map(d => ({ d, linhas: linhasDe(d) }));
+    const alturas = blocos.map(b => (b.linhas.length > 1 ? 130 : 92));
+    const h = 110 + alturas.reduce((a, b) => a + b, 0);
+    ctx.fillStyle = "#ebdcb8";
+    retanguloArredondado(ctx, x, y, w, h, 32);
+    ctx.fill();
+    ctx.textAlign = "center";
+    ctx.fillStyle = TEXTO;
+    ctx.font = fonteTitulo(50);
+    ctx.fillText("Destaques da partida", W / 2, y + 62);
+    let topo = y + 110;
+    blocos.forEach(({ d, linhas: texto }, k) => {
+      const yy = topo + alturas[k] / 2 - 4;
+      topo += alturas[k];
+      const quem = d.quem.slice(0, 3);
+      quem.forEach((j, i) => {
+        const cx = x + 64 + i * 34;
+        ctx.fillStyle = "#ebdcb8"; // anel para separar as bolinhas empatadas
+        ctx.beginPath();
+        ctx.arc(cx, yy, 33, 0, 2 * Math.PI);
+        ctx.fill();
+        ctx.fillStyle = MESAS[mesaDoJogador(j.nome, corDaMesaNoPodio(j))].cor;
+        ctx.beginPath();
+        ctx.arc(cx, yy, 29, 0, 2 * Math.PI);
+        ctx.fill();
+        if (fotos.get(j)) {
+          desenharFotoRedonda(ctx, fotos.get(j), cx, yy, 29);
+        } else {
+          ctx.fillStyle = "#ffffff";
+          ctx.textAlign = "center";
+          ctx.font = fonteTitulo(32);
+          ctx.fillText(inicialDe(j.nome), cx, yy + 1);
+        }
+      });
+      const tx = textoX(quem.length);
+      const sobe = (texto.length - 1) * 21;
+      ctx.textAlign = "left";
+      ctx.fillStyle = SUAVE;
+      ctx.font = fonte(700, 30);
+      ctx.fillText(d.titulo, tx, yy - 20 - sobe);
+      ctx.fillStyle = TEXTO;
+      ctx.font = fonte(800, 38);
+      texto.forEach((t, i) => ctx.fillText(caber(ctx, t, largura(quem.length)), tx, yy + 20 - sobe + i * 42));
+    });
+    // corta a imagem logo abaixo do painel
+    const final = document.createElement("canvas");
+    final.width = W;
+    final.height = Math.max(1350, y + h + 60);
+    final.getContext("2d").drawImage(canvas, 0, 0);
+    return new Promise(resolve => final.toBlob(resolve, "image/png"));
+  }
 }
 
 // Guarda na partida do histórico como foi o resultado da sala.

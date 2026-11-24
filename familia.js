@@ -5,7 +5,7 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import {
-  getDatabase, ref, get, set, update, remove, onValue, runTransaction, serverTimestamp
+  getDatabase, ref, get, set, update, remove, onValue, onDisconnect, runTransaction, serverTimestamp
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
 
 // Configuração do projeto "yam-familia". Não é segredo: o que protege o banco
@@ -247,6 +247,7 @@ async function sair() {
   if (!sessao) return;
   const { codigo, chave } = sessao;
   const uid = auth.currentUser && auth.currentUser.uid;
+  await pararDeMarcarAberto();
   pararDeEscutar();
   guardarSessao(null);
   partida = null;
@@ -684,6 +685,7 @@ function escutar() {
     const uid = auth.currentUser && auth.currentUser.uid;
     if (!partida || !partida.jogadores || !partida.jogadores[uid]) {
       // a partida sumiu ou este jogador saiu em outro lugar
+      pararDeMarcarAberto();
       pararDeEscutar();
       guardarSessao(null);
       partida = null;
@@ -691,6 +693,7 @@ function escutar() {
       atualizarBarra();
       return;
     }
+    marcarAberto();
     sincronizar();
     avisarDaVez();
     sugerirAvisos();
@@ -883,7 +886,8 @@ function atualizarEsperaDaSala() {
     if (!chegaramNaEspera.has(j.uid)) { li.classList.add("chegou"); chegaramNaEspera.add(j.uid); } // entra com um pulinho
     const quem = document.createElement("span");
     quem.className = "jogador-sala";
-    quem.append(avatar(j.nome, j.uid === eu ? mesaAtual() : j.corMesa, "avatar", j.uid === eu ? "eu" : j.id), j.nome + (j.uid === eu ? " (você)" : ""));
+    quem.append(comPontinho(avatar(j.nome, j.uid === eu ? mesaAtual() : j.corMesa, "avatar", j.uid === eu ? "eu" : j.id), estaAberto(j)),
+      j.nome + (j.uid === eu ? " (você)" : ""));
     li.appendChild(quem);
     if (foraUids.has(j.uid)) {
       li.classList.add("fora");
@@ -985,6 +989,7 @@ async function pausar() {
   const { codigo } = sessao;
   const uid = minhaUid();
   const casas = casasMarcadas();
+  await pararDeMarcarAberto();
   pararDeEscutar();
   guardarSessao(null);
   partida = null;
@@ -993,7 +998,7 @@ async function pausar() {
   fecharEspera();
   if (uid) {
     // vai junto o que já marquei (se a vez ainda não tinha passado)
-    try { await update(ref(db, `partidas/${codigo}/jogadores/${uid}`), { fora: true, visivel: false, casas, mesa: null }); }
+    try { await update(ref(db, `partidas/${codigo}/jogadores/${uid}`), { fora: true, aberto: false, visivel: false, casas, mesa: null }); }
     catch { /* sem conexão: a sala não fica sabendo que pausei */ }
   }
 }
@@ -1223,6 +1228,7 @@ function atualizarRevanche() {
 // Sai da sala antiga sem mostrar o resultado pessoal (ele já está no histórico).
 function sairDoPodio() {
   $("podio").hidden = true;
+  pararDeMarcarAberto();
   pararDeEscutar();
   guardarSessao(null);
   partida = null;
@@ -1280,6 +1286,7 @@ function confetePodio(mesa) {
 // Fechar o pódio encerra a partida em família neste celular.
 function fecharPodio() {
   $("podio").hidden = true;
+  pararDeMarcarAberto();
   pararDeEscutar();
   guardarSessao(null);
   partida = null;
@@ -1533,6 +1540,44 @@ async function avisosMudaram() {
   if (!timerVisto) timerVisto = setInterval(marcarVisto, 60 * 1000);
 }
 
+// ---------- quem está com o app aberto (pontinho verde na bolinha) ----------
+// jogadores/<uid>/aberto: true com o app na tela; false ao minimizar, e o
+// próprio Firebase grava false se o app fechar ou cair a conexão (onDisconnect).
+let abertoGravado = null; // { codigo, aberto } do que já foi gravado
+
+function marcarAberto() {
+  if (!sessao || !partida || !auth.currentUser) return;
+  const aberto = document.visibilityState === "visible";
+  if (abertoGravado && abertoGravado.codigo === sessao.codigo && abertoGravado.aberto === aberto) return;
+  const caminho = ref(db, `partidas/${sessao.codigo}/jogadores/${minhaUid()}`);
+  abertoGravado = { codigo: sessao.codigo, aberto };
+  if (aberto) onDisconnect(caminho).update({ aberto: false }).catch(() => {});
+  update(caminho, { aberto }).catch(() => { abertoGravado = null; });
+}
+
+async function pararDeMarcarAberto() {
+  if (!sessao || !auth.currentUser) return;
+  abertoGravado = null;
+  try { await onDisconnect(ref(db, `partidas/${sessao.codigo}/jogadores/${minhaUid()}`)).cancel(); } catch {}
+}
+
+// Está com o app aberto agora? (eu: sempre)
+function estaAberto(j) {
+  if (!j) return false;
+  if (j.uid === minhaUid()) return true;
+  return j.aberto === true && j.fora !== true;
+}
+
+// Pontinho verde na bolinha de quem está com o app aberto.
+function comPontinho(el, online) {
+  el.classList.toggle("online", !!online);
+  if (online) el.title = "Com o app aberto agora";
+  return el;
+}
+
+document.addEventListener("visibilitychange", () => marcarAberto());
+window.addEventListener("pageshow", () => marcarAberto());
+
 // "Estou com o app aberto": o servidor não manda notificação para quem está olhando.
 function marcarVisto() {
   if (!sessao || !auth.currentUser || !avisosLigados() || !comVez()) return;
@@ -1664,7 +1709,7 @@ function atualizarBarraVez() {
     } else {
       rolagemVista = { uid: vez, jogada: 0 };
     }
-    $("vez-avatar").replaceChildren(avatar(nomeDe(vez), j && j.corMesa, "avatar", j && j.id));
+    $("vez-avatar").replaceChildren(comPontinho(avatar(nomeDe(vez), j && j.corMesa, "avatar", j && j.id), estaAberto(j && { ...j, uid: vez })));
     if (partida.criador === uid) {
       acao.hidden = false;
       acao.textContent = "Pular";

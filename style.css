@@ -3319,6 +3319,21 @@ td.mudou { animation: mudou 0.7s ease-out; }
 }
 .sala-espera-prazo[hidden] { display: none; }
 .sala-espera-jogadores li.fora .jogador-sala { opacity: 0.45; }
+
+/* pontinho verde: está com o app aberto agora */
+.avatar.online { position: relative; }
+.avatar.online::before {
+  content: "";
+  position: absolute;
+  right: -0.12em;
+  bottom: -0.12em;
+  width: 0.5em;
+  height: 0.5em;
+  border-radius: 50%;
+  background: #3ecf6e;
+  box-shadow: 0 0 0 2px var(--superficie);
+}
+.barra-vez .avatar.online::before { box-shadow: 0 0 0 2px var(--destaque, var(--superficie)); }
 .sala-espera-jogadores li.fora small { color: var(--erro, #c0392b); font-weight: 700; }
 #sala-espera-sem-eles { margin-top: 8px; }
 #sala-espera-sem-eles[hidden] { display: none; }
