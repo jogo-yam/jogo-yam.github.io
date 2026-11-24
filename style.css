@@ -1987,12 +1987,13 @@ button.bolinha-mesa:active { transform: scale(0.92); box-shadow: none; }
 .vez-dados .dado-mini.segurado { transform: translateY(-3px); }
 /* quem está jogando rolou: os dadinhos pulam e giram como os seus */
 .vez-dados .dado-mini.rolando { animation: rolar-mini 0.44s ease-out both; }
-/* parou: o número que saiu dá um "pop" com um brilho dourado (como ao marcar na
-   tabela); os segurados não mexem, então dá para ver na hora o que mudou */
+/* parou: o número que saiu dá um "pop" com um brilho branco suave (como ao marcar
+   na tabela; dourado não, que é a cor do dado segurado); os segurados não mexem,
+   então dá para ver na hora o que mudou */
 .vez-dados .dado-mini.assentou { animation: pop-mini 0.42s cubic-bezier(0.2, 1.6, 0.4, 1); }
 @keyframes pop-mini {
-  0%   { transform: scale(0.55); filter: drop-shadow(0 0 0 rgba(242, 181, 58, 0)); }
-  45%  { transform: scale(1.2); filter: drop-shadow(0 0 7px rgba(242, 181, 58, 0.95)); }
+  0%   { transform: scale(0.55); filter: drop-shadow(0 0 0 rgba(255, 255, 255, 0)); }
+  45%  { transform: scale(1.2); filter: drop-shadow(0 0 6px rgba(255, 255, 255, 0.75)); }
   100% { transform: scale(1); filter: drop-shadow(0 3px 0 rgba(0, 0, 0, 0.28)); }
 }
 @media (prefers-reduced-motion: reduce) {
