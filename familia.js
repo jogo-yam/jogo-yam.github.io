@@ -2043,9 +2043,8 @@ function mostrarReacao(emoji, nome, uid = null) {
   area.appendChild(el);
   setTimeout(() => el.remove(), 2800);
   tocar(jeito === "festa" ? "festaReacao" : jeito || "reacao");
-  // 🎉: solta confete só se o anterior já acabou de cair (mandar vários seguidos
-  // não deixa a tela com confete sem parar)
-  if (jeito === "festa" && !matchMedia("(prefers-reduced-motion: reduce)").matches && confeteCaindo() < 8) soltarConfete(30);
+  // 🎉: chove confete enquanto continuarem mandando
+  if (jeito === "festa" && !matchMedia("(prefers-reduced-motion: reduce)").matches) chuvaDeConfete();
 }
 
 // Mensagem do chat subindo na tela, como as reações (com o chat fechado), com a

@@ -8,7 +8,7 @@ const rows = [
 const COLUNAS = 4;
 
 // Versão do app: igual ao número do CACHE_NAME do service-worker.js (um teste confere).
-const VERSAO = 125;
+const VERSAO = 126;
 
 // Avisos da vez com o app fechado: servidor na Cloudflare (worker/avisos.mjs).
 // Sem o endereço, a opção "Avisar a minha vez" não aparece.
@@ -1813,8 +1813,24 @@ function soltarConfete(quantos = 60, mesa = mesaAtual()) {
   }
 }
 
-// Ainda tem confete caindo? (o 🎉 das reações não solta outro por cima)
-const confeteCaindo = () => document.getElementById("confete").childElementCount;
+// Chuva de confete (🎉 das reações): o primeiro 🎉 solta uma leva e começa a
+// chover; cada 🎉 que chega estica a chuva, que só para um pouco depois de
+// pararem de mandar (o que já está no ar termina de cair).
+const CHUVA_DEPOIS_DO_ULTIMO = 1500; // ms chovendo depois do último 🎉
+let chuvaDeConfeteAte = 0;
+let timerChuvaDeConfete = null;
+
+function chuvaDeConfete() {
+  chuvaDeConfeteAte = Date.now() + CHUVA_DEPOIS_DO_ULTIMO;
+  if (timerChuvaDeConfete) return; // já está chovendo: só estica
+  soltarConfete(30);
+  const pingar = () => {
+    if (Date.now() >= chuvaDeConfeteAte || document.hidden) { timerChuvaDeConfete = null; return; }
+    soltarConfete(7);
+    timerChuvaDeConfete = setTimeout(pingar, 300);
+  };
+  timerChuvaDeConfete = setTimeout(pingar, 300);
+}
 
 // Vibração curta (só no Android; o iPhone não deixa sites vibrarem).
 function vibrar(padrao) {
