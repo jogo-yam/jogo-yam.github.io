@@ -3491,6 +3491,11 @@ td.mudou { animation: mudou 0.7s ease-out; }
 /* letra maior: o botão Estatísticas do topo fica só com o ícone, para não cobrir o título */
 :root[data-letra="grande"] .topo button.direita { font-size: 0; padding: 8px 12px; }
 :root[data-letra="grande"] .topo button.direita .icone { width: 24px; height: 24px; margin: 0; }
+/* celular bem estreito: os botões do topo ficam só com o ícone, para não cobrir o título */
+@media (max-width: 360px) {
+  :root .topo button { font-size: 0; padding: 8px 12px; } /* :root: vale também com a letra maior */
+  :root .topo button .icone { width: 24px; height: 24px; margin: 0; }
+}
 /* bolinhas da mesa com um brilho: a preta não parece vazia no modo escuro */
 button.bolinha-mesa:not(.bolinha-dado) {
   background: radial-gradient(circle at 35% 30%, rgba(255, 255, 255, 0.28), transparent 60%), var(--cor-mesa);
