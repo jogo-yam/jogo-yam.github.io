@@ -619,31 +619,48 @@ async function publicarRecorde(historicoCompleto) {
     recordeConferido = nenhum;
     return;
   }
-  const chave = `${u.chave}|${melhor.total}|${melhor.data}|${mesaAtual()}`;
+  const mes = mesDe(new Date());
+  const doMes = melhorPartidaDoMes(historico, mes);
+  const chave = JSON.stringify([u.chave, u.nome, u.id || null, mesaAtual(), melhor, mes, doMes]);
   if (recordeConferido === chave) return;
   await usuario();
   const atual = (await comLimite(lerDoBanco(`ranking/${u.chave}`))).val();
-  const igual = atual && atual.total === melhor.total && atual.data === melhor.data && atual.nome === u.nome &&
-    atual.corMesa === mesaAtual() && (!u.id || atual.id === u.id); // a cor da ficha (e a foto) acompanham
-  const desceria = atual && typeof atual.total === "number" && atual.total > melhor.total;
-  if (!igual && !(desceria && !historicoCompleto)) {
+  // sem o histórico inteiro (a nuvem não respondeu), só sobe, nunca desce; mas só
+  // vale manter o que já foi refeito com partidas em sala (soSala)
+  const confiavel = !historicoCompleto && atual && atual.soSala === true;
+  const manterTotal = !!(confiavel && typeof atual.total === "number" && typeof atual.data === "string" && atual.total > melhor.total);
+  const manterMes = !!(confiavel && atual.mes === mes && typeof atual.totalMes === "number" && typeof atual.dataMes === "string" &&
+    (!doMes || atual.totalMes > doMes.total));
+  const recorde = manterTotal ? { total: atual.total, data: atual.data } : melhor;
+  const domes = manterMes ? { total: atual.totalMes, data: atual.dataMes } : doMes;
+  // soSala: refeito só com partidas em sala (o ranking só mostra esses);
+  // mes/totalMes/dataMes: a melhor partida em sala deste mês (ranking do mês)
+  const novo = {
+    nome: u.nome, total: recorde.total, data: recorde.data, corMesa: mesaAtual(), ...(u.id ? { id: u.id } : {}), soSala: true,
+    ...(domes ? { mes, totalMes: domes.total, dataMes: domes.data } : {})
+  };
+  const campos = ["nome", "total", "data", "corMesa", "id", "soSala", "mes", "totalMes", "dataMes"];
+  const igual = atual && campos.every(k => atual[k] === novo[k]); // a cor da ficha (e a foto) acompanham
+  if (!igual) {
     // o nome precisa ser deste aparelho para gravar (com o código, ele volta para cá)
     await garantirUsuario(u.nome);
-    await comLimite(set(ref(db, `ranking/${u.chave}`), {
-      nome: u.nome, total: melhor.total, data: melhor.data, corMesa: mesaAtual(), ...(u.id ? { id: u.id } : {}), em: serverTimestamp()
-    }));
+    await comLimite(set(ref(db, `ranking/${u.chave}`), { ...novo, em: serverTimestamp() }));
   }
-  recordeConferido = chave;
+  if (!manterTotal && !manterMes) recordeConferido = chave; // mantido: confere de novo com o histórico inteiro
 }
 
 async function lerRanking() {
   await usuario();
   await publicarRecorde(false).catch(() => {}); // o seu recorde já entra atualizado
   const snap = await comLimite(lerDoBanco("ranking"));
+  // só os recordes já refeitos com partidas em sala (os antigos podiam vir de partida sozinho)
   return Object.entries(snap.val() || {})
-    .filter(([, r]) => r && typeof r.nome === "string" && typeof r.total === "number")
+    .filter(([, r]) => r && r.soSala === true && typeof r.nome === "string" && typeof r.total === "number")
     .map(([chave, r]) => ({ chave, nome: r.nome, total: r.total, data: r.data, corMesa: mesaValida(r.corMesa) ? r.corMesa : null,
-      id: typeof r.id === "string" ? r.id : null }));
+      id: typeof r.id === "string" ? r.id : null,
+      mes: typeof r.mes === "string" ? r.mes : null,
+      totalMes: typeof r.totalMes === "number" ? r.totalMes : null,
+      dataMes: typeof r.dataMes === "string" ? r.dataMes : null }));
 }
 
 let timerHistorico = null;

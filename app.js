@@ -8,7 +8,7 @@ const rows = [
 const COLUNAS = 4;
 
 // Versão do app: igual ao número do CACHE_NAME do service-worker.js (um teste confere).
-const VERSAO = 122;
+const VERSAO = 123;
 
 // Avisos da vez com o app fechado: servidor na Cloudflare (worker/avisos.mjs).
 // Sem o endereço, a opção "Avisar a minha vez" não aparece.
@@ -5000,12 +5000,56 @@ function melhorPartida(lista) {
   return melhor;
 }
 
+// "2026-11": o mês de uma data (no fuso do aparelho).
+function mesDe(data) {
+  const d = new Date(data);
+  return Number.isNaN(d.getTime()) ? "" : `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+}
+
+const NOMES_DOS_MESES = ["janeiro", "fevereiro", "março", "abril", "maio", "junho", "julho", "agosto",
+  "setembro", "outubro", "novembro", "dezembro"];
+const nomeDoMes = mes => NOMES_DOS_MESES[Number(String(mes).slice(5, 7)) - 1] || "este mês";
+
+// A melhor partida em sala de um mês (para o ranking do mês).
+function melhorPartidaDoMes(lista, mes) {
+  return melhorPartida((lista || []).filter(p => p && mesDe(p.data) === mes));
+}
+
+// Ranking do mês: quem tem partida em sala neste mês, com a melhor delas.
+function rankingDoMes(lista, mes) {
+  return (lista || [])
+    .filter(r => r.mes === mes && typeof r.totalMes === "number" && r.totalMes >= 0 && r.totalMes <= MAIOR_PONTUACAO)
+    .map(r => ({ ...r, total: r.totalMes, data: r.dataMes }));
+}
+
 // Ordem do ranking: mais pontos primeiro; empate, quem chegou antes.
 function ordenarRanking(lista) {
   return [...lista].sort((a, b) => b.total - a.total || String(a.data).localeCompare(String(b.data)));
 }
 
 let voltarDoRankingPara = "tela-mais";
+
+// Aba do ranking: "sempre" (recorde de sempre) ou "mes" (melhor do mês); fica lembrada.
+const CHAVE_PERIODO_RANKING = "yam-ranking-periodo";
+let periodoRanking = "sempre";
+try { if (localStorage.getItem(CHAVE_PERIODO_RANKING) === "mes") periodoRanking = "mes"; } catch {}
+let rankingCarregado = null; // o que veio da nuvem (trocar de aba não carrega de novo)
+
+function escolherPeriodoRanking(periodo) {
+  periodoRanking = periodo === "mes" ? "mes" : "sempre";
+  try { localStorage.setItem(CHAVE_PERIODO_RANKING, periodoRanking); } catch {}
+  mostrarPeriodoRanking();
+  if (rankingCarregado) desenharRanking();
+}
+
+function mostrarPeriodoRanking() {
+  const mes = nomeDoMes(mesDe(new Date()));
+  document.querySelectorAll("#ranking-periodo button").forEach(b =>
+    b.setAttribute("aria-checked", String(b.dataset.periodo === periodoRanking)));
+  document.getElementById("ranking-dica").textContent = periodoRanking === "mes"
+    ? `A melhor partida em sala de cada jogador em ${mes}. Recomeça todo dia 1º.`
+    : "A maior pontuação de cada jogador em partidas na sala, com mais gente. Partidas sozinho não contam.";
+}
 
 async function abrirRanking(de = "tela-mais") {
   voltarDoRankingPara = de;
@@ -5017,18 +5061,35 @@ async function abrirRanking(de = "tela-mais") {
   podio.replaceChildren();
   podio.hidden = true;
   meu.hidden = true;
+  rankingCarregado = null;
+  mostrarPeriodoRanking();
   status.textContent = "Carregando o ranking…";
   mostrarTela("tela-ranking");
   if (!window.familia) { status.textContent = "O ranking precisa de internet. Confira a conexão e tente de novo."; return; }
 
-  let todos;
+  let carregado;
   try {
-    todos = ordenarRanking(await familia.lerRanking());
+    carregado = await familia.lerRanking();
   } catch {
     status.textContent = "Não deu para carregar o ranking. Confira a internet e tente de novo.";
     return;
   }
   if (document.getElementById("tela-ranking").hidden) return; // saiu enquanto carregava
+  rankingCarregado = carregado;
+  desenharRanking();
+}
+
+function desenharRanking() {
+  const lista = document.getElementById("lista-ranking");
+  const meu = document.getElementById("ranking-meu");
+  const status = document.getElementById("ranking-status");
+  const podio = document.getElementById("ranking-podio");
+  lista.innerHTML = "";
+  podio.replaceChildren();
+  meu.hidden = true;
+  const doMes = periodoRanking === "mes";
+  const mes = mesDe(new Date());
+  const todos = ordenarRanking(doMes ? rankingDoMes(rankingCarregado, mes) : rankingCarregado || []);
 
   const u = lerUsuario();
   const minhaPosicao = u ? todos.findIndex(r => r.chave === u.chave) : -1;
@@ -5040,10 +5101,14 @@ async function abrirRanking(de = "tela-mais") {
     meu.hidden = false;
     meu.textContent = `Você está em ${minhaPosicao + 1}º, com ${todos[minhaPosicao].total} pontos.`;
   }
-  status.textContent = !todos.length ? "Ninguém entrou no ranking ainda. Termine uma partida em sala para ser o primeiro!"
+  const tenho = doMes ? melhorPartidaDoMes(historico, mes) : melhorPartida(historico);
+  status.textContent = !todos.length && !tenho
+    ? (doMes ? `Ninguém terminou uma partida em sala em ${nomeDoMes(mes)} ainda. Seja o primeiro!`
+      : "Ninguém entrou no ranking ainda. Termine uma partida em sala para ser o primeiro!")
     : minhaPosicao >= 0 ? ""
     : !u ? "Para entrar no ranking, coloque seu nome em Mais e termine uma partida em sala."
-    : melhorPartida(historico) ? "Sua pontuação entra no ranking assim que a internet ajudar."
+    : tenho ? "Sua pontuação entra no ranking assim que a internet ajudar."
+    : doMes ? `Termine uma partida em sala em ${nomeDoMes(mes)}, com mais alguém, para entrar.`
     : "Termine uma partida em sala, com mais alguém, para entrar no ranking.";
 }
 

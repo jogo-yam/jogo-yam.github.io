@@ -2558,6 +2558,25 @@ button.podio-nome {
 
 .ranking-dica { margin: -4px auto 12px; max-width: 700px; }
 
+/* ranking: de sempre ou deste mês */
+.ranking-periodo {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+  max-width: 420px;
+  margin: 0 auto 12px;
+}
+.ranking-periodo button {
+  padding: 8px 4px;
+  font-size: 15px;
+  font-weight: 700;
+  border-color: var(--borda);
+}
+.ranking-periodo button[aria-checked="true"] {
+  border-color: var(--acento);
+  background: color-mix(in srgb, var(--destaque) 12%, var(--superficie));
+}
+
 .lista-ranking {
   flex: 0 1 auto;
   min-height: 0;

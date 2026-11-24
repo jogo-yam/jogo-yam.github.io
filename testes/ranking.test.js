@@ -60,6 +60,31 @@ test("ranking: só partida em sala com mais alguém (sozinho não conta)", () =>
   assert.ok(r.total < app.MAIOR_PONTUACAO);
 });
 
+test("ranking do mês: a melhor partida em sala do mês; recorde antigo fica de fora", () => {
+  const { app, rodar } = carregarApp();
+  const cheia = tabela(rodar, "max");
+  const baixa = tabela(rodar, "min");
+  assert.equal(app.mesDe("2026-11-15T12:00:00"), "2026-11");
+  assert.equal(app.mesDe("bobagem"), "");
+  assert.equal(app.nomeDoMes("2026-03"), "março");
+  const melhorDoMes = (lista, mes) => JSON.parse(JSON.stringify(app.melhorPartidaDoMes(lista, mes)));
+  const lista = [
+    { id: 1, data: "2026-10-15T12:00:00", total: 0, valores: cheia, emSala: 2 }, // outubro, maior
+    { id: 2, data: "2026-11-10T12:00:00", total: 0, valores: baixa, emSala: 2 },
+    { id: 3, data: "2026-11-12T12:00:00", total: 0, valores: cheia } // sozinho: não conta
+  ];
+  assert.equal(melhorDoMes(lista, "2026-11").data, "2026-11-10T12:00:00");
+  assert.equal(melhorDoMes(lista, "2026-12"), null);
+
+  const doMes = JSON.parse(JSON.stringify(app.rankingDoMes([
+    { chave: "a", total: 900, mes: "2026-11", totalMes: 300, dataMes: "2026-11-02" },
+    { chave: "b", total: 500, mes: "2026-10", totalMes: 500, dataMes: "2026-10-30" }, // mês passado
+    { chave: "c", total: 400 }, // não jogou em sala com o app novo neste mês
+    { chave: "d", total: 999, mes: "2026-11", totalMes: 99999, dataMes: "2026-11-03" } // impossível
+  ], "2026-11")));
+  assert.deepEqual(doMes.map(r => [r.chave, r.total, r.data]), [["a", 300, "2026-11-02"]]);
+});
+
 test("ordem do ranking: mais pontos primeiro; empate, quem fez antes", () => {
   const { app } = carregarApp();
   const ordem = JSON.parse(JSON.stringify(app.ordenarRanking([
