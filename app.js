@@ -8,7 +8,7 @@ const rows = [
 const COLUNAS = 4;
 
 // Versão do app: igual ao número do CACHE_NAME do service-worker.js (um teste confere).
-const VERSAO = 111;
+const VERSAO = 112;
 
 // Avisos da vez com o app fechado: servidor na Cloudflare (worker/avisos.mjs).
 // Sem o endereço, a opção "Avisar a minha vez" não aparece.
@@ -60,24 +60,25 @@ function classesDaLinha(i) {
   return i < 6 ? "numeros" : "combos";
 }
 
-// Explicação de cada linha e coluna, mostrada ao tocar no nome.
+// Explicação de cada linha e coluna, mostrada ao tocar no nome (com um exemplo
+// em dadinhos, como em Como jogar: os que contam e quanto vale).
 const LEGENDA_LINHAS = [
-  ["Uns (1)", "Some os dados que caíram 1. Referência: 2 pontos."],
-  ["Dois (2)", "Some os dados que caíram 2. Referência: 4 pontos."],
-  ["Três (3)", "Some os dados que caíram 3. Referência: 9 pontos."],
-  ["Quatros (4)", "Some os dados que caíram 4. Referência: 12 pontos."],
-  ["Cincos (5)", "Some os dados que caíram 5. Referência: 15 pontos."],
-  ["Seis (6)", "Some os dados que caíram 6. Referência: 18 pontos."],
+  ["Uns (1)", "Some os dados que caíram 1. Referência: 2 pontos.", { faces: "1,4,1,6,3", conta: "0,2", vale: "2" }],
+  ["Dois (2)", "Some os dados que caíram 2. Referência: 4 pontos.", { faces: "2,5,2,3,6", conta: "0,2", vale: "4" }],
+  ["Três (3)", "Some os dados que caíram 3. Referência: 9 pontos.", { faces: "3,6,3,3,1", conta: "0,2,3", vale: "9" }],
+  ["Quatros (4)", "Some os dados que caíram 4. Referência: 12 pontos.", { faces: "4,4,2,4,5", conta: "0,1,3", vale: "12" }],
+  ["Cincos (5)", "Some os dados que caíram 5. Referência: 15 pontos.", { faces: "5,5,3,5,1", conta: "0,1,3", vale: "15" }],
+  ["Seis (6)", "Some os dados que caíram 6. Referência: 18 pontos.", { faces: "6,2,6,6,4", conta: "0,2,3", vale: "18" }],
   ["1º total", "Soma das seis linhas de cima. As referências somam 60, o necessário para o bônus."],
   ["Bônus", "Ganha 30 pontos se o 1º total for 60 ou mais. Embaixo do valor aparece quanto ainda falta, ou \"sem bônus\" quando não dá mais para chegar a 60 nem fazendo o máximo nas casas que sobraram."],
   ["2º total", "1º total + bônus."],
-  ["Q – Quadra", "Exatamente quatro dados iguais (com os cinco iguais é YAM). Vale 20 + a soma dos quatro (ex.: quatro 5 = 40)."],
-  ["F – Full", "Uma trinca e um par (ex.: 3-3-3-5-5). Vale 30 + a soma dos dados."],
-  ["S- – Sequência menor", "1-2-3-4-5. Vale 35 + 15 = 50."],
-  ["S+ – Sequência maior", "2-3-4-5-6. Vale 40 + 20 = 60."],
-  ["MIN – Mínimo", "Soma dos cinco dados, tentando fazer o menor valor. Precisa ser menor que o MAX da coluna."],
-  ["MAX – Máximo", "Soma dos cinco dados, tentando fazer o maior valor. Precisa ser maior que o MIN da coluna."],
-  ["YAM", "Os cinco dados iguais. Vale 50 + a soma dos dados (ex.: cinco 6 = 80)."],
+  ["Q – Quadra", "Exatamente quatro dados iguais (com os cinco iguais é YAM). Vale 20 + a soma dos quatro (ex.: quatro 5 = 40).", { faces: "5,5,2,5,5", conta: "0,1,3,4", vale: "40" }],
+  ["F – Full", "Uma trinca e um par (ex.: 3-3-3-5-5). Vale 30 + a soma dos dados.", { faces: "3,3,3,5,5", conta: "0,1,2,3,4", vale: "49" }],
+  ["S- – Sequência menor", "1-2-3-4-5. Vale 35 + 15 = 50.", { faces: "1,2,3,4,5", conta: "0,1,2,3,4", vale: "50" }],
+  ["S+ – Sequência maior", "2-3-4-5-6. Vale 40 + 20 = 60.", { faces: "2,3,4,5,6", conta: "0,1,2,3,4", vale: "60" }],
+  ["MIN – Mínimo", "Soma dos cinco dados, tentando fazer o menor valor. Precisa ser menor que o MAX da coluna.", { faces: "1,2,1,1,3", conta: "0,1,2,3,4", vale: "8" }],
+  ["MAX – Máximo", "Soma dos cinco dados, tentando fazer o maior valor. Precisa ser maior que o MIN da coluna.", { faces: "6,6,5,6,6", conta: "0,1,2,3,4", vale: "29" }],
+  ["YAM", "Os cinco dados iguais. Vale 50 + a soma dos dados (ex.: cinco 6 = 80).", { faces: "6,6,6,6,6", conta: "0,1,2,3,4", vale: "80" }],
   ["3º total", "Soma das linhas de Quadra até YAM."],
   ["2º + 3º total", "Total da coluna."]
 ];
@@ -95,11 +96,15 @@ let ultimoAviso = 0;
 
 // tipo: "" (legenda), "aviso" (casa fora da vez) ou "erro" (valor recusado).
 // acao (opcional): { texto, fazer } mostra um botão dentro da caixa.
-function mostrarLegenda([titulo, texto], tipo = "", acao = null) {
+function mostrarLegenda([titulo, texto, exemplo], tipo = "", acao = null) {
   const caixa = document.getElementById("legenda");
   if (tipo === "festa") rotular(caixa.querySelector("strong"), "festa", titulo);
   else caixa.querySelector("strong").textContent = titulo;
   caixa.querySelector("span").textContent = texto;
+  const lugar = caixa.querySelector(".exemplo-dados");
+  lugar.replaceChildren();
+  lugar.hidden = !exemplo;
+  if (exemplo) desenharExemplo(lugar, exemplo);
   const botao = caixa.querySelector("button");
   botao.hidden = !acao;
   botao.onclick = acao ? () => { caixa.hidden = true; acao.fazer(); } : null;
@@ -1716,16 +1721,20 @@ let voltarDasRegrasPara = "tela-jogo";
 // contam mais apagados, e quanto vale.
 function desenharExemplosDasRegras() {
   document.querySelectorAll("#tela-regras .exemplo-dados").forEach(caixa => {
-    if (caixa.childElementCount) return;
-    const faces = caixa.dataset.faces.split(",").map(Number);
-    const contam = caixa.dataset.conta.split(",").map(Number);
-    const dados = elemento("span", "exemplo-faces");
-    dados.innerHTML = faces.map(f => dadoMini(f)).join("");
-    dados.querySelectorAll(".dado-mini").forEach((d, i) => d.classList.toggle("nao-conta", !contam.includes(i)));
-    caixa.setAttribute("role", "img");
-    caixa.setAttribute("aria-label", `Exemplo: ${faces.join(", ")} = ${caixa.dataset.vale}`);
-    caixa.append(dados, elemento("span", "exemplo-vale", `= ${caixa.dataset.vale}`));
+    if (!caixa.childElementCount) desenharExemplo(caixa, caixa.dataset);
   });
+}
+
+// Um exemplo: { faces: "5,5,3,5,1", conta: "0,1,3", vale: "15" } (índices dos que contam).
+function desenharExemplo(caixa, { faces, conta, vale }) {
+  const lista = faces.split(",").map(Number);
+  const contam = conta.split(",").map(Number);
+  const dados = elemento("span", "exemplo-faces");
+  dados.innerHTML = lista.map(f => dadoMini(f)).join("");
+  dados.querySelectorAll(".dado-mini").forEach((d, i) => d.classList.toggle("nao-conta", !contam.includes(i)));
+  caixa.setAttribute("role", "img");
+  caixa.setAttribute("aria-label", `Exemplo: ${lista.join(", ")} = ${vale}`);
+  caixa.append(dados, elemento("span", "exemplo-vale", `= ${vale}`));
 }
 
 function abrirRegras() {

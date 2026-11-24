@@ -3288,6 +3288,12 @@ td.mudou { animation: mudou 0.7s ease-out; }
 .exemplo-dados .dado-mini { width: 26px; height: 26px; filter: drop-shadow(0 2px 0 rgba(0, 0, 0, 0.18)); }
 .exemplo-dados .dado-mini.nao-conta { opacity: 0.35; }
 .exemplo-vale { font-weight: 800; color: var(--texto); white-space: nowrap; }
+/* na explicação da tabela (caixa escura no tema claro, clara no escuro) */
+.legenda .exemplo-dados { margin: 8px 0 0; }
+.legenda .exemplo-dados[hidden] { display: none; }
+.legenda .exemplo-vale { color: inherit; }
+.legenda .exemplo-dados .dado-mini { filter: none; }
+.legenda .exemplo-dados .dado-mini.nao-conta { opacity: 0.3; }
 
 /* ---------- comemorações: fichas e dadinhos caindo junto com o confete ---------- */
 .confete .ficha-caindo,
