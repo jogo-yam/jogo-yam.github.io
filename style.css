@@ -3307,6 +3307,21 @@ td.mudou { animation: mudou 0.7s ease-out; }
 
 /* início: a partida em sala que ficou pela metade */
 .inicio-terminar { border: 2px dashed var(--foco); }
+
+/* janelinha de novidades */
+.caixa-novidades { text-align: left; max-height: calc(100dvh - 40px); overflow-y: auto; overscroll-behavior: contain; }
+.caixa-novidades h2 { text-align: center; margin-bottom: 12px; }
+.lista-novidades { list-style: none; margin: 0 0 16px; padding: 0; display: grid; gap: 12px; }
+.lista-novidades li { display: flex; gap: 12px; align-items: flex-start; font-size: 14px; color: var(--texto-suave); line-height: 1.35; }
+.lista-novidades strong { display: block; color: var(--texto); font-size: 15px; margin-bottom: 1px; }
+.novidade-icone {
+  flex: none; display: grid; place-items: center; width: 36px; height: 36px; border-radius: 50%;
+  background: color-mix(in srgb, var(--foco) 22%, transparent); color: var(--texto);
+}
+.novidade-icone .icone { width: 20px; height: 20px; margin: 0; }
+.novidade-icone .avatar { margin: 0; font-size: 14px; --cor-jogador: #1f6b47; --borda-jogador: #124a30; }
+:root[data-letra="grande"] .lista-novidades li { font-size: 16px; }
+:root[data-letra="grande"] .lista-novidades strong { font-size: 17px; }
 /* partida pela metade no histórico: Continuar numa linha só, acima das outras ações */
 .continuar-partida { display: flex; width: 100%; justify-content: center; margin: 12px 0 0; }
 .continuar-partida[hidden] { display: none; }

@@ -8,7 +8,7 @@ const rows = [
 const COLUNAS = 4;
 
 // Versão do app: igual ao número do CACHE_NAME do service-worker.js (um teste confere).
-const VERSAO = 120;
+const VERSAO = 121;
 
 // Avisos da vez com o app fechado: servidor na Cloudflare (worker/avisos.mjs).
 // Sem o endereço, a opção "Avisar a minha vez" não aparece.
@@ -4542,6 +4542,31 @@ if (typeof ResizeObserver === "function") {
   });
 }
 
+// ---------- novidades (uma vez, depois de uma atualização grande) ----------
+// Quem já usava o app vê uma janelinha com o que mudou; quem está chegando agora
+// vê as boas-vindas (e as novidades ficam marcadas como vistas).
+const CHAVE_NOVIDADES = "yam-novidades";
+const NOVIDADES = "sala-pausa-2026-11"; // trocar quando houver novidades novas para mostrar
+
+function fecharNovidades() {
+  try { localStorage.setItem(CHAVE_NOVIDADES, NOVIDADES); } catch {}
+  document.getElementById("janela-novidades").hidden = true;
+}
+
+function mostrarNovidadesSePrecisar(tentativa = 0) {
+  let vistas = null;
+  try { vistas = localStorage.getItem(CHAVE_NOVIDADES); } catch { return; }
+  if (vistas === NOVIDADES) return;
+  if (deveMostrarBoasVindas() || !document.getElementById("boas-vindas").hidden) { fecharNovidades(); return; }
+  // não por cima de outra janela, pergunta ou pódio: tenta de novo daqui a pouco
+  const aberta = document.querySelector(".janela:not([hidden]), .fim-de-jogo:not([hidden])");
+  if (aberta) {
+    if (tentativa < 12) { const t = setTimeout(() => mostrarNovidadesSePrecisar(tentativa + 1), 5000); if (t && t.unref) t.unref(); }
+    return;
+  }
+  document.getElementById("janela-novidades").hidden = false;
+}
+
 // ---------- boas-vindas (primeiro uso) ----------
 
 const CHAVE_BOAS_VINDAS = "yam-boas-vindas";
@@ -4910,6 +4935,8 @@ async function verificarLinkDaSala() {
 }
 
 setTimeout(verificarLinkDaSala, 0);
+const timerNovidades = setTimeout(() => { try { mostrarNovidadesSePrecisar(); } catch {} }, 1500);
+if (timerNovidades && timerNovidades.unref) timerNovidades.unref();
 
 // Ao abrir: quem está numa sala volta direto para o jogo; os outros veem a tela inicial.
 try { mostrarTela(ler("yam-familia", null) ? "tela-jogo" : "tela-inicio"); } catch {}
