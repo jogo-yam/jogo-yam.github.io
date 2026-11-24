@@ -8,7 +8,7 @@ const rows = [
 const COLUNAS = 4;
 
 // Versão do app: igual ao número do CACHE_NAME do service-worker.js (um teste confere).
-const VERSAO = 119;
+const VERSAO = 120;
 
 // Avisos da vez com o app fechado: servidor na Cloudflare (worker/avisos.mjs).
 // Sem o endereço, a opção "Avisar a minha vez" não aparece.
@@ -987,6 +987,8 @@ function destaquesDaPartida(terminaram, comVoce = true) {
     return { max: quem.length === com.length ? 0 : max, quem };
   };
   const nomes = quem => {
+    // na tela, empate de 3 ou mais: as bolinhas já mostram quem é
+    if (comVoce && quem.length >= 3) return `${quem.length} empatados`;
     const ns = comVoce
       ? [...quem].sort((a, b) => !!b.eu - !!a.eu).map(j => (j.eu ? "Você" : j.nome)) // "Você" vem primeiro
       : quem.map(j => j.nome);
@@ -2038,13 +2040,13 @@ function atualizarInicio() {
     document.getElementById("inicio-terminar-titulo").textContent = `Voltar para a sala ${daSala.codigo}`;
     const prazo = textoDoPrazo(prazoDaSala);
     document.getElementById("inicio-terminar-sub").textContent = prazo
-      ? `Termine com os outros · ${prazo} para a sala fechar` : "Termine a partida com os outros, de onde parou";
+      ? `Termine com os outros · ${prazo}` : "Termine a partida com os outros";
   } else if (pendente) {
     botaoPendente.onclick = () => continuarPartida(pendente.id);
     document.getElementById("inicio-terminar-titulo").textContent = `Terminar a partida da sala ${pendente.codigoSala}`;
     const prazo = textoDoPrazo(pendente.jeitoSala && pendente.jeitoSala.prazo);
     document.getElementById("inicio-terminar-sub").textContent =
-      `${casasMarcadas(pendente.valores)} de ${LINHAS_JOGO.length * 4} casas · ${prazo ? `${prazo} para a sala fechar` : `parou em ${formatarData(pendente.data)}`}`;
+      `${casasMarcadas(pendente.valores)} de ${LINHAS_JOGO.length * 4} casas · ${prazo || `parou em ${formatarData(pendente.data)}`}`;
   }
 
   // resumo das partidas terminadas
@@ -2078,12 +2080,11 @@ async function continuarPartida(id) {
   if (p.id !== partidaSalvaId || !partidaTemValores(state)) {
     const naSala = window.familia && familia.ativa();
     if (naSala) {
-      if (!await confirmar("Sair da sala de agora?",
-        "Para continuar a outra partida, você sai da sala em que está. A tabela de agora vai para o histórico, e dá para terminar ela depois também.",
-        "Sair e continuar")) return;
-      await familia.sair();
+      // numa sala: primeiro sai dela (pelo Sair, que pergunta se é pausa ou desistência)
+      avisar("Para continuar outra partida, saia antes da sala em que você está (botão Sair, em cima da tabela).", "Você está numa sala");
+      return;
     } else if (partidaTemValores(state) && !partidaCompleta() && !await confirmar("Continuar a outra partida?",
-      "A tabela de agora vai para o histórico, e dá para terminar ela depois também.", "Continuar")) return;
+      "A tabela de agora vai para o histórico (dá para terminar depois).", "Continuar")) return;
     if (partidaTemValores(state)) salvarPartidaAtual();
     state = { ...p.valores };
     salvar();
@@ -2113,6 +2114,16 @@ function partidaParaTerminar() {
 function irParaSala() {
   if (window.familia && familia.ativa()) { mostrarTela("tela-jogo"); return; }
   escolherSala();
+}
+
+// "24/11, 21:30" (deste ano) ou "24/11/2025, 21:30".
+function formatarDataCurta(iso) {
+  const d = new Date(iso);
+  const desteAno = d.getFullYear() === new Date().getFullYear();
+  return d.toLocaleString("pt-BR", {
+    day: "2-digit", month: "2-digit", ...(desteAno ? {} : { year: "numeric" }),
+    hour: "2-digit", minute: "2-digit"
+  });
 }
 
 function formatarData(iso) {
@@ -2153,7 +2164,7 @@ function abrirHistorico() {
       botao.className = "item-historico";
 
       const data = document.createElement("span");
-      data.textContent = formatarData(partida.data);
+      data.textContent = formatarDataCurta(partida.data); // sem o ano, se for deste ano (cabe em celular pequeno)
       const total = document.createElement("strong");
       total.textContent = `${partida.total} pts`;
 
@@ -2183,17 +2194,18 @@ function abrirHistorico() {
       const comparar = elemento("span", "item-comparar");
       // pela metade: no lugar da média e do recorde, quantas casas já foram
       const terminada = partidaTerminada(partida);
+      const prazo = !terminada && partida.codigoSala && textoDoPrazo(partida.jeitoSala && partida.jeitoSala.prazo);
       if (terminada) comparar.append(barra, doRecorde);
-      else comparar.append(elemento("span", "casas-feitas", `${casasMarcadas(partida.valores)} de ${LINHAS_JOGO.length * 4} casas`));
+      else comparar.append(elemento("span", "casas-feitas",
+        `${casasMarcadas(partida.valores)} de ${LINHAS_JOGO.length * 4} casas${prazo ? ` · a sala fecha em ${prazo.replace(/^faltam? /, "")}` : ""}`));
 
       const esquerda = elemento("span", "item-info");
       esquerda.appendChild(data);
       if (!terminada) {
-        // etiqueta: dá para continuar (e voltar para a sala, se ela ainda está aberta)
-        const prazo = partida.codigoSala && textoDoPrazo(partida.jeitoSala && partida.jeitoSala.prazo);
+        // etiqueta: dá para continuar (o prazo da sala vai na linha de baixo)
         const etiqueta = elemento("small", "pela-metade");
         etiqueta.innerHTML = icone("ampulheta");
-        etiqueta.append(prazo ? `pela metade · ${prazo}` : "pela metade"); // (o código da sala aparece ao abrir)
+        etiqueta.append("pela metade");
         esquerda.appendChild(etiqueta);
       }
       if (partida.sala) {
@@ -2248,7 +2260,7 @@ function abrirPartida(id) {
   voltarPara = null;
   document.getElementById("acoes-partida").hidden = false;
 
-  document.getElementById("titulo-partida").textContent = formatarData(partidaAberta.data);
+  document.getElementById("titulo-partida").textContent = formatarDataCurta(partidaAberta.data);
   const infoSala = document.getElementById("sala-partida");
   mostrarTextoDaSala(infoSala, partidaAberta.sala);
   infoSala.hidden = !partidaAberta.sala;
@@ -2261,7 +2273,7 @@ function abrirPartida(id) {
     textoDoPrazo(partidaAberta.jeitoSala && partidaAberta.jeitoSala.prazo);
   const avisoPrazo = document.getElementById("prazo-partida");
   avisoPrazo.hidden = !prazo;
-  if (prazo) avisoPrazo.textContent = `Partida da sala ${partidaAberta.codigoSala}: ${prazo} para terminar com os outros.`;
+  if (prazo) avisoPrazo.textContent = `Sala ${partidaAberta.codigoSala} · ${prazo} para terminar com os outros`;
   const tbody = document.getElementById("tableBody-partida");
   montarTabela(tbody, partidaAberta.valores, false);
   atualizarTotais(tbody, document.getElementById("total-geral-partida"), partidaAberta.valores);

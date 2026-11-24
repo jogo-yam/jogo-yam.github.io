@@ -2243,6 +2243,8 @@ button.podio-nome {
 }
 
 .pergunta-texto {
+  white-space: pre-line; /* "
+" no texto vira quebra de linha */
   margin: 0 0 16px;
   line-height: 1.45;
   color: var(--texto-suave);
@@ -2447,7 +2449,7 @@ button.podio-nome {
   overscroll-behavior: contain;
 }
 
-.fim-de-jogo { align-items: flex-start; }
+.fim-de-jogo { align-items: flex-start; overflow-y: auto; overscroll-behavior: contain; } /* tela baixa: a caixa rola */
 .fim-de-jogo > .fim-caixa { margin-block: auto; }
 
 .janela.janela-baixo { align-items: flex-start; }
@@ -3333,6 +3335,8 @@ td.mudou { animation: mudou 0.7s ease-out; }
 .casas-feitas { font-size: 12px; color: var(--texto-suave); }
 :root[data-letra="grande"] .pela-metade, :root[data-letra="grande"] .casas-feitas { font-size: 14px; }
 .sala-espera-jogadores li.fora .jogador-sala { opacity: 0.45; }
+.sala-espera-jogadores .jogador-sala { flex: 1 1 auto; }
+.nome-sala { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 /* pontinho verde: está com o app aberto agora */
 .avatar.online { position: relative; }
@@ -3379,7 +3383,9 @@ td.mudou { animation: mudou 0.7s ease-out; }
 .destaque-texto small { font-size: 15px; font-weight: 700; color: var(--texto); overflow-wrap: anywhere; }
 .podio-destaques li.eu .destaque-texto small { color: var(--acento); }
 :root[data-letra="grande"] .destaque-texto strong { font-size: 15px; }
-:root[data-letra="grande"] .destaque-texto small { font-size: 17px; }
+:root[data-letra="grande"] .destaque-texto small { font-size: 16px; }
+.podio-caixa .fim-acoes { flex-wrap: wrap; } /* não cabe lado a lado: o Fechar desce */
+.podio-caixa .fim-acoes button { white-space: nowrap; padding-inline: 14px; flex: 1 1 auto; }
 
 /* Letra maior: o número do total fica um pouco maior que o normal (antes ficava
    menor, 21px, e o contorno pesava), com o contorno um tico mais fino */

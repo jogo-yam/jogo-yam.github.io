@@ -37,5 +37,7 @@ test("empate junta os nomes; o que todos fizeram igual (ou ninguém fez) não ap
   const c = { nome: "Caio", valores: tabelaCompleta(semYam) };
   const lista = destaques([a, b, c]);
   assert.deepEqual(lista.map(d => d[0]), ["Maior jogada", "Menor MIN"]);
-  assert.equal(lista[0][1], "Ana, Bia e Caio · Sequência maior de 60");
+  assert.equal(lista[0][1], "3 empatados · Sequência maior de 60", "na tela: as bolinhas mostram quem é");
+  const naImagem = JSON.parse(JSON.stringify(app.destaquesDaPartida([a, b, c], false)));
+  assert.equal(naImagem[0].texto, "Ana, Bia e Caio · Sequência maior de 60", "na imagem: os nomes");
 });
