@@ -8,7 +8,7 @@ const rows = [
 const COLUNAS = 4;
 
 // Versão do app: igual ao número do CACHE_NAME do service-worker.js (um teste confere).
-const VERSAO = 110;
+const VERSAO = 111;
 
 // Avisos da vez com o app fechado: servidor na Cloudflare (worker/avisos.mjs).
 // Sem o endereço, a opção "Avisar a minha vez" não aparece.
@@ -1782,13 +1782,8 @@ function mostrarTela(id) {
   window.scrollTo(0, 0);
 }
 
-// terminou de deslizar: tira a classe (a tela fica sem transform, como sempre)
-document.addEventListener("animationend", evento => {
-  const el = evento.target;
-  if (el && el.classList && (el.classList.contains("entra-da-direita") || el.classList.contains("entra-da-esquerda")) && el.matches("section")) {
-    el.classList.remove("entra-da-direita", "entra-da-esquerda");
-  }
-});
+// A classe do deslize fica na tela até ela sair (mostrarTela tira). Tirar no
+// fim da animação fazia o "aparecer" padrão das telas recomeçar: uma piscada.
 
 function voltarParaPrincipal() {
   mostrarTela(telaPrincipal);
