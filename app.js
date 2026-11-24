@@ -8,7 +8,7 @@ const rows = [
 const COLUNAS = 4;
 
 // Versão do app: igual ao número do CACHE_NAME do service-worker.js (um teste confere).
-const VERSAO = 113;
+const VERSAO = 114;
 
 // Avisos da vez com o app fechado: servidor na Cloudflare (worker/avisos.mjs).
 // Sem o endereço, a opção "Avisar a minha vez" não aparece.
@@ -2625,6 +2625,7 @@ function mostrarMesa(nome) {
   if (nome === "verde") delete document.documentElement.dataset.mesa;
   else document.documentElement.dataset.mesa = nome;
   desenharEscolhaMesa();
+  desenharMinhaFoto(); // a bolinha da foto (em Mais) fica na cor nova na hora
   if (window.familia) familia.corDaMesaMudou(); // na sala, os outros veem a cor nova na hora
 }
 
@@ -3975,6 +3976,9 @@ let somLigado = true;
 try { somLigado = localStorage.getItem(CHAVE_SOM) !== "0"; } catch {}
 let audio = null;
 
+// (aparelhos antigos não devolvem promessa no resume/close)
+const semErro = p => { if (p && typeof p.catch === "function") p.catch(() => {}); };
+
 function contextoDeAudio() {
   if (!somLigado) return null;
   try {
@@ -3984,10 +3988,40 @@ function contextoDeAudio() {
       if (navigator.audioSession) navigator.audioSession.type = "ambient";
       audio = new Contexto();
     }
-    if (audio.state === "suspended") audio.resume();
+    // no iPhone, depois de minimizar, o estado fica "interrupted" (não só
+    // "suspended"): qualquer um que não seja "running" tenta retomar
+    if (audio.state === "closed") { audio = null; return contextoDeAudio(); }
+    if (audio.state !== "running") semErro(audio.resume());
     return audio;
   } catch { return null; }
 }
+
+// Ao voltar para o app (e no primeiro toque depois disso, que o iPhone exige
+// para liberar o som), retoma o áudio. Se ele não voltar, troca por um novo:
+// o próximo som já sai pelo áudio novo (os sons gravados servem nos dois).
+function reavivarAudio() {
+  if (!audio || !somLigado || audio.state === "running") return;
+  const velho = audio;
+  try { semErro(velho.resume()); } catch {}
+  setTimeout(() => {
+    if (audio !== velho || velho.state === "running" || document.visibilityState !== "visible") return;
+    audio = null;
+    try { semErro(velho.close()); } catch {}
+  }, 500);
+}
+let audioPausadoAoSair = false;
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "hidden") { audioPausadoAoSair = true; return; }
+  reavivarAudio();
+});
+window.addEventListener("pageshow", reavivarAudio);
+// o primeiro toque depois de voltar: retoma (ou cria um áudio novo dentro do toque)
+["pointerdown", "touchend", "keydown"].forEach(tipo => document.addEventListener(tipo, () => {
+  if (!audioPausadoAoSair && (!audio || audio.state === "running")) return;
+  audioPausadoAoSair = false;
+  if (audio && audio.state !== "running") reavivarAudio();
+  else if (!audio && somLigado) contextoDeAudio();
+}, { capture: true, passive: true }));
 
 function nota(ctx, freq, inicio, duracao, { tipo = "triangle", volume = 0.16 } = {}) {
   const osc = ctx.createOscillator();
