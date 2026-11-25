@@ -8,7 +8,7 @@ const rows = [
 const COLUNAS = 4;
 
 // Versão do app: igual ao número do CACHE_NAME do service-worker.js (um teste confere).
-const VERSAO = 127;
+const VERSAO = 128;
 
 // Avisos da vez com o app fechado: servidor na Cloudflare (worker/avisos.mjs).
 // Sem o endereço, a opção "Avisar a minha vez" não aparece.
@@ -2864,7 +2864,8 @@ const CHAVE_TEXTURA = "yam-textura"; // o nome da textura ("0", antigo, = lisa)
 
 // Texturas da mesa: "padrao" é a de cada mesa (feltro, veios da madeira,
 // losangos dourados na preta); "nao" é o feltro liso.
-const TEXTURAS = { padrao: "Padrão", tecido: "Tecido", couro: "Couro", losangos: "Losangos", nao: "Lisa" };
+const TEXTURAS = { padrao: "Padrão", feltro: "Feltro", tecido: "Tecido", couro: "Couro", madeira: "Madeira",
+  losangos: "Losangos", dourado: "Dourado", nao: "Lisa" };
 const texturaValida = t => Object.prototype.hasOwnProperty.call(TEXTURAS, t);
 
 function texturaAtual() {
@@ -2907,8 +2908,6 @@ function desenharEscolhaTextura() {
   const caixa = document.getElementById("escolha-textura");
   if (!caixa) return;
   const atual = texturaAtual();
-  const amostra = { padrao: "var(--textura-da-mesa)", tecido: "var(--textura-tecido)", couro: "var(--textura-couro)",
-    losangos: "var(--textura-losangos)", nao: "none" };
   caixa.replaceChildren(...Object.entries(TEXTURAS).map(([chave, nome]) => {
     const b = document.createElement("button");
     b.type = "button";
@@ -2916,7 +2915,7 @@ function desenharEscolhaTextura() {
     b.setAttribute("role", "radio");
     b.setAttribute("aria-checked", chave === atual);
     b.textContent = nome;
-    b.style.setProperty("--amostra", amostra[chave]);
+    b.style.setProperty("--amostra", chave === "nao" ? "none" : chave === "padrao" ? "var(--textura-da-mesa)" : `var(--textura-${chave})`);
     b.addEventListener("click", () => escolherTextura(chave));
     return b;
   }));
