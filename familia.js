@@ -505,10 +505,11 @@ async function sincronizarCofre(cofre, u) {
   if (u) {
     const aqui = mesaGuardada();
     const la = { ...(perfil || {}), em: Number(perfil && perfil.mesaEm) || 0 };
-    if (la.em > aqui.em && mesaValida(la.mesa)) aplicarMesaDaNuvem(la.mesa, la.em, la.textura, la.dados);
+    if (la.em > aqui.em && mesaValida(la.mesa)) aplicarMesaDaNuvem(la.mesa, la.em, la.textura, la.dados, la.texturaNome);
     else if (aqui.em > la.em) {
       enviar["perfil/mesa"] = aqui.mesa;
-      enviar["perfil/textura"] = aqui.textura;
+      enviar["perfil/textura"] = aqui.textura; // ligada/desligada: o app antigo só entende isso
+      enviar["perfil/texturaNome"] = aqui.texturaNome;
       enviar["perfil/dados"] = aqui.dados;
       enviar["perfil/mesaEm"] = aqui.em;
     }

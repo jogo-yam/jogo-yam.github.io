@@ -37,7 +37,26 @@ test("o script do começo da página aceita todas as mesas (e só elas)", () => 
 
 test("sem textura: o CSS deixa o feltro liso e a página aplica a escolha antes de desenhar", () => {
   assert.ok(css.includes(':root[data-textura="nao"][data-mesa] { --textura-mesa: none; }'));
-  assert.ok(html.includes('localStorage.getItem("yam-textura") === "0"'));
+  assert.ok(html.includes('if (textura === "0") document.documentElement.dataset.textura = "nao";'));
+});
+
+test("texturas: cada uma tem CSS e o começo da página aceita todas (e só elas)", () => {
+  const texturas = JSON.parse(rodar("JSON.stringify(Object.keys(TEXTURAS))"));
+  assert.equal(texturas[0], "padrao");
+  for (const t of texturas.slice(1)) assert.ok(css.includes(`:root[data-textura="${t}"][data-mesa] {`), `falta a textura ${t}`);
+  const lista = html.match(/\^\((tecido[a-z|]*)\)\$/);
+  assert.ok(lista, "regex das texturas no index.html");
+  assert.deepEqual(lista[1].split("|").sort(), texturas.slice(1).sort());
+});
+
+test("textura da nuvem: o nome vale; o ligada/desligada do app antigo manda quando discorda", () => {
+  assert.equal(rodar('texturaDaNuvem(true, "couro")'), "couro");
+  assert.equal(rodar('texturaDaNuvem(false, "nao")'), "nao");
+  assert.equal(rodar('texturaDaNuvem(false, "couro")'), "nao", "o app antigo desligou depois");
+  assert.equal(rodar('texturaDaNuvem(true, "nao")'), "padrao", "o app antigo ligou depois");
+  assert.equal(rodar('texturaDaNuvem(true)'), "padrao");
+  assert.equal(rodar('texturaDaNuvem(undefined, "losangos")'), "losangos");
+  assert.equal(rodar('texturaDaNuvem(undefined, "bobagem")'), null);
 });
 
 test("cores dos dados: marfim é o padrão, cada outra tem cores no CSS e o começo da página aceita", () => {
@@ -57,5 +76,8 @@ test("cores dos dados: marfim é o padrão, cada outra tem cores no CSS e o come
 test("avatar: a mesma pessoa sem mesa conhecida tem sempre a mesma cor; com mesa, a da mesa", () => {
   assert.equal(rodar('mesaDoJogador("Giovana")'), rodar('mesaDoJogador("giovana")'));
   assert.equal(rodar('mesaDoJogador("Giovana", "roxo")'), "roxo");
+  // as mesas novas não mudam a cor de quem já aparecia (sem mesa conhecida)
+  assert.ok(JSON.parse(rodar("JSON.stringify(MESAS_DO_NOME)")).every(m => rodar(`mesaValida("${m}")`)));
+  assert.deepEqual(JSON.parse(rodar("JSON.stringify(MESAS_DO_NOME)")), ["verde", "azul", "vinho", "roxo", "madeira", "preto"]);
   assert.equal(rodar('inicialDe(" vó Lúcia")'), "V");
 });

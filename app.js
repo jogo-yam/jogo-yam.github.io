@@ -8,7 +8,7 @@ const rows = [
 const COLUNAS = 4;
 
 // Versão do app: igual ao número do CACHE_NAME do service-worker.js (um teste confere).
-const VERSAO = 126;
+const VERSAO = 127;
 
 // Avisos da vez com o app fechado: servidor na Cloudflare (worker/avisos.mjs).
 // Sem o endereço, a opção "Avisar a minha vez" não aparece.
@@ -2837,12 +2837,19 @@ atualizarBotaoTema();
 // modo claro, usado nas bolinhas de escolher e nas imagens de compartilhar.
 const MESAS = {
   verde: { nome: "Feltro verde", cor: "#1f6b47", borda: "#124a30" },
+  turquesa: { nome: "Feltro turquesa", cor: "#146a6a", borda: "#0b4747" },
   azul: { nome: "Feltro azul", cor: "#1d5a8a", borda: "#123d61" },
-  vinho: { nome: "Feltro vinho", cor: "#7a1f33", borda: "#521423" },
   roxo: { nome: "Feltro roxo", cor: "#5b2f86", borda: "#3d1f5c" },
+  rosa: { nome: "Feltro rosa", cor: "#8e3462", borda: "#612143" },
+  vinho: { nome: "Feltro vinho", cor: "#7a1f33", borda: "#521423" },
+  terracota: { nome: "Feltro terracota", cor: "#9a4320", borda: "#6b2d14" },
   madeira: { nome: "Madeira", cor: "#7a4a24", borda: "#533117" },
+  grafite: { nome: "Grafite", cor: "#3b4248", borda: "#23282c" },
   preto: { nome: "Preto e dourado", cor: "#1f1d1a", borda: "#b8871c" }
 };
+// Quem não tem mesa conhecida ganha uma cor tirada do nome, entre as mesas que
+// já existiam (com as novas, essas pessoas não mudam de cor).
+const MESAS_DO_NOME = ["verde", "azul", "vinho", "roxo", "madeira", "preto"];
 const CHAVE_COR_MESA = "yam-cor-mesa";
 const CHAVE_COR_MESA_EM = "yam-cor-mesa-em"; // quando foi escolhida (vale a mais recente entre os aparelhos)
 
@@ -2853,16 +2860,26 @@ function mesaAtual() {
   return mesaValida(m) ? m : "verde";
 }
 
-const CHAVE_TEXTURA = "yam-textura"; // "0" = feltro liso
+const CHAVE_TEXTURA = "yam-textura"; // o nome da textura ("0", antigo, = lisa)
 
-const texturaLigada = () => document.documentElement.dataset.textura !== "nao";
+// Texturas da mesa: "padrao" é a de cada mesa (feltro, veios da madeira,
+// losangos dourados na preta); "nao" é o feltro liso.
+const TEXTURAS = { padrao: "Padrão", tecido: "Tecido", couro: "Couro", losangos: "Losangos", nao: "Lisa" };
+const texturaValida = t => Object.prototype.hasOwnProperty.call(TEXTURAS, t);
+
+function texturaAtual() {
+  const t = document.documentElement.dataset.textura;
+  return texturaValida(t) ? t : "padrao";
+}
+
+const texturaLigada = () => texturaAtual() !== "nao";
 
 // A mesa deste aparelho (cor, textura e cor dos dados) e
 // quando foi escolhida (0 = nunca escolheu aqui).
 function mesaGuardada() {
   let em = 0;
   try { em = Number(localStorage.getItem(CHAVE_COR_MESA_EM)) || 0; } catch {}
-  return { mesa: mesaAtual(), textura: texturaLigada(), dados: dadosAtuais(), em };
+  return { mesa: mesaAtual(), textura: texturaLigada(), texturaNome: texturaAtual(), dados: dadosAtuais(), em };
 }
 
 // Mudou algo da aparência: vale a partir de agora, aqui e (com nome) na nuvem.
@@ -2871,25 +2888,52 @@ function aparenciaMudou() {
   if (window.familia && lerUsuario()) familia.historicoMudou();
 }
 
-function mostrarTextura(ligada) {
-  if (ligada) delete document.documentElement.dataset.textura;
-  else document.documentElement.dataset.textura = "nao";
-  const botao = document.getElementById("botao-textura");
-  if (botao) botao.setAttribute("aria-checked", ligada);
+function mostrarTextura(nome) {
+  const t = texturaValida(nome) ? nome : "padrao";
+  if (t === "padrao") delete document.documentElement.dataset.textura;
+  else document.documentElement.dataset.textura = t;
+  desenharEscolhaTextura();
 }
 
-// Ligar ou desligar a textura do feltro: como a cor, acompanha o nome de usuário.
-function alternarTextura() {
-  const ligada = !texturaLigada();
-  mostrarTextura(ligada);
-  try { localStorage.setItem(CHAVE_TEXTURA, ligada ? "1" : "0"); } catch {}
+// Escolher a textura: como a cor, acompanha o nome de usuário.
+function escolherTextura(nome) {
+  if (!texturaValida(nome)) return;
+  mostrarTextura(nome);
+  try { localStorage.setItem(CHAVE_TEXTURA, nome); } catch {}
   aparenciaMudou();
+}
+
+function desenharEscolhaTextura() {
+  const caixa = document.getElementById("escolha-textura");
+  if (!caixa) return;
+  const atual = texturaAtual();
+  const amostra = { padrao: "var(--textura-da-mesa)", tecido: "var(--textura-tecido)", couro: "var(--textura-couro)",
+    losangos: "var(--textura-losangos)", nao: "none" };
+  caixa.replaceChildren(...Object.entries(TEXTURAS).map(([chave, nome]) => {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.className = "pilula-textura";
+    b.setAttribute("role", "radio");
+    b.setAttribute("aria-checked", chave === atual);
+    b.textContent = nome;
+    b.style.setProperty("--amostra", amostra[chave]);
+    b.addEventListener("click", () => escolherTextura(chave));
+    return b;
+  }));
+}
+
+// A textura que veio da nuvem: o nome (app novo) ou só ligada/desligada (app antigo).
+function texturaDaNuvem(ligada, nome) {
+  if (texturaValida(nome) && (typeof ligada !== "boolean" || ligada === (nome !== "nao"))) return nome;
+  if (typeof ligada === "boolean") return ligada ? "padrao" : "nao";
+  return null;
 }
 
 function mostrarMesa(nome) {
   if (nome === "verde") delete document.documentElement.dataset.mesa;
   else document.documentElement.dataset.mesa = nome;
   desenharEscolhaMesa();
+  desenharEscolhaTextura(); // as amostras de textura ficam na cor nova
   desenharMinhaFoto(); // a bolinha da foto (em Mais) fica na cor nova na hora
   if (window.familia) familia.corDaMesaMudou(); // na sala, os outros veem a cor nova na hora
 }
@@ -2910,13 +2954,14 @@ function escolherMesa(nome) {
 }
 
 // A nuvem tem uma escolha mais nova (feita em outro aparelho com o mesmo nome).
-function aplicarMesaDaNuvem(nome, em, textura, dados) {
+function aplicarMesaDaNuvem(nome, em, textura, dados, texturaNome) {
   if (!mesaValida(nome)) return;
   mostrarMesa(nome);
   guardarCorDaMesa(nome, em);
-  if (typeof textura === "boolean") {
-    mostrarTextura(textura);
-    try { localStorage.setItem(CHAVE_TEXTURA, textura ? "1" : "0"); } catch {}
+  const t = texturaDaNuvem(textura, texturaNome);
+  if (t) {
+    mostrarTextura(t);
+    try { localStorage.setItem(CHAVE_TEXTURA, t); } catch {}
   }
   if (dadosValidos(dados)) {
     mostrarDados(dados);
@@ -2943,16 +2988,20 @@ function desenharEscolhaMesa() {
   }));
 }
 desenharEscolhaMesa();
-mostrarTextura(texturaLigada());
+mostrarTextura(texturaAtual());
 
 // ---------- cor dos dados ----------
 // Como a mesa: escolha em Mais, acompanha o nome. As cores estão no style.css
 // (data-dados); aqui só o que aparece no botão de escolher.
 const DADOS = {
   marfim: { nome: "Marfim", cor: "#fffdf6", borda: "#c9bfa5", pinta: "#2a1d0e", brilho: "#ffffff" },
+  classico: { nome: "Branco com pintas vermelhas", cor: "#fffdf6", borda: "#c9bfa5", pinta: "#c8202f", brilho: "#ffffff" },
   vermelho: { nome: "Vermelho de cassino", cor: "#c8202f", borda: "#6e0b14", pinta: "#fffaf0", brilho: "#f0606b" },
-  preto: { nome: "Preto com pintas douradas", cor: "#22201d", borda: "#000000", pinta: "#e8bf55", brilho: "#4a453e" },
-  azul: { nome: "Azul de cassino", cor: "#1f4fae", borda: "#0b2155", pinta: "#fffaf0", brilho: "#5f8fe8" }
+  rosa: { nome: "Rosa", cor: "#c2417f", borda: "#5e1638", pinta: "#fffaf0", brilho: "#ec86b6" },
+  roxo: { nome: "Roxo", cor: "#5b2f9a", borda: "#2a1252", pinta: "#fffaf0", brilho: "#9b6fe0" },
+  azul: { nome: "Azul de cassino", cor: "#1f4fae", borda: "#0b2155", pinta: "#fffaf0", brilho: "#5f8fe8" },
+  verde: { nome: "Verde", cor: "#1e7a48", borda: "#0b3a21", pinta: "#fffaf0", brilho: "#5cbf86" },
+  preto: { nome: "Preto com pintas douradas", cor: "#22201d", borda: "#000000", pinta: "#e8bf55", brilho: "#4a453e" }
 };
 const CHAVE_COR_DADOS = "yam-cor-dados";
 const dadosValidos = nome => Object.prototype.hasOwnProperty.call(DADOS, nome);
@@ -3002,7 +3051,7 @@ desenharEscolhaDados();
 // tirada do nome (a mesma pessoa sempre com a mesma cor).
 function mesaDoJogador(nome, mesa) {
   if (mesaValida(mesa)) return mesa;
-  const chaves = Object.keys(MESAS);
+  const chaves = MESAS_DO_NOME;
   let h = 0;
   for (const c of normalizarNome(String(nome || ""))) h = (h * 31 + c.codePointAt(0)) >>> 0;
   return chaves[h % chaves.length];
