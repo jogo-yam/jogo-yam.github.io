@@ -8,7 +8,7 @@ const rows = [
 const COLUNAS = 4;
 
 // Versão do app: igual ao número do CACHE_NAME do service-worker.js (um teste confere).
-const VERSAO = 129;
+const VERSAO = 130;
 
 // Avisos da vez com o app fechado: servidor na Cloudflare (worker/avisos.mjs).
 // Sem o endereço, a opção "Avisar a minha vez" não aparece.
@@ -1993,6 +1993,7 @@ function abrirMais() {
   mostrarTela("tela-mais");
   document.querySelector("#tela-mais .mais").scrollTop = 0;
   desenharMinhaFoto();
+  centralizarEscolhas();
 }
 
 // Início e jogo são as telas "principais": as outras voltam para a última delas.
@@ -3051,6 +3052,38 @@ function desenharEscolhaDados() {
   }));
 }
 desenharEscolhaDados();
+
+// ---------- fileiras de mesa, dados e textura (rolam para o lado) ----------
+const FILEIRAS_DE_ESCOLHA = ["escolha-mesa", "escolha-dados", "escolha-textura"];
+
+// Esmaece a borda do lado onde ainda tem opção escondida.
+function marcarBordasDaFileira(caixa) {
+  const falta = caixa.scrollWidth - caixa.clientWidth - caixa.scrollLeft;
+  caixa.toggleAttribute("data-antes", caixa.scrollLeft > 2);
+  caixa.toggleAttribute("data-depois", falta > 2);
+}
+
+// Ao abrir Mais: cada fileira já mostra a opção escolhida, no meio.
+function centralizarEscolhas() {
+  for (const id of FILEIRAS_DE_ESCOLHA) {
+    const caixa = document.getElementById(id);
+    if (!caixa || !caixa.clientWidth) continue;
+    const b = caixa.querySelector('[aria-checked="true"]');
+    if (b) caixa.scrollLeft = b.offsetLeft + b.offsetWidth / 2 - caixa.clientWidth / 2;
+    marcarBordasDaFileira(caixa);
+  }
+}
+
+for (const id of FILEIRAS_DE_ESCOLHA) {
+  const caixa = document.getElementById(id);
+  if (caixa) caixa.addEventListener("scroll", () => marcarBordasDaFileira(caixa), { passive: true });
+}
+window.addEventListener("resize", () => {
+  for (const id of FILEIRAS_DE_ESCOLHA) {
+    const caixa = document.getElementById(id);
+    if (caixa) marcarBordasDaFileira(caixa);
+  }
+});
 
 // ---------- avatar (bolinha com a inicial) ----------
 // Na cor da mesa que a pessoa escolheu; sem saber a mesa dela, uma cor fixa
