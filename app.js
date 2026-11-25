@@ -8,7 +8,7 @@ const rows = [
 const COLUNAS = 4;
 
 // Versão do app: igual ao número do CACHE_NAME do service-worker.js (um teste confere).
-const VERSAO = 128;
+const VERSAO = 129;
 
 // Avisos da vez com o app fechado: servidor na Cloudflare (worker/avisos.mjs).
 // Sem o endereço, a opção "Avisar a minha vez" não aparece.
@@ -2862,15 +2862,23 @@ function mesaAtual() {
 
 const CHAVE_TEXTURA = "yam-textura"; // o nome da textura ("0", antigo, = lisa)
 
-// Texturas da mesa: "padrao" é a de cada mesa (feltro, veios da madeira,
-// losangos dourados na preta); "nao" é o feltro liso.
-const TEXTURAS = { padrao: "Padrão", feltro: "Feltro", tecido: "Tecido", couro: "Couro", madeira: "Madeira",
-  losangos: "Losangos", dourado: "Dourado", nao: "Lisa" };
+// Texturas da mesa, qualquer uma em qualquer cor; "nao" é o feltro liso.
+const TEXTURAS = { feltro: "Feltro", tecido: "Tecido", couro: "Couro", madeira: "Madeira", losangos: "Losangos", nao: "Lisa" };
 const texturaValida = t => Object.prototype.hasOwnProperty.call(TEXTURAS, t);
+
+// Nomes de antes: "padrao" seguia a mesa (veios na madeira, losangos dourados
+// na preta, feltro nas outras) e "dourado" virou os losangos. Quem nunca
+// escolheu fica com o que já via. (O começo do index.html faz o mesmo.)
+function texturaDe(nome, mesa) {
+  if (nome === "0") return "nao";
+  if (nome === "dourado") return "losangos";
+  if (texturaValida(nome)) return nome;
+  return mesa === "madeira" ? "madeira" : mesa === "preto" ? "losangos" : "feltro";
+}
 
 function texturaAtual() {
   const t = document.documentElement.dataset.textura;
-  return texturaValida(t) ? t : "padrao";
+  return texturaValida(t) ? t : "feltro";
 }
 
 const texturaLigada = () => texturaAtual() !== "nao";
@@ -2890,9 +2898,7 @@ function aparenciaMudou() {
 }
 
 function mostrarTextura(nome) {
-  const t = texturaValida(nome) ? nome : "padrao";
-  if (t === "padrao") delete document.documentElement.dataset.textura;
-  else document.documentElement.dataset.textura = t;
+  document.documentElement.dataset.textura = texturaValida(nome) ? nome : "feltro";
   desenharEscolhaTextura();
 }
 
@@ -2915,16 +2921,17 @@ function desenharEscolhaTextura() {
     b.setAttribute("role", "radio");
     b.setAttribute("aria-checked", chave === atual);
     b.textContent = nome;
-    b.style.setProperty("--amostra", chave === "nao" ? "none" : chave === "padrao" ? "var(--textura-da-mesa)" : `var(--textura-${chave})`);
+    b.style.setProperty("--amostra", chave === "nao" ? "none" : `var(--textura-${chave})`);
     b.addEventListener("click", () => escolherTextura(chave));
     return b;
   }));
 }
 
 // A textura que veio da nuvem: o nome (app novo) ou só ligada/desligada (app antigo).
-function texturaDaNuvem(ligada, nome) {
-  if (texturaValida(nome) && (typeof ligada !== "boolean" || ligada === (nome !== "nao"))) return nome;
-  if (typeof ligada === "boolean") return ligada ? "padrao" : "nao";
+function texturaDaNuvem(ligada, nome, mesa) {
+  const conhecido = texturaValida(nome) || nome === "padrao" || nome === "dourado";
+  if (conhecido && (typeof ligada !== "boolean" || ligada === (nome !== "nao"))) return texturaDe(nome, mesa);
+  if (typeof ligada === "boolean") return ligada ? texturaDe("padrao", mesa) : "nao";
   return null;
 }
 
@@ -2957,7 +2964,7 @@ function aplicarMesaDaNuvem(nome, em, textura, dados, texturaNome) {
   if (!mesaValida(nome)) return;
   mostrarMesa(nome);
   guardarCorDaMesa(nome, em);
-  const t = texturaDaNuvem(textura, texturaNome);
+  const t = texturaDaNuvem(textura, texturaNome, nome);
   if (t) {
     mostrarTextura(t);
     try { localStorage.setItem(CHAVE_TEXTURA, t); } catch {}

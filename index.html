@@ -20,14 +20,14 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="theme-color" content="#f4ecd8" media="(prefers-color-scheme: light)">
   <meta name="theme-color" content="#121413" media="(prefers-color-scheme: dark)">
-  <link rel="manifest" href="manifest.json?v=128">
+  <link rel="manifest" href="manifest.json?v=129">
   <link rel="icon" type="image/png" sizes="32x32" href="icone-mesa-32.png">
   <link rel="apple-touch-icon" href="icone-mesa-apple-180.png">
 
   <link rel="preload" href="fontes/nunito.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="preload" href="fontes/fredoka.woff2" as="font" type="font/woff2" crossorigin>
   <!-- ?v= é a versão do app (igual ao VERSAO do app.js; um teste confere): versão nova, endereço novo -->
-  <link rel="stylesheet" href="style.css?v=128">
+  <link rel="stylesheet" href="style.css?v=129">
 
   <!-- Aplica o tema escolhido antes de desenhar a página, para não piscar. -->
   <meta name="apple-mobile-web-app-capable" content="yes">
@@ -52,9 +52,13 @@
       if (localStorage.getItem("yam-letra") === "grande") document.documentElement.dataset.letra = "grande";
       const mesa = localStorage.getItem("yam-cor-mesa");
       if (/^(turquesa|azul|roxo|rosa|vinho|terracota|madeira|grafite|preto)$/.test(mesa || "")) document.documentElement.dataset.mesa = mesa;
-      const textura = localStorage.getItem("yam-textura"); // "0" (antigo) = lisa
-      if (textura === "0") document.documentElement.dataset.textura = "nao";
-      else if (/^(tecido|couro|feltro|madeira|dourado|losangos|nao)$/.test(textura || "")) document.documentElement.dataset.textura = textura;
+      // textura: a escolhida; nomes antigos ("0" = lisa, "dourado", ou nenhum = a que a mesa tinha) ficam guardados já trocados
+      const guardada = localStorage.getItem("yam-textura");
+      const textura = guardada === "0" ? "nao" : guardada === "dourado" ? "losangos"
+        : /^(feltro|tecido|couro|madeira|losangos|nao)$/.test(guardada || "") ? guardada
+        : mesa === "madeira" ? "madeira" : mesa === "preto" ? "losangos" : "feltro";
+      document.documentElement.dataset.textura = textura;
+      if (textura !== guardada) localStorage.setItem("yam-textura", textura);
       const dados = localStorage.getItem("yam-cor-dados");
       if (/^(vermelho|classico|rosa|roxo|azul|verde|preto)$/.test(dados || "")) document.documentElement.dataset.dados = dados;
     } catch {}
@@ -827,7 +831,7 @@
   </div>
 </div>
 
-<script src="app.js?v=128"></script>
+<script src="app.js?v=129"></script>
 <script>
   // Rede de segurança: se o app.js não carregou (ex.: troca de versão no meio
   // do caminho), recarrega sozinho uma vez, em vez de ficar com a tabela vazia.
@@ -841,7 +845,7 @@
     setTimeout(function () { location.replace(location.pathname + "?atualizado=" + Date.now()); }, 1500);
   })();
 </script>
-<script type="module" src="familia.js?v=128"></script>
+<script type="module" src="familia.js?v=129"></script>
 
 <!-- Service Worker -->
 <script>

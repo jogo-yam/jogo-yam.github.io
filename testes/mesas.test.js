@@ -37,24 +37,28 @@ test("o script do começo da página aceita todas as mesas (e só elas)", () => 
 
 test("sem textura: o CSS deixa o feltro liso e a página aplica a escolha antes de desenhar", () => {
   assert.ok(css.includes(':root[data-textura="nao"][data-mesa] { --textura-mesa: none; }'));
-  assert.ok(html.includes('if (textura === "0") document.documentElement.dataset.textura = "nao";'));
+  assert.ok(html.includes('const textura = guardada === "0" ? "nao"'));
 });
 
 test("texturas: cada uma tem CSS e o começo da página aceita todas (e só elas)", () => {
   const texturas = JSON.parse(rodar("JSON.stringify(Object.keys(TEXTURAS))"));
-  assert.equal(texturas[0], "padrao");
-  for (const t of texturas.slice(1)) assert.ok(css.includes(`:root[data-textura="${t}"][data-mesa] {`), `falta a textura ${t}`);
-  const lista = html.match(/\^\((tecido[a-z|]*)\)\$/);
+  assert.equal(texturas[0], "feltro");
+  assert.ok(!texturas.includes("padrao"), "a textura é sempre escolha da pessoa");
+  for (const t of texturas) assert.ok(css.includes(`:root[data-textura="${t}"][data-mesa] {`), `falta a textura ${t}`);
+  const lista = html.match(/\^\((feltro[a-z|]*)\)\$/);
   assert.ok(lista, "regex das texturas no index.html");
-  assert.deepEqual(lista[1].split("|").sort(), texturas.slice(1).sort());
+  assert.deepEqual(lista[1].split("|").sort(), texturas.slice().sort());
 });
 
 test("textura da nuvem: o nome vale; o ligada/desligada do app antigo manda quando discorda", () => {
   assert.equal(rodar('texturaDaNuvem(true, "couro")'), "couro");
   assert.equal(rodar('texturaDaNuvem(false, "nao")'), "nao");
   assert.equal(rodar('texturaDaNuvem(false, "couro")'), "nao", "o app antigo desligou depois");
-  assert.equal(rodar('texturaDaNuvem(true, "nao")'), "padrao", "o app antigo ligou depois");
-  assert.equal(rodar('texturaDaNuvem(true)'), "padrao");
+  assert.equal(rodar('texturaDaNuvem(true, "nao")'), "feltro", "o app antigo ligou depois");
+  assert.equal(rodar('texturaDaNuvem(true)'), "feltro");
+  assert.equal(rodar('texturaDaNuvem(true, undefined, "madeira")'), "madeira", "quem nunca escolheu fica com o que via");
+  assert.equal(rodar('texturaDaNuvem(true, "padrao", "preto")'), "losangos");
+  assert.equal(rodar('texturaDaNuvem(true, "dourado", "azul")'), "losangos");
   assert.equal(rodar('texturaDaNuvem(undefined, "losangos")'), "losangos");
   assert.equal(rodar('texturaDaNuvem(undefined, "bobagem")'), null);
 });
