@@ -3569,6 +3569,14 @@ td.mudou { animation: mudou 0.7s ease-out; }
 .sala-espera-prazo[hidden] { display: none; }
 .sala-espera-prazo .icone { width: 1em; height: 1em; margin: 0; }
 
+/* histórico: as em pausa em cima, com título; depois as terminadas */
+.lista-historico .titulo-historico {
+  padding: 6px 4px 0;
+  font-size: 13px; font-weight: 800; letter-spacing: 0.04em; text-transform: uppercase;
+  color: var(--texto-suave);
+}
+:root[data-letra="grande"] .lista-historico .titulo-historico { font-size: 15px; }
+
 /* histórico: partida pela metade (dá para continuar) */
 .pela-metade {
   display: inline-flex; align-items: center; gap: 4px; align-self: flex-start; justify-self: start; width: fit-content;

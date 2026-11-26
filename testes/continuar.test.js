@@ -61,3 +61,22 @@ test("prazo da sala: em dias e, no último dia, em horas", () => {
   assert.equal(app.textoDoPrazo(agora - 1, agora), null, "já fechou");
   assert.equal(app.textoDoPrazo(undefined, agora), null);
 });
+
+test("dá para deixar várias partidas em pausa: todas aparecem, menos a tabela de agora", () => {
+  const { app, rodar } = carregarApp();
+  rodar(`state = ${JSON.stringify(metade())}`);
+  app.marcarSalaDaTabela("11111");
+  app.salvarPartidaAtual();
+  app.comecarNovaPartida();
+  rodar(`state = { "0-0": "3" }`);
+  app.salvarPartidaAtual();
+  assert.equal(app.partidasEmPausa().length, 1, "a tabela de agora não conta");
+  app.comecarNovaPartida();
+  const pausadas = app.partidasEmPausa();
+  assert.equal(pausadas.length, 2);
+  assert.ok(pausadas.some(p => p.codigoSala === "11111"), "a da sala continua em pausa");
+  rodar(`state = ${JSON.stringify(tabelaCompleta())}`);
+  app.salvarPartidaAtual();
+  app.comecarNovaPartida();
+  assert.equal(app.partidasEmPausa().length, 2, "terminada não fica em pausa");
+});

@@ -8,7 +8,7 @@ const rows = [
 const COLUNAS = 4;
 
 // Versão do app: igual ao número do CACHE_NAME do service-worker.js (um teste confere).
-const VERSAO = 130;
+const VERSAO = 131;
 
 // Avisos da vez com o app fechado: servidor na Cloudflare (worker/avisos.mjs).
 // Sem o endereço, a opção "Avisar a minha vez" não aparece.
@@ -1920,23 +1920,20 @@ function situacaoDoJogo() {
 function atualizarBotaoNovoJogo() {
   const botao = document.getElementById("botao-novo-jogo");
   const situacao = situacaoDoJogo();
-  botao.textContent = { sala: "Sair da sala", andamento: "Encerrar", terminada: "Novo jogo", vazia: "Novo jogo" }[situacao];
+  botao.textContent = { sala: "Sair da sala", andamento: "Novo jogo", terminada: "Novo jogo", vazia: "Novo jogo" }[situacao];
   botao.disabled = situacao === "vazia";
 }
 
 async function novoJogo() {
-  const jaSalva = entradaDaPartidaAtual() !== null;
   const temValores = partidaTemValores(state);
   const situacao = situacaoDoJogo();
 
   if (situacao === "sala") {
-    if (!await confirmar("Sair da sala?",
-      "Você sai da sala e fica fora do resultado dela." +
-      (temValores && !jaSalva ? " Sua partida vai para o histórico como está e a tabela fica zerada." : ""), "Sair")) return;
-    familia.sair();
+    // pausar ou desistir (como no Sair); a tabela vai para o histórico e zera
+    if (!await familia.sairPerguntando({ paraOutra: true })) return;
   } else if (situacao === "andamento") {
-    if (!await confirmar("Encerrar a partida?",
-      "Ela vai para o histórico como está (incompleta) e a tabela fica zerada.", "Encerrar")) return;
+    if (!await confirmar("Começar outra partida?",
+      "Esta fica em pausa no histórico: dá para continuar depois. A tabela fica zerada.", "Começar")) return;
   } else if (situacao === "terminada") {
     if (!await confirmar("Novo jogo", "Começar um novo jogo com a tabela zerada?", "Começar")) return;
   } else {
@@ -2063,10 +2060,16 @@ function atualizarInicio() {
   const daSala = !naSala && emAndamento && salaDaTabela();
   const prazoDaSala = daSala && daSala.jeito && daSala.jeito.prazo;
   const recente = daSala && (prazoDaSala ? !!textoDoPrazo(prazoDaSala) : Date.now() - daSala.em < 3 * 24 * 60 * 60 * 1000);
-  const pendente = !naSala && !recente && partidaParaTerminar();
+  // partidas em pausa no histórico: uma, direto para ela; várias, para o histórico
+  const pausadas = recente ? [] : partidasEmPausa();
+  const pendente = pausadas.length === 1 && pausadas[0];
   const botaoPendente = document.getElementById("inicio-terminar");
-  botaoPendente.hidden = !pendente && !recente;
-  if (recente) {
+  botaoPendente.hidden = !pausadas.length && !recente;
+  if (pausadas.length > 1) {
+    botaoPendente.onclick = () => abrirHistorico();
+    document.getElementById("inicio-terminar-titulo").textContent = `${pausadas.length} partidas em pausa`;
+    document.getElementById("inicio-terminar-sub").textContent = "Escolha no histórico qual continuar";
+  } else if (recente) {
     botaoPendente.onclick = () => { mostrarTela("tela-jogo"); if (window.familia) familia.voltarParaSala(daSala.codigo); };
     document.getElementById("inicio-terminar-titulo").textContent = `Voltar para a sala ${daSala.codigo}`;
     const prazo = textoDoPrazo(prazoDaSala);
@@ -2074,8 +2077,9 @@ function atualizarInicio() {
       ? `Termine com os outros · ${prazo}` : "Termine a partida com os outros";
   } else if (pendente) {
     botaoPendente.onclick = () => continuarPartida(pendente.id);
-    document.getElementById("inicio-terminar-titulo").textContent = `Terminar a partida da sala ${pendente.codigoSala}`;
-    const prazo = textoDoPrazo(pendente.jeitoSala && pendente.jeitoSala.prazo);
+    const prazo = pendente.codigoSala && textoDoPrazo(pendente.jeitoSala && pendente.jeitoSala.prazo);
+    document.getElementById("inicio-terminar-titulo").textContent = prazo
+      ? `Terminar a partida da sala ${pendente.codigoSala}` : `Continuar a partida de ${formatarDataCurta(pendente.data)}`;
     document.getElementById("inicio-terminar-sub").textContent =
       `${casasMarcadas(pendente.valores)} de ${LINHAS_JOGO.length * 4} casas · ${prazo || `parou em ${formatarData(pendente.data)}`}`;
   }
@@ -2111,9 +2115,8 @@ async function continuarPartida(id) {
   if (p.id !== partidaSalvaId || !partidaTemValores(state)) {
     const naSala = window.familia && familia.ativa();
     if (naSala) {
-      // numa sala: primeiro sai dela (pelo Sair, que pergunta se é pausa ou desistência)
-      avisar("Para continuar outra partida, saia antes da sala em que você está (botão Sair, em cima da tabela).", "Você está numa sala");
-      return;
+      // numa sala: primeiro sai dela (pausa ou desistência); a tabela dela vai para o histórico
+      if (!await familia.sairPerguntando({ paraOutra: true })) return;
     } else if (partidaTemValores(state) && !partidaCompleta() && !await confirmar("Continuar a outra partida?",
       "A tabela de agora vai para o histórico (dá para terminar depois).", "Continuar")) return;
     if (partidaTemValores(state)) salvarPartidaAtual();
@@ -2140,6 +2143,11 @@ function partidaParaTerminar() {
   const limite = Date.now() - 3 * 24 * 60 * 60 * 1000;
   const aberta = p => (p.jeitoSala && p.jeitoSala.prazo ? !!textoDoPrazo(p.jeitoSala.prazo) : new Date(p.data).getTime() > limite);
   return historico.find(p => p.codigoSala && !partidaTerminada(p) && p.id !== partidaSalvaId && aberta(p)) || null;
+}
+
+// Partidas em pausa: as que ficaram pela metade no histórico (menos a tabela de agora).
+function partidasEmPausa() {
+  return historico.filter(p => !partidaTerminada(p) && p.id !== partidaSalvaId);
 }
 
 function irParaSala() {
@@ -2189,7 +2197,13 @@ function abrirHistorico() {
     document.getElementById("recorde").textContent = recorde;
     document.getElementById("media").textContent = media;
 
-    historico.forEach(partida => {
+    // as em pausa vão em cima (dá para continuar qualquer uma); depois as terminadas
+    const emPausa = historico.filter(p => !partidaTerminada(p));
+    const ordem = emPausa.length ? [...emPausa, ...historico.filter(p => partidaTerminada(p))] : historico;
+    ordem.forEach((partida, i) => {
+      if (emPausa.length && (i === 0 || i === emPausa.length)) {
+        lista.appendChild(elemento("li", "titulo-historico", i === 0 ? "Em pausa" : "Terminadas"));
+      }
       const li = document.createElement("li");
       const botao = document.createElement("button");
       botao.className = "item-historico";
@@ -2236,7 +2250,7 @@ function abrirHistorico() {
         // etiqueta: dá para continuar (o prazo da sala vai na linha de baixo)
         const etiqueta = elemento("small", "pela-metade");
         etiqueta.innerHTML = icone("ampulheta");
-        etiqueta.append("pela metade");
+        etiqueta.append(partida.id === partidaSalvaId ? "na tabela agora" : "em pausa");
         esquerda.appendChild(etiqueta);
       }
       if (partida.sala) {
@@ -3022,6 +3036,16 @@ function mostrarDados(nome) {
   if (nome === "marfim") delete document.documentElement.dataset.dados;
   else document.documentElement.dataset.dados = nome;
   desenharEscolhaDados();
+  if (window.familia) familia.corDaMesaMudou(); // na sala, os outros veem os seus dados na cor nova
+}
+
+// Os dadinhos de quem está jogando (na barra da vez), na cor que essa pessoa
+// escolheu. Sem cor conhecida (app antigo): marfim, o de todo mundo.
+function pintarDadosDoOutro(caixa, nome) {
+  const d = dadosValidos(nome) && nome !== "marfim" ? DADOS[nome] : null;
+  caixa.style.setProperty("--dado", d ? d.cor : "var(--marfim)");
+  caixa.style.setProperty("--dado-sombra", d ? d.borda : "var(--marfim-sombra)");
+  caixa.style.setProperty("--dado-pinta", d ? d.pinta : "var(--pinta)");
 }
 
 function escolherDados(nome) {

@@ -166,7 +166,7 @@ async function entrar(codigo, nome, modo = null, soDados = null) {
 
   const identidade = (lerUsuario() || {}).id || null; // as estatísticas dos outros acham a pessoa por ela
   await update(ref(db, `${raiz}/jogadores/${user.uid}`), {
-    nome, chave, id: identidade, corMesa: mesaAtual(), terminou: false, total: null, colunas: null, valores: null,
+    nome, chave, id: identidade, corMesa: mesaAtual(), corDados: dadosAtuais(), terminou: false, total: null, colunas: null, valores: null,
     modo: modoDaSalaAgora, soDados: soDadosAgora, fora: null, // (voltou da pausa)
     casas: casasMarcadas(), base: jaEstava ? (sala.jogadores[user.uid].base || 0) : base,
     ...(jaEstava ? {} : { entrouEm: serverTimestamp() }) // a ordem da vez não muda se entrar de novo
@@ -997,33 +997,43 @@ async function encerrarPartida() {
   catch (e) { avisar(mensagemDeErro(e), "Não deu para encerrar"); }
 }
 
-async function confirmarSair() {
+// Sair da sala (pelo Sair, pelo botão de baixo ou para continuar outra partida):
+// com a partida andando, pergunta se é pausa ou desistência. paraOutra: a tabela
+// vai para o histórico e outra entra no lugar. Devolve se saiu.
+async function sairPerguntando({ paraOutra = false } = {}) {
   const emAndamento = partida && !antesDeComecar() && !partida.revelada && !partida.encerrada;
   const eu = partida && partida.jogadores && partida.jogadores[minhaUid()];
   if (emAndamento && eu && eu.terminou) {
     // já terminei: saio, mas meu resultado continua na sala (e no pódio)
-    if (!await confirmar("Sair da sala?", "Seu resultado fica no pódio.", "Sair")) return;
+    if (!await confirmar("Sair da sala?", "Seu resultado fica no pódio.", "Sair")) return false;
     await pausar();
   } else if (emAndamento) {
     const prazo = textoDoPrazo(prazoDaSala());
     const resposta = await perguntar({
       titulo: "Sair da partida?",
-      texto: `Pausar: todos esperam você voltar${prazo ? ` (a sala fecha em ${prazo.replace(/^faltam? /, "")})` : ""}.\n` +
+      texto: `Pausar: todos esperam você voltar${prazo ? ` (a sala fecha em ${prazo.replace(/^faltam? /, "")})` : ""}` +
+        (paraOutra ? ", e ela fica em pausa no seu histórico" : "") + ".\n" +
         "Desistir: os outros seguem sem você.",
       sim: "Pausar", nao: "Cancelar", outro: "Desistir da partida"
     });
     if (resposta === "outro") {
-      if (!await confirmar("Desistir da partida?", "Você sai do resultado e não volta mais a esta partida.", "Desistir", true)) return;
+      if (!await confirmar("Desistir da partida?", "Você sai do resultado e não volta mais a esta partida.", "Desistir", true)) return false;
       await sair();
       marcarSalaDaTabela(null);
     } else if (resposta === true) {
       await pausar();
-    } else return;
+    } else return false;
   } else {
-    if (!await confirmar("Sair da sala?", "Sua tabela fica aqui, mas você sai do resultado da sala.", "Sair")) return;
+    if (!await confirmar("Sair da sala?", paraOutra
+      ? "Você sai da sala e fica fora do resultado dela."
+      : "Sua tabela fica aqui, mas você sai do resultado da sala.", "Sair")) return false;
     await sair();
   }
-  mostrarTela("tela-inicio"); // fora da sala, volta para o começo
+  return true;
+}
+
+async function confirmarSair() {
+  if (await sairPerguntando()) mostrarTela("tela-inicio"); // fora da sala, volta para o começo
 }
 
 // Pausar: sai da sala mas guarda o lugar (fora: true). Enquanto alguém está fora,
@@ -1746,6 +1756,7 @@ function atualizarBarraVez() {
       quem.textContent += ` · ${j.mesa.jogada}ª jogada`;
       const segurados = j.mesa.segurados || [];
       dados.innerHTML = j.mesa.valores.map((f, i) => dadoMini(f, !!segurados[i])).join("");
+      pintarDadosDoOutro(dados, j.corDados); // na cor de dados que a pessoa escolheu
       dados.setAttribute("aria-label", `Dados de ${j.nome}: ${j.mesa.valores.join(", ")} (${j.mesa.jogada}ª jogada)`);
       // rolou agora (não é só alguém segurando um dado, nem o app abrindo): som e animação
       const rolouAgora = rolagemVista !== null &&
@@ -2099,16 +2110,18 @@ function escutarFotos() {
   onValue(ref(db, "fotos"), snap => guardarFotos(snap.val()), () => { escutandoFotos = false; });
 }
 
-// Trocou a cor da mesa: quem está na sala já vê a bolinha e a ficha na cor nova.
+// Trocou a cor da mesa ou dos dados: quem está na sala já vê a bolinha, a ficha
+// e os dadinhos na cor nova.
 function corDaMesaMudou() {
   const uid = minhaUid();
   if (!sessao || !uid || !partida || !partida.jogadores || !partida.jogadores[uid]) return;
-  if (partida.jogadores[uid].corMesa === mesaAtual()) return;
-  update(ref(db, `partidas/${sessao.codigo}/jogadores/${uid}`), { corMesa: mesaAtual() }).catch(() => {});
+  const eu = partida.jogadores[uid];
+  if (eu.corMesa === mesaAtual() && eu.corDados === dadosAtuais()) return;
+  update(ref(db, `partidas/${sessao.codigo}/jogadores/${uid}`), { corMesa: mesaAtual(), corDados: dadosAtuais() }).catch(() => {});
 }
 
 window.familia = {
-  abrir, corDaMesaMudou, fotoMudou, fecharJanela, acaoJanela, sair, confirmarSair, compartilharCodigo,
+  abrir, corDaMesaMudou, fotoMudou, fecharJanela, acaoJanela, sair, confirmarSair, sairPerguntando, compartilharCodigo,
   aoTerminar, fecharEspera, fecharPodio, jogarDeNovo, limparSalasAntigas, sincronizar, registrarResultado,
   escolherModo, podeJogar, porQueNaoPode, podeDesfazer, mesaMudou, recuperar, trocarNome, avisosMudaram,
   historicoMudou, sincronizarHistorico, registrarNomeSePrecisar, alternarReacoes, reagir, lerRanking,

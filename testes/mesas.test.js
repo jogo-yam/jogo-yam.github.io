@@ -85,3 +85,14 @@ test("avatar: a mesma pessoa sem mesa conhecida tem sempre a mesma cor; com mesa
   assert.deepEqual(JSON.parse(rodar("JSON.stringify(MESAS_DO_NOME)")), ["verde", "azul", "vinho", "roxo", "madeira", "preto"]);
   assert.equal(rodar('inicialDe(" vó Lúcia")'), "V");
 });
+
+test("dados de quem está jogando: na cor que a pessoa escolheu (desconhecida = marfim)", () => {
+  const cores = JSON.parse(rodar(`(() => {
+    const caixa = { style: { v: {}, setProperty(k, valor) { this.v[k] = valor; } } };
+    const ver = n => { pintarDadosDoOutro(caixa, n); return [caixa.style.v["--dado"], caixa.style.v["--dado-pinta"]]; };
+    return JSON.stringify({ roxo: ver("roxo"), antigo: ver(undefined), marfim: ver("marfim") });
+  })()`));
+  assert.deepEqual(cores.roxo, ["#5b2f9a", "#fffaf0"]);
+  assert.deepEqual(cores.antigo, ["var(--marfim)", "var(--pinta)"]);
+  assert.deepEqual(cores.marfim, cores.antigo);
+});
