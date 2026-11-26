@@ -7,10 +7,17 @@ const { app, rodar } = carregarApp();
 
 // jogadores na ordem de entrada: Davi criou, Maria e João entraram depois
 const sala = (casas, extra = {}) => [
-  { uid: "davi", entrouEm: 1, casas: casas[0], ...extra.davi },
-  { uid: "maria", entrouEm: 2, casas: casas[1], ...extra.maria },
-  { uid: "joao", entrouEm: 3, casas: casas[2], ...extra.joao }
+  { uid: "davi", nome: "Davi", entrouEm: 1, casas: casas[0], ...extra.davi },
+  { uid: "maria", nome: "Maria", entrouEm: 2, casas: casas[1], ...extra.maria },
+  { uid: "joao", nome: "João", entrouEm: 3, casas: casas[2], ...extra.joao }
 ];
+
+test("quem saiu e virou fantasma (sem nome, recriado pelo celular dele) não fica com a vez", () => {
+  // Gi saiu; depois o Firebase gravou só { aberto: false } no lugar dela
+  const comFantasma = [...sala([10, 10, 10]), { uid: "gi", aberto: false }];
+  assert.equal(app.vezDaSala(comFantasma), "davi");
+  assert.equal(app.vezDaSala([{ uid: "gi", aberto: false, casas: 0 }]), null);
+});
 
 test("a vez segue a ordem de entrada, quem criou começa", () => {
   assert.equal(app.vezDaSala(sala([0, 0, 0])), "davi");
@@ -168,8 +175,8 @@ test("nomes juntados: as duas identidades viram uma pessoa só, com o nome de ag
 test("vez: base ou casas negativas (mexendo no banco) não dão a vez para sempre", () => {
   const { app } = require("./carregar-app.js").carregarApp();
   const jogadores = [
-    { uid: "a", entrouEm: 1, casas: 5, base: 0 },
-    { uid: "b", entrouEm: 2, casas: 4, base: -100 }
+    { uid: "a", nome: "A", entrouEm: 1, casas: 5, base: 0 },
+    { uid: "b", nome: "B", entrouEm: 2, casas: 4, base: -100 }
   ];
   // b conta como 4 casas (a base negativa vira 0): a vez é de b, mas por estar
   // mesmo atrás; depois de jogar, a vez volta a andar normalmente

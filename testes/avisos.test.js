@@ -133,8 +133,9 @@ test("servidor e app: mesma regra da vez e mesma chave pública", async () => {
     const jogadores = {};
     const qtd = 2 + (n % 4);
     for (let i = 0; i < qtd; i++) {
-      jogadores[`u${i}`] = { entrouEm: (i * 7) % qtd, casas: (n * (i + 3)) % 5, base: i === 2 ? n % 3 : 0, terminou: (n + i) % 11 === 0 };
+      jogadores[`u${i}`] = { nome: `J${i}`, entrouEm: (i * 7) % qtd, casas: (n * (i + 3)) % 5, base: i === 2 ? n % 3 : 0, terminou: (n + i) % 11 === 0 };
     }
+    if (n % 5 === 0) jogadores.fantasma = { aberto: false }; // quem saiu, recriado sem nome
     const sala = { criador: "u0", jogadores };
     if (n % 3 === 0) jogadores.u0.pulos = { u1: n % 2 };
     const lista = Object.entries(jogadores).map(([uid, j]) => ({ uid, ...j }));

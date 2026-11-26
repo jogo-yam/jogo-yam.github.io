@@ -39,7 +39,8 @@ export function vezDaSala(sala) {
   const jogadores = Object.entries((sala && sala.jogadores) || {}).map(([uid, j]) => ({ uid, ...j }));
   const criador = sala && sala.jogadores && sala.jogadores[sala.criador];
   const pulos = (criador && criador.pulos) || {};
-  const naRoda = jogadores.filter(j => !j.terminou)
+  // sem nome é "fantasma" de quem saiu (gravação atrasada do celular dele): não joga
+  const naRoda = jogadores.filter(j => typeof j.nome === "string" && j.nome !== "" && !j.terminou)
     .sort((a, b) => (a.entrouEm || 0) - (b.entrouEm || 0) || String(a.uid).localeCompare(String(b.uid)));
   if (!naRoda.length) return null;
   const vezes = j => (j.casas || 0) + (j.base || 0) + (pulos[j.uid] || 0);

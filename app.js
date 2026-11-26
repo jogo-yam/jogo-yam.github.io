@@ -8,7 +8,7 @@ const rows = [
 const COLUNAS = 4;
 
 // Versão do app: igual ao número do CACHE_NAME do service-worker.js (um teste confere).
-const VERSAO = 131;
+const VERSAO = 132;
 
 // Avisos da vez com o app fechado: servidor na Cloudflare (worker/avisos.mjs).
 // Sem o endereço, a opção "Avisar a minha vez" não aparece.
@@ -4789,8 +4789,13 @@ try { if (deveMostrarBoasVindas()) abrirBoasVindas(); } catch {}
 // De quem é a vez: de quem, na ordem de entrada (quem criou começa), jogou
 // menos vezes. Vezes = casas marcadas + "base" (quem entrou no meio começa na
 // rodada atual) + vezes que o criador pulou. Quem terminou sai da roda.
+// Jogador de verdade tem nome (gravado ao entrar). Sem nome é "fantasma": quem
+// saiu e, depois, uma gravação atrasada do celular dele (o "app fechou" que o
+// Firebase grava quando a conexão cai) recriou só um pedaço. Não joga nem conta.
+const ehJogadorDeVerdade = j => !!j && typeof j.nome === "string" && j.nome !== "";
+
 function vezDaSala(jogadores, pulos = {}) {
-  const naRoda = jogadores.filter(j => !j.terminou)
+  const naRoda = jogadores.filter(j => ehJogadorDeVerdade(j) && !j.terminou)
     .sort((a, b) => (a.entrouEm || 0) - (b.entrouEm || 0) || String(a.uid).localeCompare(String(b.uid)));
   if (!naRoda.length) return null;
   const n = v => (typeof v === "number" && Number.isFinite(v) ? v : 0);

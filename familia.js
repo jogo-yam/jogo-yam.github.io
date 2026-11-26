@@ -118,7 +118,8 @@ async function lerDoBanco(caminho) {
   return get(ref(db, caminho));
 }
 
-const jogadoresDe = p => Object.entries((p && p.jogadores) || {}).map(([uid, j]) => ({ uid, ...j }));
+// (sem os "fantasmas" de quem saiu: ver ehJogadorDeVerdade, no app.js)
+const jogadoresDe = p => Object.entries((p && p.jogadores) || {}).map(([uid, j]) => ({ uid, ...j })).filter(ehJogadorDeVerdade);
 const $ = id => document.getElementById(id);
 
 // ---------- criar / entrar / sair ----------
