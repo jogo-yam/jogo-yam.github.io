@@ -25,9 +25,11 @@ function tokenDe(uid) {
 }
 
 async function pedir(quem, metodo, caminho, valor) {
-  const r = await fetch(`http://${HOST}/${caminho}.json?ns=${NS}`, {
+  // admin: "Bearer owner" (passa por cima das regras); os outros, com o login no ?auth=
+  const login = quem === "admin" ? "" : `&auth=${tokenDe(quem)}`;
+  const r = await fetch(`http://${HOST}/${caminho}.json?ns=${NS}${login}`, {
     method: metodo,
-    headers: { Authorization: `Bearer ${quem === "admin" ? "owner" : tokenDe(quem)}` },
+    headers: quem === "admin" ? { Authorization: "Bearer owner" } : {},
     body: valor === undefined ? undefined : JSON.stringify(valor)
   });
   if (metodo === "GET" && r.ok) return r.json();
