@@ -189,14 +189,15 @@ function documentoDeMentira() {
 
 // Um celular: app.js + familia.js, com o próprio localStorage e as respostas
 // que a pessoa daria nas perguntas (fila; sem resposta = "sim").
-function celular(banco, uid, nome) {
+function celular(banco, uid, nome, { guardado = null } = {}) {
   const fb = banco.firebaseDe(uid);
   const enviados = []; // pedidos ao servidor de avisos
   const perguntas = [];
   const respostas = [];
   const timer = f => (fn, ms, ...a) => { const t = f(fn, Math.min(Number(ms) || 0, 10 * 60 * 1000) / ACELERA, ...a); if (t && t.unref) t.unref(); return t; };
-  const { rodar, app } = carregarApp({
-    armazenado: { "yam-nome": nome },
+  const legendas = []; // os avisos que apareceram na tela ([título, texto])
+  const { rodar, app, armazenado } = carregarApp({
+    armazenado: guardado ? Object.fromEntries(guardado) : { "yam-nome": nome },
     extras: {
       __firebase: fb,
       document: documentoDeMentira(),
@@ -206,6 +207,8 @@ function celular(banco, uid, nome) {
     }
   });
   rodar(`nomeJogador = ${JSON.stringify(nome)}`);
+  rodar("this").__legenda = l => legendas.push([...l]);
+  rodar("mostrarLegenda = l => globalThis.__legenda(l)");
   rodar(fonteDoFamilia());
   // as janelas de pergunta: responde sozinho e anota o que foi perguntado
   rodar("globalThis.__perguntar = null");
@@ -214,7 +217,9 @@ function celular(banco, uid, nome) {
   rodar("perguntar = o => globalThis.__perguntar(o)");
   const familia = codigo => rodar(`globalThis.__noFamilia(${JSON.stringify(codigo)})`);
   return {
-    uid, nome, app, rodar, familia, enviados, perguntas,
+    uid, nome, app, rodar, familia, enviados, perguntas, legendas, armazenado,
+    // fechar o app (para de ouvir a sala; o que está guardado no celular fica)
+    fechar: () => familia("pararDeEscutar()"),
     responder: (...r) => respostas.push(...r),
     // marca uma casa (como digitar na tabela e confirmar)
     marcar: (casa, valor) => rodar(`state[${JSON.stringify(casa)}] = ${JSON.stringify(String(valor))}; avisarSala();`)

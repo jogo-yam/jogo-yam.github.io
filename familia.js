@@ -1758,6 +1758,27 @@ async function sugerirPular() {
   pularVez(vez, true);
 }
 
+// Quantas vezes a minha vez já foi pulada em cada sala, do que este celular viu
+// (para avisar quem volta). Guarda as 10 salas mais recentes.
+const CHAVE_PULOS_VISTOS = "yam-pulos-vistos";
+function pulosVistosGuardados(codigo) {
+  try {
+    const n = (JSON.parse(localStorage.getItem(CHAVE_PULOS_VISTOS)) || {})[codigo];
+    return typeof n === "number" ? n : null;
+  } catch { return null; }
+}
+function guardarPulosVistos(codigo, n) {
+  try {
+    const todos = JSON.parse(localStorage.getItem(CHAVE_PULOS_VISTOS)) || {};
+    if (todos[codigo] === n) return;
+    delete todos[codigo];
+    todos[codigo] = n; // por último = mais recente
+    const salas = Object.keys(todos);
+    for (const velha of salas.slice(0, Math.max(0, salas.length - 10))) delete todos[velha];
+    localStorage.setItem(CHAVE_PULOS_VISTOS, JSON.stringify(todos));
+  } catch { /* sem guardar: só não avisa ao voltar */ }
+}
+
 // Avisos: "Sua vez!" e o que cada um marcou.
 function avisarDaVez() {
   if (!comVez()) return;
@@ -1776,12 +1797,21 @@ function avisarDaVez() {
   }
   jogadasVistas = vistas;
 
+  // vez pulada: com o app aberto, avisa na hora; com ele fechado, ao voltar (o
+  // celular guarda quantos pulos já viu em cada sala)
   const meusPulos = pulosDe(partida)[uid] || 0;
-  if (pulosVistos !== null && meusPulos > pulosVistos) {
+  const vistosAntes = pulosVistos !== null ? pulosVistos : pulosVistosGuardados(sessao.codigo);
+  if (vistosAntes !== null && meusPulos > vistosAntes) {
+    const n = meusPulos - vistosAntes;
+    const vezes = n === 1 ? "a sua vez" : `a sua vez ${n} vezes`;
+    const noFinal = n === 1 ? "Você joga essa vez no final da partida." : "Você joga essas vezes no final da partida.";
     ultimoAviso = Date.now();
-    mostrarLegenda(["Sua vez foi pulada", `${nomeDe(partida.criador)} passou a vez. Agora é a vez de ${nomeDe(vez)}.`]);
+    mostrarLegenda(pulosVistos !== null
+      ? ["Sua vez foi pulada", `${nomeDe(partida.criador)} passou ${vezes}. ${noFinal}`]
+      : ["Sua vez foi pulada", `Enquanto você estava fora, ${nomeDe(partida.criador)} passou ${vezes}. ${noFinal}`]);
   }
   pulosVistos = meusPulos;
+  guardarPulosVistos(sessao.codigo, meusPulos);
 
   if (pausada()) return; // pausada: ninguém joga (o aviso vem quando todos voltarem)
   if (vez === uid && vezAnterior !== uid && !esperandoPassar()) {

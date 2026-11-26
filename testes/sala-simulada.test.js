@@ -111,6 +111,30 @@ test("sala simulada: os dados de quem está jogando vão com a cor que a pessoa 
   assert.equal(banco.ler(`partidas/${codigo}/jogadores/uidBia/corDados`), "marfim", "quem não escolheu: marfim");
 });
 
+test("sala simulada: quem teve a vez pulada com o app fechado fica sabendo ao voltar", async () => {
+  const banco = new Banco();
+  const { codigo, ana, bia } = await salaComTres(banco);
+  ana.marcar("0-0", 3);
+  await assentar();
+  assert.equal(vezEm(ana), "uidBia");
+  bia.fechar();
+  await ana.familia('pularVez("uidBia", true)');
+  await assentar();
+  assert.equal(vezEm(ana), "uidCaio", "a vez passou para Caio");
+  assert.ok(!bia.legendas.some(([titulo]) => titulo === "Sua vez foi pulada"), "com o app fechado, Bia não viu o aviso");
+  // Bia abre o app de novo (mesmo celular, com o que estava guardado)
+  const biaDeNovo = celular(banco, "uidBia", "Bia", { guardado: bia.armazenado });
+  await assentar();
+  const aviso = biaDeNovo.legendas.find(([titulo]) => titulo === "Sua vez foi pulada");
+  assert.ok(aviso, "ao voltar, vê que a vez foi pulada");
+  assert.match(aviso[1], /Enquanto você estava fora, Ana passou a sua vez\. Você joga essa vez no final da partida\./);
+  // abrir de novo não repete o aviso
+  biaDeNovo.fechar();
+  const biaOutraVez = celular(banco, "uidBia", "Bia", { guardado: biaDeNovo.armazenado });
+  await assentar();
+  assert.ok(!biaOutraVez.legendas.some(([titulo]) => titulo === "Sua vez foi pulada"));
+});
+
 test("sala simulada: vez parada 5 min com a pessoa fora do app, quem criou é perguntado se pula", async () => {
   const banco = new Banco();
   const { codigo, ana, bia, caio } = await salaComTres(banco);
