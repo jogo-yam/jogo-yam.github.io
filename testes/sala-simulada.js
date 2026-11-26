@@ -89,6 +89,20 @@ class Banco {
         const dono = pegar(this.arvore, `usuarios/${m[3]}/dono`);
         if (antes !== null && antes !== uid && dono !== uid) { this.recusadas.push({ uid, caminho }); throw erroDePermissao(); }
       }
+      // trocar quem criou: só o dono do nome de usuário de quem criou (outro aparelho)
+      if (this.regras && m[0] === "partidas" && m[2] === "criador" && m.length === 3) {
+        const antes = pegar(this.arvore, caminho);
+        const chaveDoCriador = antes && pegar(this.arvore, `partidas/${m[1]}/jogadores/${antes}/chave`);
+        const ok = pegar(nova, caminho) === uid &&
+          (antes === null || (typeof chaveDoCriador === "string" && pegar(this.arvore, `usuarios/${chaveDoCriador}/dono`) === uid));
+        if (!ok) { this.recusadas.push({ uid, caminho }); throw erroDePermissao(); }
+      }
+      // lista de salas abertas: só quem criou põe a sala
+      if (this.regras && m[0] === "abertas" && m.length === 2 && pegar(nova, caminho) !== null &&
+          pegar(this.arvore, `partidas/${m[1]}/criador`) !== uid) {
+        this.recusadas.push({ uid, caminho });
+        throw erroDePermissao();
+      }
       // apagar a sala inteira: só depois de 3 dias
       if (this.regras && m[0] === "partidas" && m.length === 2 && pegar(nova, caminho) === null) {
         const criada = pegar(this.arvore, `${caminho}/criadaEm`);

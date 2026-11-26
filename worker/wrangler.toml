@@ -4,7 +4,13 @@ name = "yam-avisos"
 main = "avisos.mjs"
 compatibility_date = "2024-11-01"
 
+# todo dia às 22h UTC (19h em Brasília): prazo de quem pausou e limpeza das salas
+[triggers]
+crons = ["0 22 * * *"]
+
 [vars]
 FIREBASE_DB = "https://yam-familia-default-rtdb.firebaseio.com"
+# chave pública do app (a mesma do familia.js), para o login anônimo da tarefa diária
+FIREBASE_CHAVE = "AIzaSyAG_-doO1gG3E_y6eKmAf51ez1luLLTLOM"
 ORIGENS = "https://jogo-yam.github.io,http://localhost:8765,http://127.0.0.1:8765"
 VAPID_PUBLICA = "BKjDTbSOlrqKGROPZ2HkxqcPXUbsumI8DfVP0UUX8HW4CW1ApDoFGLLLoe9ahWpei0TeakpD7x9puO8hOn9aspM"

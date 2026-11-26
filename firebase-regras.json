@@ -43,13 +43,17 @@
         ".validate": "newData.hasChildren(['chave', 'img', 'em']) && newData.child('img').isString() && newData.child('img').val().length <= 20000 && (newData.child('img').val() === '' || newData.child('img').val().beginsWith('data:image/jpeg;base64,')) && newData.child('em').isNumber()"
       }
     },
+    "abertas": {
+      ".read": "auth != null",
+      "$codigo": {
+        ".write": "auth != null && $codigo.matches(/^[0-9]{5}$/) && ((newData.val() === true && root.child('partidas').child($codigo).child('criador').val() === auth.uid) || (!newData.exists() && (!root.child('partidas').child($codigo).child('criador').exists() || (root.child('partidas').child($codigo).child('criadaEm').isNumber() && root.child('partidas').child($codigo).child('criadaEm').val() < now - 259200000))))"
+      }
+    },
     "partidas": {
-      ".indexOn": ["criadaEm"],
-      ".read": "auth != null && query.orderByChild == 'criadaEm' && query.endAt <= now - 259200000 && query.limitToFirst <= 20",
       "$codigo": {
         ".read": "auth != null",
         ".write": "auth != null && !newData.exists() && data.child('criadaEm').isNumber() && data.child('criadaEm').val() < now - 259200000",
-        "criador": { ".write": "auth != null && !data.exists() && newData.val() === auth.uid" },
+        "criador": { ".write": "auth != null && newData.val() === auth.uid && (!data.exists() || (data.parent().child('jogadores').child(data.val()).child('chave').isString() && root.child('usuarios').child(data.parent().child('jogadores').child(data.val()).child('chave').val()).child('dono').val() === auth.uid))" },
         "criadaEm": { ".write": "auth != null && !data.exists()" },
         "iniciada": { ".write": "auth != null && data.parent().child('criador').val() === auth.uid", ".validate": "newData.isBoolean()" },
         "revelada": { ".write": "auth != null && newData.val() === true" },

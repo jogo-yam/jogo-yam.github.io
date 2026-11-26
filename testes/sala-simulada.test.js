@@ -297,6 +297,34 @@ test("sala simulada: continuando em outro aparelho sem pausar, o aparelho antigo
   assert.equal(notebook.familia("sessao.codigo"), codigo);
 });
 
+test("sala simulada: quem criou continua no tablet e segue no comando (pular, seguir sem, encerrar)", async () => {
+  const banco = new Banco();
+  const { codigo, ana, bia, caio } = await salaComTres(banco);
+  assert.equal(banco.ler(`abertas/${codigo}`), true, "a sala entrou na lista de salas abertas");
+  ana.marcar("0-0", 3);
+  await assentar();
+  await ana.familia('pularVez("uidBia", true)'); // Bia joga essa vez no final
+  await assentar();
+  comNomeDeUsuario(banco, ana);
+  const tablet = celular(banco, "uidAnaTablet", "Ana");
+  comNomeDeUsuario(banco, tablet);
+  await tablet.familia(`entrar("${codigo}", "Ana")`);
+  await assentar();
+  assert.equal(banco.ler(`partidas/${codigo}/criador`), "uidAnaTablet", "o tablet virou quem criou");
+  assert.equal(ana.familia("sessao"), null, "o celular antigo saiu");
+  assert.equal(caio.familia("JSON.stringify(noFinal())"), '{"uidBia":1}', "o pulo da Bia continua valendo");
+  assert.equal(vezEm(caio), "uidCaio");
+  assert.equal(vezEm(tablet), "uidCaio");
+  // no tablet, Ana pula a vez do Caio (só quem criou pode)
+  await tablet.familia('pularVez("uidCaio", true)');
+  await assentar();
+  assert.equal(vezEm(bia), "uidAnaTablet", "a vez passou para Ana, no tablet");
+  // alguém que não é a Ana não consegue virar quem criou
+  const intruso = celular(banco, "uidX", "Xis");
+  await assert.rejects(intruso.familia(`(async () => { await usuario(); await set(ref(db, "partidas/${codigo}/criador"), "uidX"); })()`));
+  assert.equal(banco.ler(`partidas/${codigo}/criador`), "uidAnaTablet");
+});
+
 test("sala simulada: quem só entrou (não criou) também apaga a sala vencida ao abrir o app", async () => {
   const banco = new Banco();
   const dia = 24 * 60 * 60 * 1000;
@@ -311,5 +339,6 @@ test("sala simulada: quem só entrou (não criou) também apaga a sala vencida a
   biaDeNovo.familia("guardarSessao(null)"); // (tinha saído da sala)
   await assentar(250); // a limpeza roda uns segundos depois de abrir
   assert.equal(banco.ler(`partidas/${codigo}`), null, "a sala vencida foi apagada");
+  assert.equal(banco.ler(`abertas/${codigo}`), null, "e saiu da lista de salas abertas");
   assert.ok(banco.ler(`partidas/${outra}`), "a sala nova continua");
 });

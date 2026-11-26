@@ -197,8 +197,12 @@ async function entrar(codigo, nome, modo = null, soDados = null) {
     base: antigo ? baseAssumida : jaEstava ? (sala.jogadores[user.uid].base || 0) : base,
     ...(antigo && typeof antigo.entrouEm === "number" ? { entrouEm: antigo.entrouEm }
       : jaEstava ? {} : { entrouEm: serverTimestamp() }), // a ordem da vez não muda se entrar de novo
-    ...(assumido ? { assumiu: assumido, assumiuEm: serverTimestamp() } : {})
+    ...(assumido ? { assumiu: assumido, assumiuEm: serverTimestamp() } : {}),
+    // quem criou a sala: o que só quem criou guarda (pulos e quem foi dispensado) vem junto
+    ...(antigo && sala.criador === assumido ? { pulos: antigo.pulos || null, dispensados: antigo.dispensados || null } : {})
   });
+  // e este aparelho passa a ser quem criou (as regras deixam só o dono do nome de usuário)
+  if (antigo && sala.criador === assumido) await set(ref(db, `${raiz}/criador`), user.uid).catch(() => {});
   guardarSessao({ codigo, chave });
   guardarSalaCriada(codigo); // (para apagar a sala depois de 3 dias, se ninguém apagou)
   if (voltouDaPausa) chamarQuemPausou("voltou"); // quem ainda está fora fica sabendo
@@ -248,6 +252,7 @@ async function limparSalasAntigas() {
     try {
       const existe = (await lerDoBanco(`partidas/${sala.codigo}/criadaEm`)).exists();
       if (existe) await remove(ref(db, `partidas/${sala.codigo}`));
+      await remove(ref(db, `abertas/${sala.codigo}`)).catch(() => {});
       apagadas.push(sala.codigo); // apagada agora ou já não existia
     } catch {
       // sem conexão ou ainda não pode: tenta de novo outra vez (desiste depois de 30 dias)
@@ -266,6 +271,9 @@ async function criar(nome, modo = "livre", soDados = false) {
       atual => atual === null ? user.uid : undefined);
     if (r.committed) {
       await update(ref(db, `partidas/${codigo}`), { criadaEm: serverTimestamp() });
+      // na lista de salas abertas: todo dia o servidor de avisos avisa quem pausou
+      // no último dia e apaga as salas vencidas (com as regras antigas, fica de fora)
+      await set(ref(db, `abertas/${codigo}`), true).catch(() => {});
       // sala de espera: só começa quando quem criou tocar em Começar (com as regras
       // antigas a gravação é recusada e a sala começa na hora, como antes)
       await update(ref(db, `partidas/${codigo}`), { iniciada: false }).catch(() => {});
@@ -951,7 +959,6 @@ function atualizarEsperaDaSala() {
     mostrarLegenda(["Partida pausada", `${juntarNomes(quemEstaFora().map(j => j.nome))} saiu. Continua quando todos voltarem.`]);
   }
   estavaPausada = pausadaAgora;
-  if (pausadaAgora) lembrarPrazoDaPausa();
   jogandoSemPausa = !!sessao && !!partida && !esperando;
   // começou agora: quem estava esperando vê o aviso
   if (estavaEsperando && !esperando && sessao && partida && partida.iniciada === true) {
@@ -1624,8 +1631,8 @@ window.addEventListener("pagehide", passarVezAgora);
 
 // ---------- avisos com o app fechado ----------
 
-// Pede ao servidor de avisos que chame quem pausou: "voltou" (eu voltei da pausa)
-// ou "prazo" (a sala fecha em menos de 1 dia). Ele confere tudo no banco e só
+// Pede ao servidor de avisos que chame quem pausou: "voltou" (eu voltei da pausa).
+// Ele confere tudo no banco e só
 // avisa quem está fora e ligou os avisos.
 async function chamarQuemPausou(motivo) {
   if (!AVISOS_URL || !auth.currentUser || !sessao) return;
@@ -1640,18 +1647,8 @@ async function chamarQuemPausou(motivo) {
   } catch { /* sem aviso desta vez */ }
 }
 
-// Partida pausada no último dia da sala: quem está dentro (o primeiro a ver)
-// chama quem está fora, uma vez só por sala (marca "lembrouPrazo" no próprio jogador).
-let prazoLembrado = null;
-function lembrarPrazoDaPausa() {
-  if (!sessao || !partida || !pausada() || prazoLembrado === sessao.codigo) return;
-  const prazo = prazoDaSala();
-  if (!prazo || prazo <= Date.now() || prazo - Date.now() > 24 * 60 * 60 * 1000) return;
-  if (jogadoresDe(partida).some(j => j.lembrouPrazo === true)) { prazoLembrado = sessao.codigo; return; }
-  prazoLembrado = sessao.codigo;
-  update(ref(db, `partidas/${sessao.codigo}/jogadores/${minhaUid()}`), { lembrouPrazo: true }).catch(() => {});
-  chamarQuemPausou("prazo");
-}
+// (Partida pausada no último dia da sala: o servidor de avisos chama quem está
+// fora, uma vez por dia; ver avisarPrazos, no worker.)
 
 // Pede ao servidor de avisos que avise quem está na vez agora (ele confere tudo no banco).
 async function avisarProximo(texto) {

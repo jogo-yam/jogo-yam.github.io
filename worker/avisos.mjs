@@ -7,8 +7,11 @@
 // manda uma notificação (Web Push) para o celular dessa pessoa, se ela pediu
 // avisos e não está com o app aberto na tela.
 //
+// Todo dia, sozinho, avisa quem pausou no último dia da sala e apaga as salas
+// vencidas (tarefaDiaria, mais abaixo).
+//
 // Segredo: VAPID_PRIVADA (chave privada, JWK), guardada na Cloudflare.
-// Variáveis: VAPID_PUBLICA, FIREBASE_DB, ORIGENS (wrangler.toml).
+// Variáveis: VAPID_PUBLICA, FIREBASE_DB, FIREBASE_CHAVE, ORIGENS (wrangler.toml).
 
 const enc = new TextEncoder();
 
@@ -231,6 +234,72 @@ export async function tratarPausa(pedido, env, agora = Date.now(), buscar = fetc
   return { status: enviados ? 200 : 502, motivo: `avisados ${enviados} de ${alvos.length}` };
 }
 
+// ---------- todo dia: o prazo de quem pausou e a limpeza ----------
+// O app põe cada sala nova em abertas/<código>. Uma vez por dia (cron, no fim da
+// tarde no Brasil) o servidor entra no Firebase como visitante anônimo e, para
+// cada sala da lista: apaga a vencida (mais de 3 dias: as regras só deixam
+// isso), tira da lista a que não existe mais e, no último dia da sala, avisa
+// quem pausou que ela vai fechar. Assim não depende de alguém abrir o app.
+
+const FOLGA = 10 * 60 * 1000; // relógio: só apaga 10 min depois do que as regras deixam
+
+export async function entrarAnonimo(env, buscar = fetch) {
+  const r = await buscar(`https://identitytoolkit.googleapis.com/v1/accounts:signUp?key=${env.FIREBASE_CHAVE}`, {
+    method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ returnSecureToken: true })
+  });
+  if (!r.ok) throw new Error(`login anônimo: ${r.status}`);
+  return (await r.json()).idToken;
+}
+
+// Avisa quem pausou (e pediu avisos) que a sala fecha em menos de 1 dia. Devolve quantos.
+export async function avisarPrazo(codigo, sala, env, agora = Date.now(), buscar = fetch) {
+  if (!sala || sala.revelada || sala.encerrada) return 0;
+  const prazo = typeof sala.criadaEm === "number" ? sala.criadaEm + PRAZO_DA_SALA : null;
+  if (!prazo || prazo <= agora || prazo - agora > UM_DIA) return 0;
+  const criador = sala.jogadores && sala.jogadores[sala.criador];
+  const dispensados = (criador && criador.dispensados) || {};
+  const alvos = jogadoresValidos(sala).filter(j =>
+    j.fora === true && !j.terminou && !dispensados[j.uid] && j.push && j.push.endpoint);
+  const horas = Math.max(1, Math.round((prazo - agora) / (60 * 60 * 1000)));
+  const dados = {
+    titulo: "Sua sala vai fechar",
+    texto: `A sala ${codigo} fecha em ${horas} h. Volte para terminar a partida com os outros.`,
+    codigo: String(codigo)
+  };
+  let enviados = 0;
+  for (const j of alvos) {
+    try { if ((await enviarPush(j.push, dados, env, buscar)).ok) enviados++; } catch { /* segue para o próximo */ }
+  }
+  return enviados;
+}
+
+export async function tarefaDiaria(env, agora = Date.now(), buscar = fetch) {
+  const token = await entrarAnonimo(env, buscar);
+  const com = caminho => `${env.FIREBASE_DB}/${caminho}.json?auth=${encodeURIComponent(token)}`;
+  const lista = await buscar(com("abertas"));
+  if (!lista.ok) return { status: 403, motivo: "sem acesso à lista de salas" };
+  const codigos = Object.keys((await lista.json()) || {}).filter(c => /^\d{5}$/.test(c));
+  const feito = { salas: codigos.length, apagadas: 0, tiradas: 0, avisados: 0 };
+  for (const codigo of codigos) {
+    try {
+      const resposta = await buscar(com(`partidas/${codigo}`));
+      if (!resposta.ok) continue;
+      const sala = await resposta.json();
+      const vencida = !!sala && typeof sala.criadaEm === "number" && sala.criadaEm < agora - PRAZO_DA_SALA - FOLGA;
+      if (vencida) {
+        if (!(await buscar(com(`partidas/${codigo}`), { method: "DELETE" })).ok) continue;
+        feito.apagadas++;
+      }
+      if (vencida || !sala || !sala.criador) {
+        if ((await buscar(com(`abertas/${codigo}`), { method: "DELETE" })).ok) feito.tiradas++;
+        continue;
+      }
+      feito.avisados += await avisarPrazo(codigo, sala, env, agora, buscar);
+    } catch { /* segue para a próxima sala */ }
+  }
+  return { status: 200, motivo: JSON.stringify(feito), feito };
+}
+
 // ---------- Worker ----------
 
 function cabecalhosCors(origem, env) {
@@ -260,5 +329,10 @@ export default {
     } catch (e) {
       return new Response("erro", { status: 500, headers: cors });
     }
+  },
+
+  // todo dia (wrangler.toml, [triggers])
+  async scheduled(evento, env, ctx) {
+    ctx.waitUntil(tarefaDiaria(env).then(r => console.log("tarefa diária", r.motivo), e => console.log("tarefa diária falhou", String(e))));
   }
 };

@@ -242,3 +242,43 @@ test("sala no último dia: avisa quem pausou que ela vai fechar (antes disso, n�
   assert.match(dados.texto, /fecha em 5 h/);
   assert.equal((await pedirPausa(sala, "davi", "prazo", 3 * dia + 1)).enviados.length, 0, "já fechou");
 });
+
+test("tarefa diária: apaga a sala vencida, tira da lista a que sumiu e avisa quem pausou no último dia", async () => {
+  const { tarefaDiaria } = await carregar();
+  const { jwk, publica } = chavesVapid();
+  const cel = celular();
+  const push = { endpoint: "https://fcm.googleapis.com/wp/maria", p256dh: cel.p256dh, auth: cel.auth };
+  const dia = 24 * 60 * 60 * 1000;
+  const agora = 10 * dia;
+  const banco = {
+    abertas: { 11111: true, 22222: true, 33333: true, 44444: true, lixo: true },
+    partidas: {
+      11111: { ...salaCom(), criadaEm: agora - 4 * dia },                          // vencida
+      // 22222 já não existe
+      33333: { ...salaCom({ fora: true, push }), criadaEm: agora - 3 * dia + 6 * 60 * 60 * 1000 }, // fecha em 6 h
+      44444: { ...salaCom({ fora: true, push }), criadaEm: agora - 1 * dia }      // ainda tem 2 dias
+    }
+  };
+  const pedidos = [];
+  const buscar = async (url, opcoes = {}) => {
+    pedidos.push(`${opcoes.method || "GET"} ${url.replace(/\?.*/, "")}`);
+    if (url.includes("identitytoolkit")) return { ok: true, json: async () => ({ idToken: "tok" }) };
+    if (url.includes("firebaseio")) {
+      assert.ok(url.endsWith("?auth=tok"), "lê com o login anônimo");
+      const caminho = url.replace(/^https:\/\/teste\.firebaseio\.com\//, "").replace(/\.json\?.*/, "").split("/");
+      if (opcoes.method === "DELETE") { delete banco[caminho[0]][caminho[1]]; return { ok: true }; }
+      const valor = caminho.length === 1 ? banco[caminho[0]] : (banco[caminho[0]][caminho[1]] ?? null);
+      return { ok: true, json: async () => JSON.parse(JSON.stringify(valor)) };
+    }
+    return { ok: true, status: 201 }; // push
+  };
+  const env = { FIREBASE_DB: "https://teste.firebaseio.com", FIREBASE_CHAVE: "chave", VAPID_PUBLICA: publica, VAPID_PRIVADA: JSON.stringify(jwk) };
+  const r = await tarefaDiaria(env, agora, buscar);
+  assert.equal(r.status, 200, r.motivo);
+  assert.deepEqual(r.feito, { salas: 4, apagadas: 1, tiradas: 2, avisados: 1 });
+  assert.equal(banco.partidas[11111], undefined, "a vencida foi apagada");
+  assert.deepEqual(Object.keys(banco.abertas).sort(), ["33333", "44444", "lixo"]);
+  assert.ok(banco.partidas[33333] && banco.partidas[44444], "as outras continuam");
+  const pushes = pedidos.filter(p => p.includes("fcm.googleapis.com"));
+  assert.equal(pushes.length, 1, "só quem pausou na sala do último dia");
+});
