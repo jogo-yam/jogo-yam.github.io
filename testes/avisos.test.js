@@ -282,3 +282,47 @@ test("tarefa diária: apaga a sala vencida, tira da lista a que sumiu e avisa qu
   const pushes = pedidos.filter(p => p.includes("fcm.googleapis.com"));
   assert.equal(pushes.length, 1, "só quem pausou na sala do último dia");
 });
+
+test("vez parada há 10 min com a pessoa fora do app: avisa quem criou, uma vez só", async () => {
+  const { avisarVezParada, desdeDaVez } = await carregar();
+  const { jwk, publica } = chavesVapid();
+  const cel = celular();
+  const push = { endpoint: "https://fcm.googleapis.com/wp/davi", p256dh: cel.p256dh, auth: cel.auth };
+  const min = 60 * 1000;
+  const agora = 100 * min;
+  // Davi criou e jogou há 12 min; é a vez da Maria, que está com o app fechado
+  const sala = salaCom();
+  sala.iniciada = true;
+  sala.jogadores.davi = { ...sala.jogadores.davi, push, ultima: { key: "0-0", valor: 3, n: 1, em: agora - 12 * min } };
+  assert.equal(desdeDaVez(sala), agora - 12 * min);
+  const enviados = [];
+  const buscar = async (url, opcoes) => { enviados.push({ url, opcoes }); return { ok: true, status: 201 }; };
+  const env = { VAPID_PUBLICA: publica, VAPID_PRIVADA: JSON.stringify(jwk) };
+  assert.equal(await avisarVezParada("12345", sala, env, agora, buscar), 1);
+  const dados = JSON.parse(decifrar(enviados[0].opcoes.body, cel));
+  assert.equal(dados.titulo, "A vez está parada");
+  assert.match(dados.texto, /^A vez de Maria está parada há 12 min/);
+  assert.equal(await avisarVezParada("12345", sala, env, agora + 5 * min, buscar), 0, "na passada seguinte, não repete");
+  assert.equal(await avisarVezParada("12345", sala, env, agora - 4 * min, buscar), 0, "antes dos 10 min, não");
+  const aberta = { ...sala, jogadores: { ...sala.jogadores, maria: { ...sala.jogadores.maria, visivel: true, vistoEm: agora - 30000 } } };
+  assert.equal(await avisarVezParada("12345", aberta, env, agora, buscar), 0, "Maria está no app: só pensando");
+  const pausada = { ...sala, jogadores: { ...sala.jogadores, maria: { ...sala.jogadores.maria, fora: true } } };
+  assert.equal(await avisarVezParada("12345", pausada, env, agora, buscar), 0, "partida pausada");
+  const pulou = { ...sala, jogadores: { ...sala.jogadores, davi: { ...sala.jogadores.davi, pulouEm: agora - 2 * min } } };
+  assert.equal(await avisarVezParada("12345", pulou, env, agora, buscar), 0, "a vez acabou de mudar (pulo)");
+  const livre = { ...sala, jogadores: { ...sala.jogadores, davi: { ...sala.jogadores.davi, modo: "livre" } } };
+  assert.equal(await avisarVezParada("12345", livre, env, agora, buscar), 0, "sala sem vez");
+  assert.equal(enviados.length, 1);
+});
+
+test("o servidor entra sempre como o mesmo visitante quando tem o FIREBASE_RENOVAR", async () => {
+  const { entrarAnonimo } = await carregar();
+  const pedidos = [];
+  const buscar = async (url, opcoes) => {
+    pedidos.push(url.replace(/\?.*/, ""));
+    return { ok: true, json: async () => (url.includes("securetoken") ? { id_token: "renovado" } : { idToken: "novo" }) };
+  };
+  assert.equal(await entrarAnonimo({ FIREBASE_CHAVE: "k", FIREBASE_RENOVAR: "r" }, buscar), "renovado");
+  assert.equal(await entrarAnonimo({ FIREBASE_CHAVE: "k" }, buscar), "novo");
+  assert.deepEqual(pedidos, ["https://securetoken.googleapis.com/v1/token", "https://identitytoolkit.googleapis.com/v1/accounts:signUp"]);
+});

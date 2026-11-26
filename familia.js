@@ -198,6 +198,7 @@ async function entrar(codigo, nome, modo = null, soDados = null) {
     ...(antigo && typeof antigo.entrouEm === "number" ? { entrouEm: antigo.entrouEm }
       : jaEstava ? {} : { entrouEm: serverTimestamp() }), // a ordem da vez não muda se entrar de novo
     ...(assumido ? { assumiu: assumido, assumiuEm: serverTimestamp() } : {}),
+    ...(voltouDaPausa ? { voltouEm: serverTimestamp() } : {}), // (a vez recomeça a contar)
     // quem criou a sala: o que só quem criou guarda (pulos e quem foi dispensado) vem junto
     ...(antigo && sala.criador === assumido ? { pulos: antigo.pulos || null, dispensados: antigo.dispensados || null } : {})
   });
@@ -1056,6 +1057,7 @@ async function comecarPartida() {
     "Ninguém mais entrou ainda. Quem entrar depois começa na rodada em que a partida estiver.", "Começar")) return;
   try {
     await comLimite(update(ref(db, `partidas/${sessao.codigo}`), { iniciada: true }));
+    marcarHoraDaVez("comecouEm");
   } catch (e) {
     avisar(mensagemDeErro(e), "Não deu para começar");
   }
@@ -1788,6 +1790,7 @@ async function pularVez(uid, jaConfirmou = false) {
   if (daVez() !== uid) return; // a vez mudou enquanto perguntava
   try {
     const r = await runTransaction(ref(db, `partidas/${sessao.codigo}/jogadores/${minhaUid()}/pulos/${uid}`), n => (n || 0) + 1);
+    marcarHoraDaVez("pulouEm");
     avisarProximo(`${nomeJogador} pulou a vez de ${nome}.`);
     // por alguns segundos dá para desfazer (tocou sem querer), se ninguém jogou ainda
     const pulo = { codigo: sessao.codigo, uid, n: r.snapshot.val(), casas: casasDaSala() };
@@ -1825,6 +1828,7 @@ async function desfazerPulo(pulo) {
     const r = await runTransaction(ref(db, `partidas/${sessao.codigo}/jogadores/${minhaUid()}/pulos/${pulo.uid}`),
       n => (n === pulo.n ? Math.max(0, n - 1) : undefined));
     if (!r.committed) { avisar("O pulo mudou enquanto desfazia.", "Não deu para desfazer"); return; }
+    marcarHoraDaVez("pulouEm");
     ultimoAviso = Date.now();
     mostrarLegenda(["Pulo desfeito", `A vez voltou para ${nome}.`]);
     avisarProximo(`${nomeJogador} desfez o pulo: a vez voltou para você.`);
@@ -1838,6 +1842,24 @@ let vezParada = { chave: null, desde: 0 };
 let sugeriuPular = null;
 let timerVezParada = null;
 
+// A vez muda quando alguém joga, quando quem criou começa a partida ou pula/desfaz
+// um pulo e quando alguém volta da pausa: cada um grava a hora no próprio
+// jogador. A mais recente é desde quando a vez de agora está parada (o servidor
+// de avisos usa a mesma conta para avisar quem criou).
+function marcarHoraDaVez(campo) {
+  if (!sessao || !minhaUid()) return;
+  update(ref(db, `partidas/${sessao.codigo}/jogadores/${minhaUid()}`), { [campo]: serverTimestamp() }).catch(() => {});
+}
+function desdeDaVez(p = partida) {
+  let desde = null;
+  for (const j of jogadoresDe(p)) {
+    for (const t of [j.ultima && j.ultima.em, j.voltouEm, j.pulouEm, j.comecouEm]) {
+      if (typeof t === "number" && (desde === null || t > desde)) desde = t;
+    }
+  }
+  return desde;
+}
+
 function chaveDaVezParada() {
   if (!comVez() || antesDeComecar() || pausada()) return null;
   const vez = daVez();
@@ -1848,9 +1870,16 @@ function chaveDaVezParada() {
 
 function vigiarVezParada() {
   const chave = chaveDaVezParada();
-  if (chave !== vezParada.chave) vezParada = { chave, desde: Date.now() };
+  if (chave !== vezParada.chave) {
+    // parada desde antes de abrir o app (veio pela notificação, por exemplo): vale a hora do banco
+    const noBanco = desdeDaVez();
+    vezParada = { chave, desde: Math.min(Date.now(), noBanco || Date.now()) };
+  }
   const vigiar = !!chave && partida.criador === minhaUid() && daVez() !== minhaUid();
-  if (vigiar && !timerVezParada) timerVezParada = setInterval(sugerirPular, 30 * 1000);
+  if (vigiar && !timerVezParada) {
+    timerVezParada = setInterval(sugerirPular, 30 * 1000);
+    setTimeout(sugerirPular, 1500); // já parada há tempo: pergunta logo
+  }
   if (!vigiar && timerVezParada) { clearInterval(timerVezParada); timerVezParada = null; }
 }
 
@@ -2357,7 +2386,6 @@ window.familia = {
 };
 
 atualizarBarra();
-setTimeout(limparSalasAntigas, 3000); // depois que o app abriu, sem atrapalhar
 // histórico na nuvem: confere ao abrir (quem só tem nome ganha o nome de usuário)
 setTimeout(() => {
   ultimaSincronizacao = Date.now();

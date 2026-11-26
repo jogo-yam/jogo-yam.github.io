@@ -342,6 +342,28 @@ test("sala simulada: sala de antes da lista de abertas entra nela quando quem cr
   assert.ok(biaDeNovo);
 });
 
+test("sala simulada: quem criou abre o app com a vez parada há tempo (pela notificação) e é perguntado logo", async () => {
+  const banco = new Banco();
+  const { codigo, ana, bia } = await salaComTres(banco);
+  ana.marcar("0-0", 3);
+  await assentar();
+  assert.equal(typeof banco.ler(`partidas/${codigo}/jogadores/uidAna/comecouEm`), "number", "e a hora em que começou");
+  bia.fechar(); // Bia some sem pausar
+  // (a partida começou há 13 min e Ana jogou há 12)
+  banco.gravar("uidAna", { [`partidas/${codigo}/jogadores/uidAna/comecouEm`]: Date.now() - 13 * 60 * 1000 });
+  banco.gravar("uidAna", { [`partidas/${codigo}/jogadores/uidAna/ultima/em`]: Date.now() - 12 * 60 * 1000 });
+  await assentar();
+  // Ana estava com o app fechado (não acompanhou a espera) e agora abre pelo aviso
+  ana.familia("clearInterval(timerVezParada); timerVezParada = null; vezParada = { chave: null }");
+  banco.gravar("uidBia", { [`partidas/${codigo}/jogadores/uidBia/aberto`]: false });
+  const anaDeNovo = ana;
+  await assentar(100);
+  assert.ok(anaDeNovo.perguntas.includes("Pular a vez de Bia?"), "pergunta sem esperar mais 5 minutos");
+  await assentar();
+  assert.equal(anaDeNovo.familia("daVez()"), "uidCaio");
+  assert.equal(typeof banco.ler(`partidas/${codigo}/jogadores/uidAna/pulouEm`), "number", "a hora do pulo fica no banco");
+});
+
 test("sala simulada: quem só entrou (não criou) também apaga a sala vencida ao abrir o app", async () => {
   const banco = new Banco();
   const dia = 24 * 60 * 60 * 1000;
@@ -354,6 +376,7 @@ test("sala simulada: quem só entrou (não criou) também apaga a sala vencida a
   const outra = await celular(banco, "uidX", "Xis").familia('criar("Xis", "livre", false)'); // sala nova, de outra pessoa
   const biaDeNovo = celular(banco, "uidBia", "Bia", { guardado: bia.armazenado });
   biaDeNovo.familia("guardarSessao(null)"); // (tinha saído da sala)
+  biaDeNovo.armazenado.delete("yam-limpeza-salas"); // (a última limpeza dela foi há dias)
   await assentar(250); // a limpeza roda uns segundos depois de abrir
   assert.equal(banco.ler(`partidas/${codigo}`), null, "a sala vencida foi apagada");
   assert.equal(banco.ler(`abertas/${codigo}`), null, "e saiu da lista de salas abertas");

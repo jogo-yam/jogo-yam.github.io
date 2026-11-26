@@ -8,9 +8,11 @@
 // avisos e não está com o app aberto na tela.
 //
 // Todo dia, sozinho, avisa quem pausou no último dia da sala e apaga as salas
-// vencidas (tarefaDiaria, mais abaixo).
+// vencidas (tarefaDiaria, mais abaixo). A cada 5 minutos, avisa quem criou a
+// sala quando a vez está parada (vigiarVezes).
 //
-// Segredo: VAPID_PRIVADA (chave privada, JWK), guardada na Cloudflare.
+// Segredos (guardados na Cloudflare): VAPID_PRIVADA (chave privada, JWK) e
+// FIREBASE_RENOVAR (login do visitante anônimo do servidor; opcional).
 // Variáveis: VAPID_PUBLICA, FIREBASE_DB, FIREBASE_CHAVE, ORIGENS (wrangler.toml).
 
 const enc = new TextEncoder();
@@ -243,7 +245,16 @@ export async function tratarPausa(pedido, env, agora = Date.now(), buscar = fetc
 
 const FOLGA = 10 * 60 * 1000; // relógio: só apaga 10 min depois do que as regras deixam
 
+// Com FIREBASE_RENOVAR (segredo: o "refresh token" de um visitante anônimo
+// criado uma vez), entra sempre como o mesmo visitante; sem ele, cria um novo.
 export async function entrarAnonimo(env, buscar = fetch) {
+  if (env.FIREBASE_RENOVAR) {
+    const r = await buscar(`https://securetoken.googleapis.com/v1/token?key=${env.FIREBASE_CHAVE}`, {
+      method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: `grant_type=refresh_token&refresh_token=${encodeURIComponent(env.FIREBASE_RENOVAR)}`
+    });
+    if (r.ok) return (await r.json()).id_token;
+  }
   const r = await buscar(`https://identitytoolkit.googleapis.com/v1/accounts:signUp?key=${env.FIREBASE_CHAVE}`, {
     method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ returnSecureToken: true })
   });
@@ -271,6 +282,60 @@ export async function avisarPrazo(codigo, sala, env, agora = Date.now(), buscar 
     try { if ((await enviarPush(j.push, dados, env, buscar)).ok) enviados++; } catch { /* segue para o próximo */ }
   }
   return enviados;
+}
+
+// ---------- a cada 5 minutos: vez parada ----------
+// Na sala com vez, se a vez está parada há 10 minutos com a pessoa fora do app,
+// avisa quem criou (que pode pular a vez). Sem guardar nada: só avisa na passada
+// em que a parada cai entre 10 e 15 minutos, então é um aviso por vez parada.
+
+const VEZ_PARADA = 10 * 60 * 1000;
+const ENTRE_PASSADAS = 5 * 60 * 1000;
+const estaNoApp = (j, agora) => !!j && j.visivel === true && typeof j.vistoEm === "number" && agora - j.vistoEm < ABERTO_HA_POUCO;
+
+// Desde quando a vez de agora está parada (igual ao desdeDaVez do familia.js).
+export function desdeDaVez(sala) {
+  let desde = null;
+  for (const j of jogadoresValidos(sala)) {
+    for (const t of [j.ultima && j.ultima.em, j.voltouEm, j.pulouEm, j.comecouEm]) {
+      if (typeof t === "number" && (desde === null || t > desde)) desde = t;
+    }
+  }
+  return desde;
+}
+
+export async function avisarVezParada(codigo, sala, env, agora = Date.now(), buscar = fetch) {
+  if (!sala || sala.revelada || sala.encerrada || sala.iniciada === false || modoDaSala(sala) !== "vez") return 0;
+  const criador = sala.jogadores && sala.jogadores[sala.criador];
+  if (!temNome(criador) || !criador.push || !criador.push.endpoint || estaNoApp(criador, agora)) return 0;
+  const dispensados = criador.dispensados || {};
+  if (jogadoresValidos(sala).some(j => j.fora === true && !j.terminou && !dispensados[j.uid])) return 0; // pausada
+  const vez = vezDaSala(sala);
+  if (!vez || vez === sala.criador || estaNoApp(sala.jogadores[vez], agora)) return 0;
+  const desde = desdeDaVez(sala);
+  if (desde === null || agora - desde < VEZ_PARADA || agora - desde >= VEZ_PARADA + ENTRE_PASSADAS) return 0;
+  const nome = sala.jogadores[vez].nome;
+  const dados = {
+    titulo: "A vez está parada",
+    texto: `A vez de ${nome} está parada há ${Math.floor((agora - desde) / 60000)} min, com o app fechado. Toque para pular ou continuar esperando.`,
+    codigo: String(codigo)
+  };
+  try { return (await enviarPush(criador.push, dados, env, buscar)).ok ? 1 : 0; } catch { return 0; }
+}
+
+export async function vigiarVezes(env, agora = Date.now(), buscar = fetch) {
+  const token = await entrarAnonimo(env, buscar);
+  const com = caminho => `${env.FIREBASE_DB}/${caminho}.json?auth=${encodeURIComponent(token)}`;
+  const lista = await buscar(com("abertas"));
+  if (!lista.ok) return { status: 403, motivo: "sem acesso à lista de salas" };
+  let avisados = 0;
+  for (const codigo of Object.keys((await lista.json()) || {}).filter(c => /^\d{5}$/.test(c))) {
+    try {
+      const resposta = await buscar(com(`partidas/${codigo}`));
+      if (resposta.ok) avisados += await avisarVezParada(codigo, await resposta.json(), env, agora, buscar);
+    } catch { /* segue para a próxima sala */ }
+  }
+  return { status: 200, motivo: `vez parada: avisados ${avisados}`, avisados };
 }
 
 export async function tarefaDiaria(env, agora = Date.now(), buscar = fetch) {
@@ -331,8 +396,13 @@ export default {
     }
   },
 
-  // todo dia (wrangler.toml, [triggers])
+  // wrangler.toml, [triggers]: todo dia (prazo e limpeza) e a cada 5 min (vez parada)
   async scheduled(evento, env, ctx) {
-    ctx.waitUntil(tarefaDiaria(env).then(r => console.log("tarefa diária", r.motivo), e => console.log("tarefa diária falhou", String(e))));
+    if (evento.cron === "0 22 * * *") {
+      ctx.waitUntil(tarefaDiaria(env).then(r => console.log("tarefa diária", r.motivo), e => console.log("tarefa diária falhou", String(e))));
+    } else {
+      ctx.waitUntil(vigiarVezes(env).then(r => { if (r.avisados || r.status !== 200) console.log(r.motivo); },
+        e => console.log("vez parada falhou", String(e))));
+    }
   }
 };
