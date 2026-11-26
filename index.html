@@ -20,14 +20,14 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="theme-color" content="#f4ecd8" media="(prefers-color-scheme: light)">
   <meta name="theme-color" content="#121413" media="(prefers-color-scheme: dark)">
-  <link rel="manifest" href="manifest.json?v=132">
+  <link rel="manifest" href="manifest.json?v=133">
   <link rel="icon" type="image/png" sizes="32x32" href="icone-mesa-32.png">
   <link rel="apple-touch-icon" href="icone-mesa-apple-180.png">
 
   <link rel="preload" href="fontes/nunito.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="preload" href="fontes/fredoka.woff2" as="font" type="font/woff2" crossorigin>
   <!-- ?v= é a versão do app (igual ao VERSAO do app.js; um teste confere): versão nova, endereço novo -->
-  <link rel="stylesheet" href="style.css?v=132">
+  <link rel="stylesheet" href="style.css?v=133">
 
   <!-- Aplica o tema escolhido antes de desenhar a página, para não piscar. -->
   <meta name="apple-mobile-web-app-capable" content="yes">
@@ -757,18 +757,18 @@
   <div class="janela-caixa caixa-novidades" role="dialog" aria-modal="true" aria-labelledby="novidades-titulo">
     <h2 id="novidades-titulo">Novidades no YAM</h2>
     <ul class="lista-novidades">
-      <li><span class="novidade-icone"><svg class="icone" aria-hidden="true"><use href="#i-sala"/></svg></span>
+      <li><span class="novidade-icone"><svg class="icone" aria-hidden="true"><use href="#i-ajustes"/></svg></span>
+        <span><strong>Mesas, dados e texturas</strong>10 cores de mesa, 8 de dados e 6 texturas, em Mais. Deslize cada fileira para ver todas.</span></li>
+      <li><span class="novidade-icone"><svg class="icone" aria-hidden="true"><use href="#i-ampulheta"/></svg></span>
+        <span><strong>Várias partidas em pausa</strong>Comece outra sem perder a de agora: as pausadas ficam no topo do histórico.</span></li>
+      <li><span class="novidade-icone"><svg class="icone" aria-hidden="true"><use href="#i-dado"/></svg></span>
+        <span><strong>Os dados de cada um</strong>Na sala, os dados de quem está jogando aparecem na cor que a pessoa escolheu.</span></li>
+      <li><span class="novidade-icone"><svg class="icone" aria-hidden="true"><use href="#i-sino"/></svg></span>
+        <span><strong>Avisos para quem pausou</strong>Com os avisos ligados, o app chama você quando os outros voltam e quando a sala está para fechar.</span></li>
+      <li class="novidade-antiga"><span class="novidade-icone"><svg class="icone" aria-hidden="true"><use href="#i-sala"/></svg></span>
         <span><strong>Ranking só com partidas em sala</strong>Partidas sozinho não contam mais. Se você já jogou em sala, seu recorde volta sozinho.</span></li>
-      <li><span class="novidade-icone"><svg class="icone" aria-hidden="true"><use href="#i-estrela"/></svg></span>
+      <li class="novidade-antiga"><span class="novidade-icone"><svg class="icone" aria-hidden="true"><use href="#i-estrela"/></svg></span>
         <span><strong>Ranking do mês</strong>Uma aba nova com a melhor partida de cada um no mês, e quem venceu o mês passado.</span></li>
-      <li class="novidade-antiga"><span class="novidade-icone"><svg class="icone" aria-hidden="true"><use href="#i-ampulheta"/></svg></span>
-        <span><strong>Pausar a partida em sala</strong>Teve que parar? Toque em Sair → Pausar. A sala espera todos voltarem (até 3 dias).</span></li>
-      <li class="novidade-antiga"><span class="novidade-icone"><span class="avatar online" aria-hidden="true">A</span></span>
-        <span><strong>Quem está no app</strong>Um pontinho verde na bolinha de quem está com o app aberto agora.</span></li>
-      <li class="novidade-antiga"><span class="novidade-icone"><svg class="icone" aria-hidden="true"><use href="#i-trofeu"/></svg></span>
-        <span><strong>Destaques da partida</strong>No pódio e na imagem para o grupo: mais YAMs, maior jogada e mais.</span></li>
-      <li class="novidade-antiga"><span class="novidade-icone"><svg class="icone" aria-hidden="true"><use href="#i-sino"/></svg></span>
-        <span><strong>Bolinha no ícone</strong>O ícone do YAM mostra quando é a sua vez ou chegou mensagem.</span></li>
     </ul>
     <button class="principal largo" onclick="fecharNovidades()">Entendi</button>
   </div>
@@ -831,7 +831,7 @@
   </div>
 </div>
 
-<script src="app.js?v=132"></script>
+<script src="app.js?v=133"></script>
 <script>
   // Rede de segurança: se o app.js não carregou (ex.: troca de versão no meio
   // do caminho), recarrega sozinho uma vez, em vez de ficar com a tabela vazia.
@@ -845,7 +845,7 @@
     setTimeout(function () { location.replace(location.pathname + "?atualizado=" + Date.now()); }, 1500);
   })();
 </script>
-<script type="module" src="familia.js?v=132"></script>
+<script type="module" src="familia.js?v=133"></script>
 
 <!-- Service Worker -->
 <script>

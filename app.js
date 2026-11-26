@@ -8,7 +8,7 @@ const rows = [
 const COLUNAS = 4;
 
 // Versão do app: igual ao número do CACHE_NAME do service-worker.js (um teste confere).
-const VERSAO = 132;
+const VERSAO = 133;
 
 // Avisos da vez com o app fechado: servidor na Cloudflare (worker/avisos.mjs).
 // Sem o endereço, a opção "Avisar a minha vez" não aparece.
@@ -2145,9 +2145,31 @@ function partidaParaTerminar() {
   return historico.find(p => p.codigoSala && !partidaTerminada(p) && p.id !== partidaSalvaId && aberta(p)) || null;
 }
 
-// Partidas em pausa: as que ficaram pela metade no histórico (menos a tabela de agora).
+// Partidas em pausa: as que ficaram pela metade no histórico (menos a tabela de
+// agora). Parada há mais de 30 dias (e sem sala aberta) é "esquecida": continua
+// no histórico, mas não chama mais no início.
+const PAUSA_ESQUECIDA = 30 * 24 * 60 * 60 * 1000;
+const pausaEsquecida = (p, agora = Date.now()) =>
+  !(p.codigoSala && p.jeitoSala && p.jeitoSala.prazo && textoDoPrazo(p.jeitoSala.prazo)) &&
+  agora - new Date(p.data).getTime() > PAUSA_ESQUECIDA;
+
 function partidasEmPausa() {
-  return historico.filter(p => !partidaTerminada(p) && p.id !== partidaSalvaId);
+  return historico.filter(p => !partidaTerminada(p) && p.id !== partidaSalvaId && !pausaEsquecida(p));
+}
+
+// No histórico: tira de uma vez as partidas em pausa esquecidas.
+async function limparPausasEsquecidas() {
+  const velhas = historico.filter(p => !partidaTerminada(p) && p.id !== partidaSalvaId && pausaEsquecida(p));
+  if (!velhas.length) return;
+  const qtd = velhas.length === 1 ? "1 partida em pausa" : `${velhas.length} partidas em pausa`;
+  if (!await confirmar(`Excluir ${qtd} há mais de 30 dias?`,
+    "Elas não foram terminadas e saem do histórico. Não dá para desfazer.", "Excluir", true)) return;
+  const ids = new Set(velhas.map(p => p.id));
+  historico = historico.filter(p => !ids.has(p.id));
+  // lembra que foram excluídas: somem também da nuvem e dos outros aparelhos
+  try { localStorage.setItem(CHAVE_EXCLUIDAS, JSON.stringify([...new Set([...lerExcluidas(), ...[...ids].map(String)])])); } catch {}
+  salvarHistorico();
+  abrirHistorico();
 }
 
 function irParaSala() {
@@ -2202,7 +2224,15 @@ function abrirHistorico() {
     const ordem = emPausa.length ? [...emPausa, ...historico.filter(p => partidaTerminada(p))] : historico;
     ordem.forEach((partida, i) => {
       if (emPausa.length && (i === 0 || i === emPausa.length)) {
-        lista.appendChild(elemento("li", "titulo-historico", i === 0 ? "Em pausa" : "Terminadas"));
+        const titulo = elemento("li", "titulo-historico", i === 0 ? "Em pausa" : "Terminadas");
+        const esquecidas = i === 0 ? emPausa.filter(p => p.id !== partidaSalvaId && pausaEsquecida(p)).length : 0;
+        if (esquecidas) {
+          const limpar = elemento("button", "link limpar-pausas", `Excluir ${esquecidas === 1 ? "a antiga" : `as ${esquecidas} antigas`}`);
+          limpar.type = "button";
+          limpar.addEventListener("click", limparPausasEsquecidas);
+          titulo.appendChild(limpar);
+        }
+        lista.appendChild(titulo);
       }
       const li = document.createElement("li");
       const botao = document.createElement("button");
@@ -4693,8 +4723,8 @@ if (typeof ResizeObserver === "function") {
 // Quem já usava o app vê uma janelinha com o que mudou; quem está chegando agora
 // vê as boas-vindas (e as novidades ficam marcadas como vistas).
 const CHAVE_NOVIDADES = "yam-novidades";
-const NOVIDADES = "ranking-2026-11"; // trocar quando houver novidades novas para mostrar
-const NOVIDADES_ANTERIORES = "sala-pausa-2026-11"; // quem já viu estas não vê de novo os itens antigos
+const NOVIDADES = "visual-pausas-2026-11"; // trocar quando houver novidades novas para mostrar
+const NOVIDADES_ANTERIORES = "ranking-2026-11"; // quem já viu estas não vê de novo os itens antigos
 
 function fecharNovidades() {
   try { localStorage.setItem(CHAVE_NOVIDADES, NOVIDADES); } catch {}

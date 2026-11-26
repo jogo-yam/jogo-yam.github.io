@@ -62,12 +62,16 @@ test("prazo da sala: em dias e, no último dia, em horas", () => {
   assert.equal(app.textoDoPrazo(undefined, agora), null);
 });
 
+// o id da partida é a hora (em ms): duas salvas no mesmo ms teriam o mesmo id
+const proximoMs = () => { const t = Date.now(); while (Date.now() === t) { /* espera */ } };
+
 test("dá para deixar várias partidas em pausa: todas aparecem, menos a tabela de agora", () => {
   const { app, rodar } = carregarApp();
   rodar(`state = ${JSON.stringify(metade())}`);
   app.marcarSalaDaTabela("11111");
   app.salvarPartidaAtual();
   app.comecarNovaPartida();
+  proximoMs();
   rodar(`state = { "0-0": "3" }`);
   app.salvarPartidaAtual();
   assert.equal(app.partidasEmPausa().length, 1, "a tabela de agora não conta");
@@ -75,8 +79,22 @@ test("dá para deixar várias partidas em pausa: todas aparecem, menos a tabela 
   const pausadas = app.partidasEmPausa();
   assert.equal(pausadas.length, 2);
   assert.ok(pausadas.some(p => p.codigoSala === "11111"), "a da sala continua em pausa");
+  proximoMs();
   rodar(`state = ${JSON.stringify(tabelaCompleta())}`);
   app.salvarPartidaAtual();
   app.comecarNovaPartida();
   assert.equal(app.partidasEmPausa().length, 2, "terminada não fica em pausa");
+});
+
+test("pausa esquecida (mais de 30 dias, sem sala aberta) sai do início, mas fica no histórico", () => {
+  const { app, rodar } = carregarApp();
+  const dias = n => new Date(Date.now() - n * 24 * 60 * 60 * 1000).toISOString();
+  rodar(`historico = [
+    { id: 1, data: "${dias(40)}", total: 3, valores: { "0-0": "3" } },
+    { id: 2, data: "${dias(2)}", total: 3, valores: { "0-0": "3" } },
+    { id: 3, data: "${dias(40)}", total: 3, valores: { "0-0": "3" }, codigoSala: "22222", jeitoSala: { prazo: Date.now() + 3600000 } }
+  ]`);
+  const ids = JSON.parse(JSON.stringify(app.partidasEmPausa().map(p => p.id).sort()));
+  assert.deepEqual(ids, [2, 3], "a de 40 dias sai; a de sala ainda aberta fica");
+  assert.equal(app.historico.length, 3, "nada sai do histórico sozinho");
 });

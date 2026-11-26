@@ -160,6 +160,7 @@ async function entrar(codigo, nome, modo = null, soDados = null) {
     : 0;
   const base = minhasCasas > 0 ? Math.max(0, rodadaAgora - minhasCasas - meusPulos - 1) : rodadaAgora;
   const jaEstava = snap.child(`jogadores/${user.uid}/entrouEm`).exists();
+  const voltouDaPausa = jaEstava && snap.child(`jogadores/${user.uid}/fora`).val() === true;
   if (jaEstava && dispensadosDe(sala)[user.uid]) {
     esquecerSala(codigo);
     throw new Error("A partida dessa sala continuou sem você.");
@@ -173,6 +174,7 @@ async function entrar(codigo, nome, modo = null, soDados = null) {
     ...(jaEstava ? {} : { entrouEm: serverTimestamp() }) // a ordem da vez não muda se entrar de novo
   });
   guardarSessao({ codigo, chave });
+  if (voltouDaPausa) chamarQuemPausou("voltou"); // quem ainda está fora fica sabendo
   // a tabela é desta sala (se sair, dá para voltar e terminar enquanto ela não fechar)
   const prazo = typeof sala.criadaEm === "number" ? sala.criadaEm + PRAZO_DA_SALA : null;
   marcarSalaDaTabela(codigo, { modo: modoDaSalaAgora, soDados: !!soDadosAgora, ...(prazo ? { prazo } : {}) });
@@ -898,6 +900,7 @@ function atualizarEsperaDaSala() {
     mostrarLegenda(["Partida pausada", `${juntarNomes(quemEstaFora().map(j => j.nome))} saiu. Continua quando todos voltarem.`]);
   }
   estavaPausada = pausadaAgora;
+  if (pausadaAgora) lembrarPrazoDaPausa();
   jogandoSemPausa = !!sessao && !!partida && !esperando;
   // começou agora: quem estava esperando vê o aviso
   if (estavaEsperando && !esperando && sessao && partida && partida.iniciada === true) {
@@ -1435,6 +1438,9 @@ function reiniciarVez() {
   perguntouAvisos = false;
   clearInterval(timerVisto);
   timerVisto = null;
+  clearInterval(timerVezParada);
+  timerVezParada = null;
+  vezParada = { chave: null, desde: 0 };
   atualizarBarraVez();
 }
 
@@ -1559,6 +1565,35 @@ window.addEventListener("pagehide", passarVezAgora);
 
 // ---------- avisos com o app fechado ----------
 
+// Pede ao servidor de avisos que chame quem pausou: "voltou" (eu voltei da pausa)
+// ou "prazo" (a sala fecha em menos de 1 dia). Ele confere tudo no banco e só
+// avisa quem está fora e ligou os avisos.
+async function chamarQuemPausou(motivo) {
+  if (!AVISOS_URL || !auth.currentUser || !sessao) return;
+  try {
+    const token = await auth.currentUser.getIdToken();
+    await fetch(`${AVISOS_URL}/pausa`, {
+      method: "POST",
+      headers: { "Content-Type": "text/plain" },
+      body: JSON.stringify({ codigo: sessao.codigo, token, motivo }),
+      keepalive: true
+    });
+  } catch { /* sem aviso desta vez */ }
+}
+
+// Partida pausada no último dia da sala: quem está dentro (o primeiro a ver)
+// chama quem está fora, uma vez só por sala (marca "lembrouPrazo" no próprio jogador).
+let prazoLembrado = null;
+function lembrarPrazoDaPausa() {
+  if (!sessao || !partida || !pausada() || prazoLembrado === sessao.codigo) return;
+  const prazo = prazoDaSala();
+  if (!prazo || prazo <= Date.now() || prazo - Date.now() > 24 * 60 * 60 * 1000) return;
+  if (jogadoresDe(partida).some(j => j.lembrouPrazo === true)) { prazoLembrado = sessao.codigo; return; }
+  prazoLembrado = sessao.codigo;
+  update(ref(db, `partidas/${sessao.codigo}/jogadores/${minhaUid()}`), { lembrouPrazo: true }).catch(() => {});
+  chamarQuemPausou("prazo");
+}
+
 // Pede ao servidor de avisos que avise quem está na vez agora (ele confere tudo no banco).
 async function avisarProximo(texto) {
   if (!AVISOS_URL || !auth.currentUser || !sessao) return;
@@ -1672,15 +1707,55 @@ function mesaMudou(valores = mesa.valores) {
   }).catch(() => {});
 }
 
-async function pularVez(uid) {
+async function pularVez(uid, jaConfirmou = false) {
   const nome = nomeDe(uid);
-  if (!await confirmar(`Pular a vez de ${nome}?`,
+  if (!jaConfirmou && !await confirmar(`Pular a vez de ${nome}?`,
     `${nome} perde esta jogada e a vez passa para o próximo.`, "Pular")) return;
   if (daVez() !== uid) return; // a vez mudou enquanto perguntava
   try {
     await runTransaction(ref(db, `partidas/${sessao.codigo}/jogadores/${minhaUid()}/pulos/${uid}`), n => (n || 0) + 1);
     avisarProximo(`${nomeJogador} pulou a vez de ${nome}.`);
   } catch (e) { avisar(mensagemDeErro(e), "Não deu para pular"); }
+}
+
+// A vez parada: se a vez de alguém fica parada 5 min com essa pessoa fora do app,
+// quem criou a sala (o único que pode pular) recebe a pergunta, uma vez por jogada.
+const VEZ_PARADA = 5 * 60 * 1000;
+let vezParada = { chave: null, desde: 0 };
+let sugeriuPular = null;
+let timerVezParada = null;
+
+function chaveDaVezParada() {
+  if (!comVez() || antesDeComecar() || pausada()) return null;
+  const vez = daVez();
+  if (!vez) return null;
+  const j = partida.jogadores[vez] || {};
+  return `${vez}:${j.casas || 0}:${pulosDe(partida)[vez] || 0}`;
+}
+
+function vigiarVezParada() {
+  const chave = chaveDaVezParada();
+  if (chave !== vezParada.chave) vezParada = { chave, desde: Date.now() };
+  const vigiar = !!chave && partida.criador === minhaUid() && daVez() !== minhaUid();
+  if (vigiar && !timerVezParada) timerVezParada = setInterval(sugerirPular, 30 * 1000);
+  if (!vigiar && timerVezParada) { clearInterval(timerVezParada); timerVezParada = null; }
+}
+
+async function sugerirPular() {
+  if (!sessao || !partida || document.visibilityState === "hidden") return;
+  const chave = chaveDaVezParada();
+  if (!chave || chave !== vezParada.chave || sugeriuPular === chave) return;
+  if (Date.now() - vezParada.desde < VEZ_PARADA) return;
+  const vez = daVez();
+  if (estaAberto({ ...partida.jogadores[vez], uid: vez })) return; // está no app: só pensando
+  if (document.querySelector(".janela:not([hidden]), .fim-de-jogo:not([hidden])")) return; // não por cima de outra
+  sugeriuPular = chave;
+  const nome = nomeDe(vez);
+  if (!await confirmar(`Pular a vez de ${nome}?`,
+    `A vez de ${nome} está parada há mais de 5 minutos, com o app fechado. Pulando, ${nome} perde esta jogada e a vez passa para o próximo.`,
+    "Pular")) return;
+  if (chaveDaVezParada() !== chave) return; // a pessoa jogou enquanto perguntava
+  pularVez(vez, true);
 }
 
 // Avisos: "Sua vez!" e o que cada um marcou.
@@ -1736,6 +1811,7 @@ function atualizarBarraVez() {
   barra.classList.toggle("minha", vez === uid && !passando);
   dados.innerHTML = "";
   acao.hidden = true;
+  vigiarVezParada();
   $("vez-avatar").replaceChildren(); // passando a vez: sem bolinha
   atualizarPulsoDaVez();
 

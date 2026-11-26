@@ -196,3 +196,49 @@ test("app minimizado: espera a gravação chegar antes de desistir", async () =>
   assert.equal(r.status, 200, r.motivo);
   assert.equal(leituras, 3);
 });
+
+// ---------- o pedido "chamar quem pausou" ----------
+
+async function pedirPausa(sala, uid, motivo, agora = 1000000) {
+  const { tratarPausa } = await carregar();
+  const { jwk, publica } = chavesVapid();
+  const enviados = [];
+  const buscar = async (url, opcoes) => {
+    if (url.includes("firebaseio")) return { ok: true, json: async () => sala };
+    enviados.push({ url, opcoes });
+    return { ok: true, status: 201 };
+  };
+  const env = { FIREBASE_DB: "https://teste.firebaseio.com", VAPID_PUBLICA: publica, VAPID_PRIVADA: JSON.stringify(jwk) };
+  return { r: await tratarPausa({ codigo: "12345", token: tokenDe(uid), motivo }, env, agora, buscar), enviados };
+}
+
+test("quem voltou da pausa chama quem ainda está fora (e só quem pediu avisos)", async () => {
+  const cel = celular();
+  const push = { endpoint: "https://fcm.googleapis.com/wp/maria", p256dh: cel.p256dh, auth: cel.auth };
+  const sala = salaCom({ fora: true, push });
+  sala.jogadores.joao = { nome: "João", entrouEm: 3, fora: true }; // fora, mas sem avisos
+  sala.jogadores.fantasma = { aberto: false, fora: true, push };   // sem nome: não é jogador
+  const { r, enviados } = await pedirPausa(sala, "davi", "voltou");
+  assert.equal(r.status, 200, r.motivo);
+  assert.equal(enviados.length, 1);
+  const dados = JSON.parse(decifrar(enviados[0].opcoes.body, cel));
+  assert.equal(dados.titulo, "Esperando você no YAM");
+  assert.match(dados.texto, /^Davi voltou para a sala 12345/);
+  assert.equal((await pedirPausa(sala, "maria", "voltou")).enviados.length, 0, "quem chamou ainda está fora");
+  assert.equal((await pedirPausa(sala, "davi", "qualquer")).r.status, 400);
+});
+
+test("sala no último dia: avisa quem pausou que ela vai fechar (antes disso, não)", async () => {
+  const cel = celular();
+  const push = { endpoint: "https://fcm.googleapis.com/wp/maria", p256dh: cel.p256dh, auth: cel.auth };
+  const dia = 24 * 60 * 60 * 1000;
+  const sala = { ...salaCom({ fora: true, push }), criadaEm: 0 };
+  const cedo = await pedirPausa(sala, "davi", "prazo", 1 * dia);
+  assert.equal(cedo.enviados.length, 0, "faltam 2 dias");
+  const { r, enviados } = await pedirPausa(sala, "davi", "prazo", 3 * dia - 5 * 60 * 60 * 1000);
+  assert.equal(r.status, 200, r.motivo);
+  const dados = JSON.parse(decifrar(enviados[0].opcoes.body, cel));
+  assert.equal(dados.titulo, "Sua sala vai fechar");
+  assert.match(dados.texto, /fecha em 5 h/);
+  assert.equal((await pedirPausa(sala, "davi", "prazo", 3 * dia + 1)).enviados.length, 0, "já fechou");
+});

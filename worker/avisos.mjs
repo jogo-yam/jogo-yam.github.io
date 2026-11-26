@@ -175,6 +175,52 @@ export async function tratarVez(pedido, env, agora = Date.now(), buscar = fetch,
   return { status: envio.ok ? 200 : 502, motivo: envio.ok ? "avisado" : `push ${envio.status}` };
 }
 
+// ---------- o pedido "chamar quem pausou" ----------
+// POST /pausa { codigo, token, motivo }: "voltou" (quem chamou voltou da pausa)
+// ou "prazo" (a sala fecha em menos de 1 dia). Avisa quem ainda está fora (e
+// pediu avisos). O texto é montado aqui, com o que está no banco.
+
+const PRAZO_DA_SALA = 3 * 24 * 60 * 60 * 1000;
+const UM_DIA = 24 * 60 * 60 * 1000;
+const temNome = j => !!j && typeof j.nome === "string" && j.nome !== "";
+
+export async function tratarPausa(pedido, env, agora = Date.now(), buscar = fetch) {
+  const { codigo, token, motivo } = pedido || {};
+  if (!/^\d{5}$/.test(String(codigo)) || typeof token !== "string" || !["voltou", "prazo"].includes(motivo)) {
+    return { status: 400, motivo: "pedido inválido" };
+  }
+  const quemChamou = uidDoToken(token);
+  const resposta = await buscar(`${env.FIREBASE_DB}/partidas/${codigo}.json?auth=${encodeURIComponent(token)}`);
+  if (!resposta.ok) return { status: 403, motivo: "sem acesso à sala" };
+  const sala = await resposta.json();
+  const eu = sala && sala.jogadores && sala.jogadores[quemChamou];
+  if (!temNome(eu)) return { status: 403, motivo: "não está na sala" };
+  if (sala.revelada || sala.encerrada) return { status: 204, motivo: "a partida acabou" };
+  if (eu.fora === true) return { status: 204, motivo: "quem chamou também está fora" };
+
+  let texto;
+  if (motivo === "voltou") {
+    texto = `${eu.nome} voltou para a sala ${codigo}. A partida continua quando você voltar.`;
+  } else {
+    const prazo = typeof sala.criadaEm === "number" ? sala.criadaEm + PRAZO_DA_SALA : null;
+    if (!prazo || prazo <= agora || prazo - agora > UM_DIA) return { status: 204, motivo: "fora do último dia" };
+    const horas = Math.max(1, Math.round((prazo - agora) / (60 * 60 * 1000)));
+    texto = `A sala ${codigo} fecha em ${horas} h. Volte para terminar a partida com os outros.`;
+  }
+
+  const criador = sala.jogadores[sala.criador];
+  const dispensados = (criador && criador.dispensados) || {};
+  const alvos = Object.entries(sala.jogadores).filter(([uid, j]) =>
+    uid !== quemChamou && temNome(j) && j.fora === true && !j.terminou && !dispensados[uid] && j.push && j.push.endpoint);
+  if (!alvos.length) return { status: 204, motivo: "ninguém fora com avisos" };
+  const dados = { titulo: motivo === "voltou" ? "Esperando você no YAM" : "Sua sala vai fechar", texto, codigo: String(codigo) };
+  let enviados = 0;
+  for (const [, j] of alvos) {
+    try { if ((await enviarPush(j.push, dados, env, buscar)).ok) enviados++; } catch { /* segue para o próximo */ }
+  }
+  return { status: enviados ? 200 : 502, motivo: `avisados ${enviados} de ${alvos.length}` };
+}
+
 // ---------- Worker ----------
 
 function cabecalhosCors(origem, env) {
@@ -192,13 +238,14 @@ export default {
     const cors = cabecalhosCors(request.headers.get("Origin") || "", env);
     if (request.method === "OPTIONS") return new Response(null, { status: 204, headers: cors });
     const url = new URL(request.url);
-    if (request.method !== "POST" || url.pathname !== "/vez") {
+    const tratar = { "/vez": tratarVez, "/pausa": tratarPausa }[url.pathname];
+    if (request.method !== "POST" || !tratar) {
       return new Response("YAM avisos", { status: url.pathname === "/" ? 200 : 404, headers: cors });
     }
     let pedido;
     try { pedido = JSON.parse(await request.text()); } catch { pedido = null; }
     try {
-      const r = await tratarVez(pedido, env);
+      const r = await tratar(pedido, env);
       return new Response(r.motivo, { status: r.status === 204 ? 200 : r.status, headers: cors });
     } catch (e) {
       return new Response("erro", { status: 500, headers: cors });

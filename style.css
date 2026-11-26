@@ -3571,11 +3571,13 @@ td.mudou { animation: mudou 0.7s ease-out; }
 
 /* histórico: as em pausa em cima, com título; depois as terminadas */
 .lista-historico .titulo-historico {
+  display: flex; align-items: baseline; justify-content: space-between; gap: 10px;
   padding: 6px 4px 0;
   font-size: 13px; font-weight: 800; letter-spacing: 0.04em; text-transform: uppercase;
   color: var(--texto-suave);
 }
 :root[data-letra="grande"] .lista-historico .titulo-historico { font-size: 15px; }
+.lista-historico .limpar-pausas { font-size: 13px; letter-spacing: 0; text-transform: none; padding: 6px 2px; }
 
 /* histórico: partida pela metade (dá para continuar) */
 .pela-metade {

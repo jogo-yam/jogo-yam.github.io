@@ -27,8 +27,9 @@ function qualquerCoisa() {
 }
 
 // `armazenado`: o que já está guardado no celular (localStorage), ex.:
-// { "yam-historico": JSON.stringify([...]) }.
-function carregarApp({ armazenado = {} } = {}) {
+// { "yam-historico": JSON.stringify([...]) }. `extras`: o que mais o "navegador"
+// tem (ex.: as funções do Firebase de mentira, relógios acelerados, fetch).
+function carregarApp({ armazenado = {}, extras = {} } = {}) {
   const dados = new Map(Object.entries(armazenado));
   const localStorage = {
     getItem: k => (dados.has(k) ? dados.get(k) : null),
@@ -48,6 +49,7 @@ function carregarApp({ armazenado = {} } = {}) {
     setTimeout, clearTimeout, setInterval, clearInterval,
     URL, Blob, File, TextEncoder, console
   };
+  Object.assign(janela, extras);
   janela.window = janela;
   janela.self = janela;
 
@@ -79,4 +81,4 @@ function tabelaCompleta(mudar = {}) {
   return { ...v, ...mudar };
 }
 
-module.exports = { carregarApp, igual, tabelaCompleta, lerArquivo, RAIZ };
+module.exports = { carregarApp, igual, tabelaCompleta, lerArquivo, RAIZ, qualquerCoisa };
