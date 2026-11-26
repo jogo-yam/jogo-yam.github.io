@@ -325,6 +325,23 @@ test("sala simulada: quem criou continua no tablet e segue no comando (pular, se
   assert.equal(banco.ler(`partidas/${codigo}/criador`), "uidAnaTablet");
 });
 
+test("sala simulada: sala de antes da lista de abertas entra nela quando quem criou abre o app", async () => {
+  const banco = new Banco();
+  const { codigo, ana, bia } = await salaComTres(banco);
+  banco.arvore.abertas = {}; // (como uma sala da versão 136)
+  bia.fechar();
+  ana.fechar();
+  ana.armazenado.delete("yam-salas-na-lista"); // (a versão 136 não tinha essa marca)
+  const biaDeNovo = celular(banco, "uidBia", "Bia", { guardado: bia.armazenado });
+  await assentar(250);
+  assert.equal(banco.ler(`abertas/${codigo}`), null, "quem só entrou não põe");
+  const anaDeNovo = celular(banco, "uidAna", "Ana", { guardado: ana.armazenado });
+  await assentar(250);
+  assert.equal(banco.ler(`abertas/${codigo}`), true, "quem criou põe");
+  assert.equal(await anaDeNovo.familia("porSalasAntigasNaLista()"), 0, "uma vez só");
+  assert.ok(biaDeNovo);
+});
+
 test("sala simulada: quem só entrou (não criou) também apaga a sala vencida ao abrir o app", async () => {
   const banco = new Banco();
   const dia = 24 * 60 * 60 * 1000;

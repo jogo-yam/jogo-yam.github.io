@@ -4,6 +4,10 @@ name = "yam-avisos"
 main = "avisos.mjs"
 compatibility_date = "2024-11-01"
 
+# registro de cada pedido e da tarefa diária (painel da Cloudflare; npx wrangler tail ao vivo)
+[observability]
+enabled = true
+
 # todo dia às 22h UTC (19h em Brasília): prazo de quem pausou e limpeza das salas
 [triggers]
 crons = ["0 22 * * *"]

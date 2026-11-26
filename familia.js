@@ -241,6 +241,24 @@ function limparSalasAoAbrir() {
   limparSalasAntigas().then(() => { try { localStorage.setItem(CHAVE_LIMPEZA, String(Date.now())); } catch {} }).catch(() => {});
 }
 
+// Salas criadas antes da lista de abertas (até a versão 136): quem criou põe a
+// sala na lista, uma vez, para o servidor de avisos cuidar dela também.
+const CHAVE_NA_LISTA = "yam-salas-na-lista";
+async function porSalasAntigasNaLista() {
+  try { if (localStorage.getItem(CHAVE_NA_LISTA) === "1") return 0; } catch { return 0; }
+  let postas = 0;
+  try {
+    const user = await usuario();
+    for (const s of salasCriadas()) {
+      if ((await lerDoBanco(`partidas/${s.codigo}/criador`)).val() !== user.uid) continue;
+      await set(ref(db, `abertas/${s.codigo}`), true);
+      postas++;
+    }
+    localStorage.setItem(CHAVE_NA_LISTA, "1");
+  } catch { /* sem conexão: tenta na próxima vez que abrir */ }
+  return postas;
+}
+
 async function limparSalasAntigas() {
   const limite = Date.now() - 3.5 * DIA;
   const antigas = salasCriadas().filter(s => s.em < limite);
@@ -2349,4 +2367,4 @@ setTimeout(() => {
 }, 2500);
 if (sessao) usuario().then(escutar).catch(e => atualizarBarra(mensagemDeErro(e)));
 usuario().then(escutarFotos).catch(() => {});
-{ const t = setTimeout(limparSalasAoAbrir, 8000); if (t && t.unref) t.unref(); } // depois de abrir, sem atrasar nada
+{ const t = setTimeout(() => { limparSalasAoAbrir(); porSalasAntigasNaLista(); }, 8000); if (t && t.unref) t.unref(); } // depois de abrir, sem atrasar nada
