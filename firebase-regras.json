@@ -55,7 +55,7 @@
         "revelada": { ".write": "auth != null && newData.val() === true" },
         "encerrada": { ".write": "auth != null && newData.val() === true && data.parent().child('criador').val() === auth.uid" },
         "nomes": {
-          "$chave": { ".write": "auth != null && (!data.exists() || data.val() === auth.uid) && (!newData.exists() || (newData.val() === auth.uid && root.child('usuarios').child($chave).child('dono').val() === auth.uid))" }
+          "$chave": { ".write": "auth != null && (!data.exists() || data.val() === auth.uid || root.child('usuarios').child($chave).child('dono').val() === auth.uid) && (!newData.exists() || (newData.val() === auth.uid && root.child('usuarios').child($chave).child('dono').val() === auth.uid))" }
         },
         "jogadores": {
           "$uid": {

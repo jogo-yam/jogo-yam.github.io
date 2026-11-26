@@ -118,8 +118,8 @@ async function lerDoBanco(caminho) {
   return get(ref(db, caminho));
 }
 
-// (sem os "fantasmas" de quem saiu: ver ehJogadorDeVerdade, no app.js)
-const jogadoresDe = p => Object.entries((p && p.jogadores) || {}).map(([uid, j]) => ({ uid, ...j })).filter(ehJogadorDeVerdade);
+// (sem os "fantasmas" de quem saiu, e cada pessoa uma vez só: ver jogadoresValidos, no app.js)
+const jogadoresDe = p => jogadoresValidos(Object.entries((p && p.jogadores) || {}).map(([uid, j]) => ({ uid, ...j })));
 const $ = id => document.getElementById(id);
 
 // ---------- criar / entrar / sair ----------
@@ -132,11 +132,25 @@ async function entrar(codigo, nome, modo = null, soDados = null) {
   if (snap.child("revelada").val() || snap.child("encerrada").val()) throw new Error("A partida dessa sala já terminou.");
 
   const chave = chaveDoNome(nome);
-  const resultado = await runTransaction(ref(db, `${raiz}/nomes/${chave}`),
-    atual => (atual === null || atual === user.uid) ? user.uid : undefined);
-  if (!resultado.committed) {
-    throw new Error(`Já tem alguém chamado "${nome}" nesta sala. Use outro nome (pode ser com sobrenome ou apelido).`);
+  const jaTemNome = () => new Error(`Já tem alguém chamado "${nome}" nesta sala. Use outro nome (pode ser com sobrenome ou apelido).`);
+  // O nome está com outro aparelho, mas o nome de usuário é meu (recuperado com o
+  // código): sou eu em outro aparelho e assumo o meu lugar. As regras só deixam
+  // se este aparelho é o dono do nome de usuário agora.
+  const meuNomeDeUsuario = (lerUsuario() || {}).chave === chave;
+  let assumido = null;
+  let resultado;
+  try {
+    resultado = await runTransaction(ref(db, `${raiz}/nomes/${chave}`), atual => {
+      assumido = null;
+      if (atual === null || atual === user.uid) return user.uid;
+      if (meuNomeDeUsuario) { assumido = atual; return user.uid; }
+      return undefined;
+    });
+  } catch (e) {
+    if (assumido && negado(e)) throw jaTemNome();
+    throw e;
   }
+  if (!resultado.committed) throw jaTemNome();
 
   // se esse celular já estava na partida com outro nome, libera o nome antigo
   const chaveAntiga = snap.child(`jogadores/${user.uid}/chave`).val();
@@ -160,7 +174,16 @@ async function entrar(codigo, nome, modo = null, soDados = null) {
     : 0;
   const base = minhasCasas > 0 ? Math.max(0, rodadaAgora - minhasCasas - meusPulos - 1) : rodadaAgora;
   const jaEstava = snap.child(`jogadores/${user.uid}/entrouEm`).exists();
-  const voltouDaPausa = jaEstava && snap.child(`jogadores/${user.uid}/fora`).val() === true;
+  // assumindo o lugar do outro aparelho: mesma ordem na vez e a mesma rodada
+  const antigo = assumido ? snap.child(`jogadores/${assumido}`).val() : null;
+  if (antigo && dispensadosDe(sala)[assumido]) {
+    esquecerSala(codigo);
+    throw new Error("A partida dessa sala continuou sem você.");
+  }
+  if (antigo && antigo.terminou) throw new Error("Você já terminou esta partida no outro aparelho.");
+  const baseAssumida = antigo
+    ? Math.max(0, (antigo.casas || 0) + (antigo.base || 0) + (pulos[assumido] || 0) - minhasCasas) : null;
+  const voltouDaPausa = (jaEstava && snap.child(`jogadores/${user.uid}/fora`).val() === true) || !!(antigo && antigo.fora === true);
   if (jaEstava && dispensadosDe(sala)[user.uid]) {
     esquecerSala(codigo);
     throw new Error("A partida dessa sala continuou sem você.");
@@ -170,10 +193,14 @@ async function entrar(codigo, nome, modo = null, soDados = null) {
   await update(ref(db, `${raiz}/jogadores/${user.uid}`), {
     nome, chave, id: identidade, corMesa: mesaAtual(), corDados: dadosAtuais(), terminou: false, total: null, colunas: null, valores: null,
     modo: modoDaSalaAgora, soDados: soDadosAgora, fora: null, // (voltou da pausa)
-    casas: casasMarcadas(), base: jaEstava ? (sala.jogadores[user.uid].base || 0) : base,
-    ...(jaEstava ? {} : { entrouEm: serverTimestamp() }) // a ordem da vez não muda se entrar de novo
+    casas: casasMarcadas(),
+    base: antigo ? baseAssumida : jaEstava ? (sala.jogadores[user.uid].base || 0) : base,
+    ...(antigo && typeof antigo.entrouEm === "number" ? { entrouEm: antigo.entrouEm }
+      : jaEstava ? {} : { entrouEm: serverTimestamp() }), // a ordem da vez não muda se entrar de novo
+    ...(assumido ? { assumiu: assumido, assumiuEm: serverTimestamp() } : {})
   });
   guardarSessao({ codigo, chave });
+  guardarSalaCriada(codigo); // (para apagar a sala depois de 3 dias, se ninguém apagou)
   if (voltouDaPausa) chamarQuemPausou("voltou"); // quem ainda está fora fica sabendo
   // a tabela é desta sala (se sair, dá para voltar e terminar enquanto ela não fechar)
   const prazo = typeof sala.criadaEm === "number" ? sala.criadaEm + PRAZO_DA_SALA : null;
@@ -196,8 +223,18 @@ function salasCriadas() {
   try { return JSON.parse(localStorage.getItem(CHAVE_CRIADAS)) || []; } catch { return []; }
 }
 
+// Toda sala em que este aparelho entrou (não só as que criou): depois de 3 dias,
+// quem abrir o app primeiro apaga a sala (quem criou pode nunca mais voltar).
 function guardarSalaCriada(codigo) {
+  if (salasCriadas().some(s => s.codigo === codigo)) return;
   localStorage.setItem(CHAVE_CRIADAS, JSON.stringify([...salasCriadas(), { codigo, em: Date.now() }]));
+}
+
+// Ao abrir o app, uma vez por dia, apaga as salas vencidas da lista.
+const CHAVE_LIMPEZA = "yam-limpeza-salas";
+function limparSalasAoAbrir() {
+  try { if (Date.now() - (Number(localStorage.getItem(CHAVE_LIMPEZA)) || 0) < DIA) return; } catch { return; }
+  limparSalasAntigas().then(() => { try { localStorage.setItem(CHAVE_LIMPEZA, String(Date.now())); } catch {} }).catch(() => {});
 }
 
 async function limparSalasAntigas() {
@@ -730,6 +767,20 @@ function escutar() {
   pararEscuta = onValue(ref(db, `partidas/${sessao.codigo}`), snap => {
     partida = snap.val();
     const uid = auth.currentUser && auth.currentUser.uid;
+    // continuei esta partida em outro aparelho (o lugar foi assumido lá): saio daqui
+    const eu = partida && partida.jogadores && partida.jogadores[uid];
+    if (eu && ehJogadorDeVerdade(eu) && !jogadoresDe(partida).some(j => j.uid === uid)) {
+      pararDeMarcarAberto();
+      pararDeEscutar();
+      guardarSessao(null);
+      marcarSalaDaTabela(null);
+      partida = null;
+      reiniciarVez();
+      atualizarBarra();
+      ultimoAviso = Date.now();
+      mostrarLegenda(["Partida continuada em outro aparelho", "Você assumiu o seu lugar na sala por outro aparelho. Por aqui, a tabela fica como estava."]);
+      return;
+    }
     if (!partida || !partida.jogadores || !partida.jogadores[uid]) {
       // a partida sumiu ou este jogador saiu em outro lugar
       pararDeMarcarAberto();
@@ -1051,6 +1102,9 @@ async function pausar() {
   const { codigo } = sessao;
   const uid = minhaUid();
   const casas = casasMarcadas();
+  // a tabela vai para o histórico (em pausa, com a sala): com nome de usuário, ela
+  // sobe para a nuvem e dá para continuar de outro aparelho
+  if (partidaTemValores(state)) salvarPartidaAtual();
   await pararDeMarcarAberto();
   pararDeEscutar();
   guardarSessao(null);
@@ -2298,3 +2352,4 @@ setTimeout(() => {
 }, 2500);
 if (sessao) usuario().then(escutar).catch(e => atualizarBarra(mensagemDeErro(e)));
 usuario().then(escutarFotos).catch(() => {});
+{ const t = setTimeout(limparSalasAoAbrir, 8000); if (t && t.unref) t.unref(); } // depois de abrir, sem atrasar nada

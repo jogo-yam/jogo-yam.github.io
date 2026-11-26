@@ -8,7 +8,7 @@ const rows = [
 const COLUNAS = 4;
 
 // Versão do app: igual ao número do CACHE_NAME do service-worker.js (um teste confere).
-const VERSAO = 135;
+const VERSAO = 136;
 
 // Avisos da vez com o app fechado: servidor na Cloudflare (worker/avisos.mjs).
 // Sem o endereço, a opção "Avisar a minha vez" não aparece.
@@ -4824,8 +4824,22 @@ try { if (deveMostrarBoasVindas()) abrirBoasVindas(); } catch {}
 // Firebase grava quando a conexão cai) recriou só um pedaço. Não joga nem conta.
 const ehJogadorDeVerdade = j => !!j && typeof j.nome === "string" && j.nome !== "";
 
+// Os jogadores que valem: sem fantasmas e, se a mesma pessoa (mesma chave de
+// nome) está duas vezes porque continuou a partida em outro aparelho, só o lugar
+// assumido por último (maior "assumiuEm"). (O servidor de avisos faz o mesmo.)
+function jogadoresValidos(lista) {
+  const reais = lista.filter(ehJogadorDeVerdade);
+  const ultimo = {};
+  for (const j of reais) {
+    if (typeof j.chave !== "string") continue;
+    const em = typeof j.assumiuEm === "number" ? j.assumiuEm : 0;
+    if (!(j.chave in ultimo) || em > ultimo[j.chave]) ultimo[j.chave] = em;
+  }
+  return reais.filter(j => typeof j.chave !== "string" || (typeof j.assumiuEm === "number" ? j.assumiuEm : 0) === ultimo[j.chave]);
+}
+
 function vezDaSala(jogadores, pulos = {}) {
-  const naRoda = jogadores.filter(j => ehJogadorDeVerdade(j) && !j.terminou)
+  const naRoda = jogadoresValidos(jogadores).filter(j => !j.terminou)
     .sort((a, b) => (a.entrouEm || 0) - (b.entrouEm || 0) || String(a.uid).localeCompare(String(b.uid)));
   if (!naRoda.length) return null;
   const n = v => (typeof v === "number" && Number.isFinite(v) ? v : 0);

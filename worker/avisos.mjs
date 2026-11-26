@@ -35,12 +35,22 @@ const juntar = (...partes) => {
 
 // ---------- de quem é a vez (igual ao vezDaSala do app.js) ----------
 
+// Sem fantasmas (sem nome) e cada pessoa uma vez só: se continuou em outro
+// aparelho, vale o lugar assumido por último (igual ao jogadoresValidos do app.js).
+export function jogadoresValidos(sala) {
+  const reais = Object.entries((sala && sala.jogadores) || {}).map(([uid, j]) => ({ uid, ...j }))
+    .filter(j => typeof j.nome === "string" && j.nome !== "");
+  const em = j => (typeof j.assumiuEm === "number" ? j.assumiuEm : 0);
+  const ultimo = {};
+  for (const j of reais) if (typeof j.chave === "string" && (!(j.chave in ultimo) || em(j) > ultimo[j.chave])) ultimo[j.chave] = em(j);
+  return reais.filter(j => typeof j.chave !== "string" || em(j) === ultimo[j.chave]);
+}
+
 export function vezDaSala(sala) {
-  const jogadores = Object.entries((sala && sala.jogadores) || {}).map(([uid, j]) => ({ uid, ...j }));
+  const jogadores = jogadoresValidos(sala);
   const criador = sala && sala.jogadores && sala.jogadores[sala.criador];
   const pulos = (criador && criador.pulos) || {};
-  // sem nome é "fantasma" de quem saiu (gravação atrasada do celular dele): não joga
-  const naRoda = jogadores.filter(j => typeof j.nome === "string" && j.nome !== "" && !j.terminou)
+  const naRoda = jogadores.filter(j => !j.terminou)
     .sort((a, b) => (a.entrouEm || 0) - (b.entrouEm || 0) || String(a.uid).localeCompare(String(b.uid)));
   if (!naRoda.length) return null;
   const vezes = j => (j.casas || 0) + (j.base || 0) + (pulos[j.uid] || 0);
@@ -210,8 +220,8 @@ export async function tratarPausa(pedido, env, agora = Date.now(), buscar = fetc
 
   const criador = sala.jogadores[sala.criador];
   const dispensados = (criador && criador.dispensados) || {};
-  const alvos = Object.entries(sala.jogadores).filter(([uid, j]) =>
-    uid !== quemChamou && temNome(j) && j.fora === true && !j.terminou && !dispensados[uid] && j.push && j.push.endpoint);
+  const alvos = jogadoresValidos(sala).map(j => [j.uid, j]).filter(([uid, j]) =>
+    uid !== quemChamou && j.fora === true && !j.terminou && !dispensados[uid] && j.push && j.push.endpoint);
   if (!alvos.length) return { status: 204, motivo: "ninguém fora com avisos" };
   const dados = { titulo: motivo === "voltou" ? "Esperando você no YAM" : "Sua sala vai fechar", texto, codigo: String(codigo) };
   let enviados = 0;

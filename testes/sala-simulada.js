@@ -83,6 +83,20 @@ class Banco {
     for (const [caminho, valor] of Object.entries(mudancas)) pôr(nova, caminho, resolver(copia(valor)));
     for (const caminho of Object.keys(mudancas)) {
       const m = partes(caminho);
+      // o nome na sala com outro aparelho: só quem é dono do nome de usuário assume
+      if (this.regras && m[0] === "partidas" && m[2] === "nomes" && m[3]) {
+        const antes = pegar(this.arvore, caminho);
+        const dono = pegar(this.arvore, `usuarios/${m[3]}/dono`);
+        if (antes !== null && antes !== uid && dono !== uid) { this.recusadas.push({ uid, caminho }); throw erroDePermissao(); }
+      }
+      // apagar a sala inteira: só depois de 3 dias
+      if (this.regras && m[0] === "partidas" && m.length === 2 && pegar(nova, caminho) === null) {
+        const criada = pegar(this.arvore, `${caminho}/criadaEm`);
+        if (!(typeof criada === "number" && criada < Date.now() - 3 * 24 * 60 * 60 * 1000)) {
+          this.recusadas.push({ uid, caminho });
+          throw erroDePermissao();
+        }
+      }
       if (m[0] === "partidas" && m[2] === "jogadores" && m[3]) {
         if (m[3] !== uid) { this.recusadas.push({ uid, caminho }); throw erroDePermissao(); }
         const jogador = pegar(nova, m.slice(0, 4).join("/"));
@@ -134,7 +148,23 @@ class Banco {
       getDatabase: () => ({}),
       ref: (_, caminho = "") => ({ caminho: String(caminho) }),
       serverTimestamp: () => ({ ".sv": "timestamp" }),
-      get: async r => new Foto(banco.ler(caminhoDe(r))),
+      get: async r => {
+        const valor = banco.ler(caminhoDe(r));
+        if (!r.filtros || !valor) return new Foto(valor);
+        // consulta: orderByChild + startAt/endAt + limitToFirst
+        const f = Object.assign({}, ...r.filtros);
+        const val = x => (x && typeof x === "object" ? x[f.ordem] : undefined) ?? null;
+        const filhos = Object.entries(valor)
+          .filter(([, x]) => (f.de === undefined || (val(x) !== null && val(x) >= f.de)) && (f.ate === undefined || val(x) === null || val(x) <= f.ate))
+          .sort(([, a], [, b]) => (val(a) ?? -Infinity) - (val(b) ?? -Infinity))
+          .slice(0, f.limite ?? Infinity);
+        return new Foto(filhos.length ? Object.fromEntries(filhos) : null);
+      },
+      query: (r, ...filtros) => ({ caminho: r.caminho, filtros }),
+      orderByChild: ordem => ({ ordem }),
+      startAt: de => ({ de }),
+      endAt: ate => ({ ate }),
+      limitToFirst: limite => ({ limite }),
       set: async (r, v) => banco.gravar(uid, { [caminhoDe(r)]: v }),
       update: async (r, v) => banco.gravar(uid, comoUpdate(r, v)),
       remove: async r => banco.gravar(uid, { [caminhoDe(r)]: null }),
@@ -172,7 +202,8 @@ function fonteDoFamilia() {
   const fonte = lerArquivo("familia.js").replace(/^import\s*\{[^}]*\}\s*from\s*"[^"]+";\s*$/gm, "");
   if (/^import /m.test(fonte)) throw new Error("sobrou import no familia.js");
   const nomes = ["initializeApp", "getAuth", "signInAnonymously", "onAuthStateChanged", "getDatabase", "ref", "get", "set",
-    "update", "remove", "onValue", "onDisconnect", "runTransaction", "serverTimestamp"];
+    "update", "remove", "onValue", "onDisconnect", "runTransaction", "serverTimestamp",
+    "query", "orderByChild", "startAt", "endAt", "limitToFirst"];
   // (o app.js tem funções com alguns desses nomes: por isso vêm como parâmetros)
   return `(function (fb) {"use strict";\nconst { ${nomes.join(", ")} } = fb;\n${fonte}\n;globalThis.__noFamilia = codigo => eval(codigo);\n})(globalThis.__firebase);`;
 }

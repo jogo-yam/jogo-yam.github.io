@@ -238,3 +238,78 @@ test("sala simulada: revanche depois do pódio (um chama, o outro entra)", async
   assert.equal(banco.ler(`partidas/${nova}/iniciada`), false, "a revanche começa na sala de espera");
   assert.equal(bia.rodar("casasMarcadas()"), 0, "com a tabela zerada");
 });
+
+// A pessoa com nome de usuário: o celular dela é o dono do nome (como ao registrar).
+function comNomeDeUsuario(banco, c) {
+  const chave = c.nome.toLowerCase();
+  banco.gravar(c.uid, { [`usuarios/${chave}`]: { dono: c.uid, nome: c.nome } });
+  c.rodar(`localStorage.setItem("yam-usuario", JSON.stringify({ nome: "${c.nome}", chave: "${chave}", codigo: "1234-5678" }))`);
+}
+
+test("sala simulada: Bia pausa no celular e continua a partida no tablet, no mesmo lugar", async () => {
+  const banco = new Banco();
+  const { codigo, ana, bia, caio } = await salaComTres(banco);
+  comNomeDeUsuario(banco, bia);
+  ana.marcar("0-0", 3);
+  await assentar();
+  bia.marcar("0-0", 2);
+  await assentar();
+  bia.responder(true); // Sair → Pausar
+  await bia.familia("confirmarSair()");
+  await assentar();
+  const pausada = bia.rodar(`historico.find(p => p.codigoSala === "${codigo}")`);
+  assert.equal(ana.familia("pausada()"), true);
+
+  // o tablet: recuperou o nome com o código (vira o dono) e o histórico veio da nuvem
+  const tablet = celular(banco, "uidBiaTablet", "Bia");
+  tablet.rodar(`localStorage.setItem("yam-historico", ${JSON.stringify(bia.armazenado.get("yam-historico"))}); historico = ler("yam-historico", [])`);
+  comNomeDeUsuario(banco, tablet);
+  await tablet.rodar(`continuarPartida(${pausada.id})`);
+  await tablet.familia(`entrar("${codigo}", "Bia")`);
+  await assentar();
+
+  assert.equal(banco.ler(`partidas/${codigo}/nomes/bia`), "uidBiaTablet", "o nome na sala passou para o tablet");
+  assert.equal(ana.familia("jogadoresDe(partida).map(j => j.nome).sort().join()"), "Ana,Bia,Caio", "Bia aparece uma vez só");
+  assert.equal(ana.familia("pausada()"), false, "Bia voltou: a partida segue");
+  assert.equal(tablet.rodar("casasMarcadas()"), 1, "com a tabela dela");
+  assert.equal(vezEm(ana), "uidCaio", "a vez continua de onde estava");
+  caio.marcar("0-0", 1);
+  await assentar();
+  ana.marcar("1-0", 6);
+  await assentar();
+  assert.equal(vezEm(ana), "uidBiaTablet", "e chega em Bia, agora no tablet, na ordem de sempre");
+
+  // o celular antigo não consegue mais entrar no lugar dela (o nome de usuário é do tablet)
+  await assert.rejects(bia.familia(`entrar("${codigo}", "Bia")`), /Já tem alguém chamado "Bia"/);
+});
+
+test("sala simulada: continuando em outro aparelho sem pausar, o aparelho antigo sai sozinho", async () => {
+  const banco = new Banco();
+  const { codigo, ana, caio } = await salaComTres(banco);
+  comNomeDeUsuario(banco, caio);
+  const notebook = celular(banco, "uidCaioNote", "Caio");
+  comNomeDeUsuario(banco, notebook);
+  await notebook.familia(`entrar("${codigo}", "Caio")`);
+  await assentar();
+  assert.ok(caio.legendas.some(([t]) => t === "Partida continuada em outro aparelho"), "o celular antigo avisa");
+  assert.equal(caio.familia("sessao"), null, "e sai da sala");
+  assert.equal(ana.familia("jogadoresDe(partida).length"), 3);
+  assert.equal(notebook.familia("sessao.codigo"), codigo);
+});
+
+test("sala simulada: quem só entrou (não criou) também apaga a sala vencida ao abrir o app", async () => {
+  const banco = new Banco();
+  const dia = 24 * 60 * 60 * 1000;
+  const { codigo, bia } = await salaComTres(banco);
+  assert.ok(bia.familia("salasCriadas().some(s => s.codigo === " + JSON.stringify(codigo) + ")"), "Bia guardou a sala em que entrou");
+  // passaram 4 dias: Ana (quem criou) nunca mais abriu; Bia abre o app
+  bia.familia(`localStorage.setItem(CHAVE_CRIADAS, JSON.stringify([{ codigo: "${codigo}", em: ${Date.now() - 4 * dia} }]))`);
+  bia.fechar();
+  banco.gravar("uidAna", { [`partidas/${codigo}/criadaEm`]: Date.now() - 4 * dia }); // (a sala é de 4 dias atrás)
+  const outra = await celular(banco, "uidX", "Xis").familia('criar("Xis", "livre", false)'); // sala nova, de outra pessoa
+  const biaDeNovo = celular(banco, "uidBia", "Bia", { guardado: bia.armazenado });
+  biaDeNovo.familia("guardarSessao(null)"); // (tinha saído da sala)
+  await assentar(250); // a limpeza roda uns segundos depois de abrir
+  assert.equal(banco.ler(`partidas/${codigo}`), null, "a sala vencida foi apagada");
+  assert.ok(banco.ler(`partidas/${outra}`), "a sala nova continua");
+});
