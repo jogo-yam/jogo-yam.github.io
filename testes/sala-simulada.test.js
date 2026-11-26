@@ -154,3 +154,87 @@ test("sala simulada: vez parada 5 min com a pessoa fora do app, quem criou é pe
   await assentar();
   assert.equal(vezEm(caio), "uidCaio", "a vez passou para Caio");
 });
+
+const { tabelaCompleta } = require("./carregar-app.js");
+const completar = c => c.rodar(`state = ${JSON.stringify(tabelaCompleta())}; avisarSala();`);
+
+test("sala simulada: pulo desfeito volta a vez; depois de alguém jogar, não dá mais", async () => {
+  const banco = new Banco();
+  const { codigo, ana, bia, caio } = await salaComTres(banco);
+  ana.marcar("0-0", 3);
+  await assentar();
+  await ana.familia('pularVez("uidBia", true)');
+  await assentar();
+  assert.equal(vezEm(ana), "uidCaio");
+  assert.equal(caio.familia("JSON.stringify(noFinal())"), '{"uidBia":1}', "Bia aparece com +1 no final");
+  const aviso = ana.legendas.find(([t]) => t === "Você pulou a vez de Bia");
+  assert.ok(aviso && aviso.acao && aviso.acao.texto === "Desfazer", "o aviso do pulo tem Desfazer");
+  await aviso.acao.fazer();
+  await assentar();
+  assert.equal(banco.ler(`partidas/${codigo}/jogadores/uidAna/pulos/uidBia`), 0);
+  assert.equal(vezEm(caio), "uidBia", "a vez voltou para Bia");
+  assert.equal(caio.familia("JSON.stringify(noFinal())"), "{}");
+
+  // pula de novo, Caio joga, e aí o Desfazer não vale mais
+  await ana.familia('pularVez("uidBia", true)');
+  await assentar();
+  const outro = ana.legendas.filter(([t]) => t === "Você pulou a vez de Bia").pop();
+  caio.marcar("0-0", 1);
+  await assentar();
+  await outro.acao.fazer();
+  await assentar();
+  assert.ok(ana.perguntas.includes("Não dá mais para desfazer"));
+  assert.equal(banco.ler(`partidas/${codigo}/jogadores/uidAna/pulos/uidBia`), 1, "o pulo continua");
+});
+
+test("sala simulada: a regra nova recusa números estranhos na vez (casas negativas)", async () => {
+  const banco = new Banco();
+  const { codigo } = await salaComTres(banco);
+  assert.throws(() => banco.gravar("uidBia", { [`partidas/${codigo}/jogadores/uidBia/casas`]: -100 }), /PERMISSION_DENIED/);
+  assert.throws(() => banco.gravar("uidAna", { [`partidas/${codigo}/jogadores/uidAna/pulos/uidBia`]: 1.5 }), /PERMISSION_DENIED/);
+  banco.gravar("uidBia", { [`partidas/${codigo}/jogadores/uidBia/casas`]: 3 }); // normal: aceita
+});
+
+test("sala simulada: seguir sem quem pausou e terminar com pódio", async () => {
+  const banco = new Banco();
+  const { codigo, ana, bia, caio } = await salaComTres(banco);
+  ana.marcar("0-0", 3);
+  await assentar();
+  bia.responder(true); // Sair → Pausar
+  await bia.familia("confirmarSair()");
+  await assentar();
+  assert.equal(ana.familia("pausada()"), true);
+  await ana.familia("continuarSemQuemFalta()"); // Ana (criou) segue sem Bia
+  await assentar();
+  assert.equal(ana.familia("pausada()"), false, "a partida segue");
+  assert.equal(vezEm(ana), "uidCaio", "a vez pula Bia");
+  // Ana e Caio terminam: o pódio sai sem esperar Bia
+  completar(ana);
+  completar(caio);
+  await assentar(250);
+  assert.equal(banco.ler(`partidas/${codigo}/revelada`), true, "todos (menos quem foi dispensado) terminaram");
+  assert.equal(ana.familia("podioMostrado"), true);
+  // Bia tenta voltar: fica sabendo que seguiram sem ela
+  await bia.familia(`voltarParaSala("${codigo}")`);
+  assert.ok(bia.legendas.some(([t]) => t === "A partida continuou sem você"));
+});
+
+test("sala simulada: revanche depois do pódio (um chama, o outro entra)", async () => {
+  const banco = new Banco();
+  const { codigo, ana, bia, caio } = await salaComTres(banco);
+  for (const c of [ana, bia, caio]) completar(c);
+  await assentar(250);
+  assert.equal(banco.ler(`partidas/${codigo}/revelada`), true);
+  await ana.familia("jogarDeNovo()");
+  await assentar();
+  const nova = ana.familia("sessao && sessao.codigo");
+  assert.ok(nova && nova !== codigo, "Ana criou outra sala");
+  assert.equal(banco.ler(`partidas/${codigo}/jogadores/uidAna/revanche`), nova, "e avisou na sala antiga");
+  assert.equal(bia.familia("JSON.stringify(revancheDeOutro())"), JSON.stringify({ codigo: nova, nome: "Ana" }));
+  await bia.familia("jogarDeNovo()");
+  await assentar();
+  assert.equal(bia.familia("sessao.codigo"), nova, "Bia entrou na revanche");
+  assert.deepEqual(Object.keys(banco.ler(`partidas/${nova}/jogadores`)).sort(), ["uidAna", "uidBia"]);
+  assert.equal(banco.ler(`partidas/${nova}/iniciada`), false, "a revanche começa na sala de espera");
+  assert.equal(bia.rodar("casasMarcadas()"), 0, "com a tabela zerada");
+});

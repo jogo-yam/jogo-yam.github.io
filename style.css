@@ -3592,6 +3592,7 @@ td.mudou { animation: mudou 0.7s ease-out; }
 .casas-feitas { font-size: 12px; color: var(--texto-suave); }
 :root[data-letra="grande"] .pela-metade, :root[data-letra="grande"] .casas-feitas { font-size: 14px; }
 .sala-espera-jogadores li.fora .jogador-sala { opacity: 0.45; }
+.sala-espera-jogadores .no-final { color: var(--foco); font-weight: 800; }
 .sala-espera-jogadores .jogador-sala { flex: 1 1 auto; }
 .nome-sala { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 

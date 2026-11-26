@@ -61,7 +61,10 @@
           "$uid": {
             ".write": "auth != null && auth.uid === $uid",
             ".validate": "newData.hasChild('nome')",
-            "nome": { ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 20" }
+            "nome": { ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 20" },
+            "casas": { ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 52 && newData.val() % 1 === 0" },
+            "base": { ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 1000000 && newData.val() % 1 === 0" },
+            "pulos": { "$outro": { ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 1000000 && newData.val() % 1 === 0" } }
           }
         }
       }

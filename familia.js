@@ -928,6 +928,7 @@ function atualizarEsperaDaSala() {
   const dispensados = dispensadosDe(partida);
   const jogadores = jogadoresDe(partida).filter(j => !dispensados[j.uid]).sort((a, b) => (a.entrouEm || 0) - (b.entrouEm || 0));
   const lista = $("sala-espera-jogadores");
+  const finais = noFinal();
   lista.innerHTML = "";
   for (const j of jogadores) {
     const li = document.createElement("li");
@@ -937,11 +938,14 @@ function atualizarEsperaDaSala() {
     quem.append(comPontinho(avatar(j.nome, j.uid === eu ? mesaAtual() : j.corMesa, "avatar", j.uid === eu ? "eu" : j.id), estaAberto(j)),
       elemento("span", "nome-sala", j.nome + (j.uid === eu ? " (você)" : ""))); // nome comprido: corta com "…"
     li.appendChild(quem);
+    const extra = finais[j.uid];
     if (foraUids.has(j.uid)) {
       li.classList.add("fora");
       const falta = document.createElement("small");
-      falta.textContent = "ainda não voltou";
+      falta.textContent = "ainda não voltou" + (extra ? ` · ${textoNoFinal(extra)}` : "");
       li.appendChild(falta);
+    } else if (extra) {
+      li.appendChild(elemento("small", "no-final", textoNoFinal(extra)));
     } else if (j.uid === partida.criador) {
       const criou = document.createElement("small");
       criou.textContent = "criou a sala";
@@ -1193,8 +1197,9 @@ function atualizarEspera() {
   $("espera-total").textContent = geral;
   // sem quem foi dispensado; quem pausou aparece como "(pausou)"
   const dispensados = dispensadosDe(partida);
+  const finais = noFinal();
   const faltam = jogadoresDe(partida).filter(j => !j.terminou && !dispensados[j.uid])
-    .map(j => (j.fora ? `${j.nome} (pausou)` : j.nome));
+    .map(j => (j.fora ? `${j.nome} (pausou)` : finais[j.uid] ? `${j.nome} (${textoNoFinal(finais[j.uid])})` : j.nome));
   $("espera-faltam").textContent = faltam.length
     ? `Esperando: ${faltam.join(", ")}`
     : "Todos terminaram!";
@@ -1710,12 +1715,51 @@ function mesaMudou(valores = mesa.valores) {
 async function pularVez(uid, jaConfirmou = false) {
   const nome = nomeDe(uid);
   if (!jaConfirmou && !await confirmar(`Pular a vez de ${nome}?`,
-    `${nome} perde esta jogada e a vez passa para o próximo.`, "Pular")) return;
+    `A vez passa para o próximo, e ${nome} joga essa vez no final da partida.`, "Pular")) return;
   if (daVez() !== uid) return; // a vez mudou enquanto perguntava
   try {
-    await runTransaction(ref(db, `partidas/${sessao.codigo}/jogadores/${minhaUid()}/pulos/${uid}`), n => (n || 0) + 1);
+    const r = await runTransaction(ref(db, `partidas/${sessao.codigo}/jogadores/${minhaUid()}/pulos/${uid}`), n => (n || 0) + 1);
     avisarProximo(`${nomeJogador} pulou a vez de ${nome}.`);
+    // por alguns segundos dá para desfazer (tocou sem querer), se ninguém jogou ainda
+    const pulo = { codigo: sessao.codigo, uid, n: r.snapshot.val(), casas: casasDaSala() };
+    ultimoAviso = Date.now();
+    mostrarLegenda([`Você pulou a vez de ${nome}`, `${nome} joga essa vez no final da partida.`], "",
+      { texto: "Desfazer", fazer: () => desfazerPulo(pulo) });
   } catch (e) { avisar(mensagemDeErro(e), "Não deu para pular"); }
+}
+
+// Quantas vezes cada um joga no final (teve a vez pulada mais que os outros que
+// ainda jogam). Quem foi dispensado ou já terminou não conta.
+function noFinal(p = partida) {
+  const dispensados = dispensadosDe(p);
+  const pulos = pulosDe(p);
+  const ativos = jogadoresDe(p).filter(j => !j.terminou && !dispensados[j.uid]);
+  if (!ativos.length) return {};
+  const menor = Math.min(...ativos.map(j => pulos[j.uid] || 0));
+  const saida = {};
+  for (const j of ativos) if ((pulos[j.uid] || 0) > menor) saida[j.uid] = (pulos[j.uid] || 0) - menor;
+  return saida;
+}
+const textoNoFinal = n => `+${n} no final`;
+
+// Quantas casas a sala toda já marcou (mudou: alguém jogou).
+const casasDaSala = () => jogadoresDe(partida).reduce((n, j) => n + (j.casas || 0), 0);
+
+async function desfazerPulo(pulo) {
+  if (!sessao || sessao.codigo !== pulo.codigo || !partida) return;
+  const nome = nomeDe(pulo.uid);
+  if (casasDaSala() !== pulo.casas || (pulosDe(partida)[pulo.uid] || 0) !== pulo.n) {
+    avisar(`Alguém já jogou depois do pulo. ${nome} joga essa vez no final da partida.`, "Não dá mais para desfazer");
+    return;
+  }
+  try {
+    const r = await runTransaction(ref(db, `partidas/${sessao.codigo}/jogadores/${minhaUid()}/pulos/${pulo.uid}`),
+      n => (n === pulo.n ? Math.max(0, n - 1) : undefined));
+    if (!r.committed) { avisar("O pulo mudou enquanto desfazia.", "Não deu para desfazer"); return; }
+    ultimoAviso = Date.now();
+    mostrarLegenda(["Pulo desfeito", `A vez voltou para ${nome}.`]);
+    avisarProximo(`${nomeJogador} desfez o pulo: a vez voltou para você.`);
+  } catch (e) { avisar(mensagemDeErro(e), "Não deu para desfazer"); }
 }
 
 // A vez parada: se a vez de alguém fica parada 5 min com essa pessoa fora do app,
@@ -1752,7 +1796,7 @@ async function sugerirPular() {
   sugeriuPular = chave;
   const nome = nomeDe(vez);
   if (!await confirmar(`Pular a vez de ${nome}?`,
-    `A vez de ${nome} está parada há mais de 5 minutos, com o app fechado. Pulando, ${nome} perde esta jogada e a vez passa para o próximo.`,
+    `A vez de ${nome} está parada há mais de 5 minutos, com o app fechado. Pulando, a vez passa para o próximo e ${nome} joga essa vez no final da partida.`,
     "Pular")) return;
   if (chaveDaVezParada() !== chave) return; // a pessoa jogou enquanto perguntava
   pularVez(vez, true);
@@ -1859,6 +1903,10 @@ function atualizarBarraVez() {
   } else {
     const j = partida.jogadores[vez];
     quem.textContent = `Vez de ${nomeDe(vez)}`;
+    const extraDaVez = noFinal()[vez];
+    if (extraDaVez && jogadoresDe(partida).filter(o => !o.terminou && !dispensadosDe(partida)[o.uid]).length === 1) {
+      quem.textContent += " · a vez que foi pulada"; // os outros já terminaram: é a vez que ficou para o final
+    }
     if (j && j.mesa && j.mesa.jogada > 0 && Array.isArray(j.mesa.valores)) {
       quem.textContent += ` · ${j.mesa.jogada}ª jogada`;
       const segurados = j.mesa.segurados || [];

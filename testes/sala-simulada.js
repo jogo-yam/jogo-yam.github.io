@@ -86,7 +86,10 @@ class Banco {
       if (m[0] === "partidas" && m[2] === "jogadores" && m[3]) {
         if (m[3] !== uid) { this.recusadas.push({ uid, caminho }); throw erroDePermissao(); }
         const jogador = pegar(nova, m.slice(0, 4).join("/"));
-        if (this.regras && jogador !== null && !(typeof jogador.nome === "string" && jogador.nome)) {
+        const inteiro = (v, max) => v === undefined || (Number.isInteger(v) && v >= 0 && v <= max);
+        const numerosOk = j => inteiro(j.casas, 52) && inteiro(j.base, 1000000) &&
+          Object.values(j.pulos || {}).every(v => inteiro(v, 1000000));
+        if (this.regras && jogador !== null && (!(typeof jogador.nome === "string" && jogador.nome) || !numerosOk(jogador))) {
           this.recusadas.push({ uid, caminho });
           throw erroDePermissao();
         }
@@ -179,8 +182,22 @@ function fonteDoFamilia() {
 function documentoDeMentira() {
   const dataset = {};
   const raiz = new Proxy(qualquerCoisa(), { get: (t, p) => (p === "dataset" ? dataset : t[p]) });
+  // cada elemento lembra o que o app gravou nele (texto, hidden, disabled...);
+  // o resto (classList, append...) aceita tudo e não faz nada
+  const elementos = new Map();
+  const elemento = id => {
+    if (!elementos.has(id)) {
+      const guardado = { disabled: false, hidden: false, value: "", textContent: "" };
+      elementos.set(id, new Proxy(qualquerCoisa(), {
+        get: (t, p) => (p in guardado ? guardado[p] : t[p]),
+        set: (t, p, v) => { guardado[p] = v; return true; }
+      }));
+    }
+    return elementos.get(id);
+  };
   return new Proxy(qualquerCoisa(), {
     get: (t, p) => (p === "documentElement" ? raiz : p === "visibilityState" ? "visible"
+      : p === "getElementById" ? elemento
       // nenhuma janela aberta por cima (o app confere antes de perguntar algo)
       : p === "querySelector" ? s => (/:not\(\[hidden\]\)/.test(s) ? null : qualquerCoisa())
       : t[p])
@@ -202,13 +219,17 @@ function celular(banco, uid, nome, { guardado = null } = {}) {
       __firebase: fb,
       document: documentoDeMentira(),
       scrollTo() {},
+      performance, // (o pódio anima: confete, contagem)
+      requestAnimationFrame: fn => { const t = setTimeout(() => fn(performance.now()), 16); if (t.unref) t.unref(); return t; },
+      cancelAnimationFrame: t => clearTimeout(t),
       setTimeout: timer(setTimeout), setInterval: timer(setInterval),
       fetch: async (url, opcoes = {}) => { enviados.push({ url, corpo: JSON.parse(opcoes.body || "null") }); return { ok: true, status: 200 }; }
     }
   });
   rodar(`nomeJogador = ${JSON.stringify(nome)}`);
-  rodar("this").__legenda = l => legendas.push([...l]);
-  rodar("mostrarLegenda = l => globalThis.__legenda(l)");
+  // (com o botão, se tiver: aviso.acao.fazer() é tocar nele)
+  rodar("this").__legenda = (l, acao) => legendas.push(Object.assign([...l], { acao }));
+  rodar("mostrarLegenda = (l, tipo, acao) => globalThis.__legenda(l, acao)");
   rodar(fonteDoFamilia());
   // as janelas de pergunta: responde sozinho e anota o que foi perguntado
   rodar("globalThis.__perguntar = null");
