@@ -1,5 +1,5 @@
 // Ao publicar mudanças, aumente a versão para limpar o cache antigo.
-const CACHE_NAME = "yam-cache-v140";
+const CACHE_NAME = "yam-cache-v141";
 const FILES_TO_CACHE = [
   "./",
   "./index.html",
@@ -47,10 +47,12 @@ self.addEventListener("push", event => {
   try { dados = event.data ? event.data.json() : {}; } catch {}
   // a bolinha no ícone do app (o app, ao abrir, recalcula: chat novo + sua vez)
   try { if (self.navigator.setAppBadge) self.navigator.setAppBadge(1).catch(() => {}); } catch {}
+  // "Agora é a sua vez." só no aviso da vez (os outros: convite, pausa, prazo, vez parada)
+  const daVez = !dados.tipo && (!dados.titulo || dados.titulo === "Sua vez no YAM!");
   event.waitUntil(self.registration.showNotification(dados.titulo || "Sua vez no YAM!", {
-    body: dados.texto ? `${dados.texto}\nAgora é a sua vez.` : "Toque para jogar.",
+    body: dados.texto ? (daVez ? `${dados.texto}\nAgora é a sua vez.` : dados.texto) : "Toque para jogar.",
     icon: "icone-mesa-192.png",
-    tag: `vez-${dados.codigo || ""}`, // um aviso por sala: o novo substitui o antigo
+    tag: `${dados.tipo === "convite" ? "convite" : "vez"}-${dados.codigo || ""}`, // um aviso por sala: o novo substitui o antigo
     renotify: true,
     data: { url: "./" }
   }));

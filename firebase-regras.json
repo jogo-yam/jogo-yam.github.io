@@ -49,6 +49,34 @@
         ".write": "auth != null && $codigo.matches(/^[0-9]{5}$/) && ((newData.val() === true && root.child('partidas').child($codigo).child('criador').val() === auth.uid) || (!newData.exists() && (!root.child('partidas').child($codigo).child('criador').exists() || (root.child('partidas').child($codigo).child('criadaEm').isNumber() && root.child('partidas').child($codigo).child('criadaEm').val() < now - 259200000))))"
       }
     },
+    "convites": {
+      ".read": "auth != null",
+      "$id": {
+        "$codigo": {
+          ".write": "auth != null && $codigo.matches(/^[0-9]{5}$/) && (newData.exists() ? (root.child('partidas').child($codigo).child('jogadores').child(auth.uid).child('nome').isString() && root.child('partidas').child($codigo).child('revelada').val() !== true && root.child('partidas').child($codigo).child('encerrada').val() !== true && root.child('identidades').child($id).child('nome').isString()) : (data.child('deUid').val() === auth.uid || data.child('em').val() < now - 21600000 || !root.child('partidas').child($codigo).child('criador').exists() || (root.child('identidades').child($id).child('chave').isString() && root.child('usuarios').child(root.child('identidades').child($id).child('chave').val()).child('dono').val() === auth.uid)))",
+          ".validate": "newData.hasChildren(['de', 'deUid', 'em']) && newData.child('de').val() === root.child('partidas').child($codigo).child('jogadores').child(auth.uid).child('nome').val()",
+          "de": { ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 20" },
+          "deUid": { ".validate": "newData.val() === auth.uid" },
+          "deId": { ".validate": "newData.isString() && newData.val().length <= 40" },
+          "em": { ".validate": "newData.val() === now" },
+          "$outro": { ".validate": false }
+        }
+      }
+    },
+    "avisos": {
+      "$id": {
+        ".read": "auth != null",
+        "$uid": {
+          ".write": "auth != null && auth.uid === $uid && (!newData.exists() || (root.child('identidades').child($id).child('chave').isString() && root.child('usuarios').child(root.child('identidades').child($id).child('chave').val()).child('dono').val() === auth.uid))",
+          ".validate": "newData.hasChildren(['endpoint', 'p256dh', 'auth', 'em'])",
+          "endpoint": { ".validate": "newData.isString() && newData.val().beginsWith('https://') && newData.val().length <= 800" },
+          "p256dh": { ".validate": "newData.isString() && newData.val().length <= 200" },
+          "auth": { ".validate": "newData.isString() && newData.val().length <= 100" },
+          "em": { ".validate": "newData.val() === now" },
+          "$outro": { ".validate": false }
+        }
+      }
+    },
     "partidas": {
       "$codigo": {
         ".read": "auth != null",

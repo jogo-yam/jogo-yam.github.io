@@ -257,6 +257,9 @@ test("tarefa diária: apaga a sala vencida, tira da lista a que sumiu e avisa qu
       // 22222 já não existe
       33333: { ...salaCom({ fora: true, push }), criadaEm: agora - 3 * dia + 6 * 60 * 60 * 1000 }, // fecha em 6 h
       44444: { ...salaCom({ fora: true, push }), criadaEm: agora - 1 * dia }      // ainda tem 2 dias
+    },
+    convites: {
+      jbia: { 33333: { de: "Davi", deUid: "davi", em: agora - 2 * dia }, 44444: { de: "Davi", deUid: "davi", em: agora - 60000 } }
     }
   };
   const pedidos = [];
@@ -266,8 +269,9 @@ test("tarefa diária: apaga a sala vencida, tira da lista a que sumiu e avisa qu
     if (url.includes("firebaseio")) {
       assert.ok(url.endsWith("?auth=tok"), "lê com o login anônimo");
       const caminho = url.replace(/^https:\/\/teste\.firebaseio\.com\//, "").replace(/\.json\?.*/, "").split("/");
-      if (opcoes.method === "DELETE") { delete banco[caminho[0]][caminho[1]]; return { ok: true }; }
-      const valor = caminho.length === 1 ? banco[caminho[0]] : (banco[caminho[0]][caminho[1]] ?? null);
+      const pai = caminho.slice(0, -1).reduce((o, k) => (o ? o[k] : undefined), banco);
+      if (opcoes.method === "DELETE") { if (pai) delete pai[caminho.at(-1)]; return { ok: true }; }
+      const valor = (pai ? pai[caminho.at(-1)] : undefined) ?? null;
       return { ok: true, json: async () => JSON.parse(JSON.stringify(valor)) };
     }
     return { ok: true, status: 201 }; // push
@@ -275,7 +279,8 @@ test("tarefa diária: apaga a sala vencida, tira da lista a que sumiu e avisa qu
   const env = { FIREBASE_DB: "https://teste.firebaseio.com", FIREBASE_CHAVE: "chave", VAPID_PUBLICA: publica, VAPID_PRIVADA: JSON.stringify(jwk) };
   const r = await tarefaDiaria(env, agora, buscar);
   assert.equal(r.status, 200, r.motivo);
-  assert.deepEqual(r.feito, { salas: 4, apagadas: 1, tiradas: 2, avisados: 1 });
+  assert.deepEqual(r.feito, { salas: 4, apagadas: 1, tiradas: 2, avisados: 1, convites: 1 });
+  assert.deepEqual(Object.keys(banco.convites.jbia), ["44444"], "o convite de 2 dias atrás saiu; o de agora fica");
   assert.equal(banco.partidas[11111], undefined, "a vencida foi apagada");
   assert.deepEqual(Object.keys(banco.abertas).sort(), ["33333", "44444", "lixo"]);
   assert.ok(banco.partidas[33333] && banco.partidas[44444], "as outras continuam");
@@ -325,4 +330,48 @@ test("o servidor entra sempre como o mesmo visitante quando tem o FIREBASE_RENOV
   assert.equal(await entrarAnonimo({ FIREBASE_CHAVE: "k", FIREBASE_RENOVAR: "r" }, buscar), "renovado");
   assert.equal(await entrarAnonimo({ FIREBASE_CHAVE: "k" }, buscar), "novo");
   assert.deepEqual(pedidos, ["https://securetoken.googleapis.com/v1/token", "https://identitytoolkit.googleapis.com/v1/accounts:signUp"]);
+});
+
+test("convite: avisa os aparelhos de quem foi convidado, com o nome que está na sala, uma vez só", async () => {
+  const { tratarConvite } = await carregar();
+  const { jwk, publica } = chavesVapid();
+  const cel1 = celular(), cel2 = celular();
+  const agora = 50 * 24 * 60 * 60 * 1000;
+  const banco = {
+    convites: { jbia: { 12345: { de: "Davi", deUid: "davi", em: agora - 5000 }, 54321: { de: "Davi", deUid: "davi", em: agora - 10 * 60000 } } },
+    avisos: { jbia: {
+      celular: { endpoint: "https://fcm.googleapis.com/wp/bia1", p256dh: cel1.p256dh, auth: cel1.auth, em: 1 },
+      tablet: { endpoint: "https://web.push.apple.com/bia2", p256dh: cel2.p256dh, auth: cel2.auth, em: 1 }
+    } },
+    partidas: { 12345: salaCom(), 54321: salaCom() }
+  };
+  const enviados = [];
+  const buscar = async (url, opcoes = {}) => {
+    if (url.includes("firebaseio")) {
+      assert.ok(url.includes("?auth="), "lê com o token de quem chamou");
+      const caminho = url.replace(/^https:\/\/teste\.firebaseio\.com\//, "").replace(/\.json\?.*/, "").split("/");
+      const valor = caminho.reduce((o, k) => (o ? o[k] : undefined), banco) ?? null;
+      return { ok: true, json: async () => JSON.parse(JSON.stringify(valor)) };
+    }
+    enviados.push({ url, opcoes });
+    return { ok: true, status: 201 };
+  };
+  const env = { FIREBASE_DB: "https://teste.firebaseio.com", VAPID_PUBLICA: publica, VAPID_PRIVADA: JSON.stringify(jwk) };
+  const pedido = (codigo, uid = "davi", para = "jbia") => tratarConvite({ codigo, token: tokenDe(uid), para }, env, agora, buscar);
+
+  const r = await pedido("12345");
+  assert.equal(r.status, 200, r.motivo);
+  assert.deepEqual(enviados.map(e => e.url), ["https://fcm.googleapis.com/wp/bia1", "https://web.push.apple.com/bia2"], "os dois aparelhos");
+  const dados = JSON.parse(decifrar(enviados[0].opcoes.body, cel1));
+  assert.equal(dados.tipo, "convite");
+  assert.equal(dados.codigo, "12345");
+  assert.match(dados.texto, /^Davi está te convidando para jogar!/);
+
+  enviados.length = 0;
+  assert.equal((await pedido("12345")).motivo, "já avisado");
+  assert.equal((await pedido("54321")).motivo, "convite antigo", "convite de 10 min atrás: não manda de novo");
+  assert.equal((await pedido("12345", "maria")).status, 403, "o convite não é de quem chamou");
+  assert.equal((await pedido("12345", "davi", "../x")).status, 400);
+  assert.equal((await pedido("99999")).status, 403, "convite que não existe");
+  assert.equal(enviados.length, 0);
 });

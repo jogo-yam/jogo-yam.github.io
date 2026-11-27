@@ -407,3 +407,47 @@ test("sala simulada: quantas rodadas faltam conta quem está mais atrasado", asy
   assert.equal(caio.rodar("rodadasQueFaltam()"), 51, "Ana adiantou, mas Caio ainda tem 51");
   assert.equal(ana.rodar("rodadasQueFaltam()"), 51, "para Ana também (ela espera os outros)");
 });
+
+test("sala simulada: convidar quem já tem o app (a pessoa toca em Entrar e cai na sala, sem digitar código)", async () => {
+  const banco = new Banco();
+  // nome de usuário com identidade (como quem já tem o app)
+  const comId = (c, id) => {
+    const chave = c.nome.toLowerCase();
+    banco.gravar(c.uid, { [`usuarios/${chave}`]: { dono: c.uid, nome: c.nome, id }, [`identidades/${id}`]: { nome: c.nome, chave } });
+    c.rodar(`localStorage.setItem("yam-usuario", JSON.stringify({ nome: "${c.nome}", chave: "${chave}", codigo: "1234-5678", id: "${id}" }))`);
+  };
+  const ana = celular(banco, "uidAna", "Ana");
+  comId(ana, "jana");
+  const bia = celular(banco, "uidBia", "Bia");
+  comId(bia, "jbia");
+  const dani = celular(banco, "uidDani", "Dani");
+  comId(dani, "jdani");
+  const eva = celular(banco, "uidEva", "Eva");
+  comId(eva, "jeva");
+  const codigo = await ana.familia('criar("Ana", "vez", false)');
+  await bia.familia(`entrar("${codigo}", "Bia")`);
+  await assentar();
+
+  await ana.familia("abrirConvites()");
+  assert.equal(ana.familia("JSON.stringify(pessoasParaConvidar.map(p => p.nome))"), '["Dani","Eva"]',
+    "a lista: quem tem nome no app, sem Ana (eu) e sem Bia (já está na sala)");
+  dani.familia("escutarConvites()");
+  assert.equal(await ana.familia("convidar(pessoasParaConvidar[0])"), true);
+  await assentar(300);
+  assert.equal(dani.perguntas[0], "Ana está te convidando para jogar!");
+  assert.equal(dani.familia("sessao && sessao.codigo"), codigo, "Dani tocou em Entrar e está na sala");
+  assert.equal(banco.ler(`partidas/${codigo}/jogadores/uidDani/nome`), "Dani");
+  assert.equal(banco.ler(`convites/jdani/${codigo}`), null, "o convite respondido sai do banco");
+  assert.ok(ana.enviados.some(e => e.url.endsWith("/convite") && e.corpo.para === "jdani" && e.corpo.codigo === codigo),
+    "pediu a notificação ao servidor de avisos");
+
+  // Eva diz "Agora não": não entra, e o convite não volta a aparecer
+  eva.responder(false);
+  eva.rodar('document.getElementById("janela-pergunta").hidden = true'); // (a pergunta fechou)
+  eva.familia("escutarConvites()");
+  await ana.familia("convidar(pessoasParaConvidar[1])");
+  await assentar(300);
+  assert.equal(eva.perguntas.length, 1);
+  assert.equal(eva.familia("sessao"), null, "Eva não entrou");
+  assert.equal(eva.familia("convitesParaMostrar().length"), 0, "não pergunta de novo");
+});

@@ -892,6 +892,7 @@ function atualizarBolinhaDoIcone() {
 function atualizarBarra(erro) {
   try { atualizarBolinhaDoIcone(); } catch {}
   try { mostrarRodadas(); } catch {}
+  try { escutarConvites(); } catch {}
   const barra = $("familia-barra");
   if (!barra) return;
   barra.innerHTML = "";
@@ -931,10 +932,10 @@ function atualizarBarra(erro) {
   chat.onclick = abrirChat;
   barra.appendChild(chat);
 
-  const codigo = document.createElement("button");
-  rotular(codigo, "enviar", "Código");
-  codigo.onclick = compartilharCodigo;
-  barra.appendChild(codigo);
+  const convidarBotao = document.createElement("button");
+  rotular(convidarBotao, "enviar", "Convidar");
+  convidarBotao.onclick = abrirConvites;
+  barra.appendChild(convidarBotao);
 
   const uid = auth.currentUser && auth.currentUser.uid;
   if (partida && partida.criador === uid && !partida.revelada &&
@@ -1087,6 +1088,267 @@ async function encerrarPartida() {
 // Sair da sala (pelo Sair, pelo botão de baixo ou para continuar outra partida):
 // com a partida andando, pergunta se é pausa ou desistência. paraOutra: a tabela
 // vai para o histórico e outra entra no lugar. Devolve se saiu.
+// ---------- convites (para quem já tem o app) ----------
+// convites/<identidade de quem é convidado>/<código da sala> = { de, deUid, deId, em }.
+// Quem está na sala escolhe a pessoa numa lista (quem tem nome de usuário no
+// app); o app dela mostra "Fulano está te convidando para jogar!" com o botão
+// de entrar, sem digitar código. Com os avisos ligados, chega também uma
+// notificação com o app fechado: o servidor de avisos manda para os aparelhos
+// em avisos/<identidade>/<aparelho>. As regras só deixam convidar quem está na
+// sala, com o próprio nome.
+
+const VALIDADE_DO_CONVITE = 6 * 60 * 60 * 1000; // convite mais velho que isso não aparece
+let pessoasParaConvidar = []; // [{ id, nome, partidas }]
+const convidadosAgora = new Set(); // "<código>:<identidade>" já convidados daqui
+
+// Todos com nome de usuário, menos eu e quem já está na sala. Primeiro quem já
+// jogou comigo (mais partidas antes), depois por ordem alfabética.
+function quemDaParaConvidar(todos, p = partida) {
+  const u = lerUsuario();
+  const eu = u && u.id ? identidadeReal(u.id) : null;
+  const naSala = new Set(jogadoresDe(p).map(j => (typeof j.id === "string" ? identidadeReal(j.id) : null)).filter(Boolean));
+  const jogaram = new Map(confrontos(historico).filter(c => c.id).map(c => [c.id, c.partidas]));
+  const lista = [];
+  for (const [id, r] of Object.entries(todos || {})) {
+    if (!r || typeof r.nome !== "string" || !r.nome || typeof r.chave !== "string") continue;
+    if (identidadeReal(id) !== id) continue; // nome juntado a outro: vale o outro
+    if (id === eu || naSala.has(id)) continue;
+    lista.push({ id, nome: r.nome, partidas: jogaram.get(id) || 0 });
+  }
+  return lista.sort((a, b) => b.partidas - a.partidas || a.nome.localeCompare(b.nome, "pt-BR"));
+}
+
+async function abrirConvites() {
+  if (!sessao) return;
+  $("convidar-codigo").textContent = sessao.codigo;
+  $("convidar-busca").value = "";
+  pessoasParaConvidar = [];
+  $("janela-convidar").hidden = false;
+  desenharConvites("Procurando quem tem o app…");
+  try {
+    await usuario();
+    const todos = (await comLimite(lerDoBanco("identidades"))).val() || {};
+    guardarNomesAtuais(todos); // (aproveita: os nomes de agora)
+    pessoasParaConvidar = quemDaParaConvidar(todos);
+    desenharConvites();
+  } catch (e) {
+    desenharConvites(mensagemDeErro(e));
+  }
+}
+
+function fecharConvites() {
+  $("janela-convidar").hidden = true;
+}
+
+function filtrarConvites() {
+  desenharConvites();
+}
+
+function desenharConvites(mensagem = "") {
+  const lista = $("convidar-lista");
+  lista.innerHTML = "";
+  const busca = chaveDoNome($("convidar-busca").value || "");
+  const mostrar = mensagem ? [] : pessoasParaConvidar.filter(p => !busca || chaveDoNome(p.nome).includes(busca));
+  $("convidar-busca").hidden = pessoasParaConvidar.length < 8;
+  for (const p of mostrar) {
+    const li = document.createElement("li");
+    const quem = document.createElement("span");
+    quem.className = "jogador-sala";
+    quem.append(avatar(p.nome, null, "avatar", p.id), elemento("span", "nome-sala", p.nome));
+    const botao = document.createElement("button");
+    const feito = !!sessao && convidadosAgora.has(`${sessao.codigo}:${p.id}`);
+    botao.className = feito ? "convidado" : "principal";
+    botao.textContent = feito ? "Convidado" : "Convidar";
+    botao.disabled = feito;
+    botao.setAttribute("aria-label", feito ? `${p.nome} já foi convidado` : `Convidar ${p.nome}`);
+    botao.onclick = () => convidar(p, botao);
+    li.append(quem, botao);
+    lista.appendChild(li);
+  }
+  lista.hidden = !mostrar.length;
+  const vazio = $("convidar-vazio");
+  vazio.hidden = !!mostrar.length;
+  vazio.textContent = mensagem || (pessoasParaConvidar.length ? "Ninguém com esse nome."
+    : "Ainda não tem mais ninguém com nome de usuário no app. Mande o código por mensagem.");
+}
+
+async function convidar(p, botao = {}) {
+  if (!sessao || !partida) return false;
+  const eu = partida.jogadores && partida.jogadores[minhaUid()];
+  if (!eu || !eu.nome) return false;
+  const codigo = sessao.codigo;
+  botao.disabled = true;
+  botao.textContent = "Convidando…";
+  const u = lerUsuario();
+  try {
+    await comLimite(set(ref(db, `convites/${p.id}/${codigo}`), {
+      de: eu.nome, deUid: minhaUid(), ...(u && u.id ? { deId: u.id } : {}), em: serverTimestamp()
+    }));
+  } catch (e) {
+    botao.disabled = false;
+    botao.textContent = "Convidar";
+    avisar(mensagemDeErro(e), "Não deu para convidar");
+    return false;
+  }
+  convidadosAgora.add(`${codigo}:${p.id}`);
+  botao.className = "convidado";
+  botao.textContent = "Convidado";
+  if (typeof botao.setAttribute === "function") botao.setAttribute("aria-label", `${p.nome} foi convidado`);
+  avisarConvidado(codigo, p.id);
+  return true;
+}
+
+// Pede ao servidor de avisos a notificação do convite (ele confere no banco).
+async function avisarConvidado(codigo, id) {
+  if (!AVISOS_URL || !auth.currentUser) return;
+  try {
+    const token = await auth.currentUser.getIdToken();
+    await fetch(`${AVISOS_URL}/convite`, {
+      method: "POST",
+      headers: { "Content-Type": "text/plain" },
+      body: JSON.stringify({ codigo, token, para: id }),
+      keepalive: true
+    });
+  } catch { /* sem notificação: o convite aparece quando a pessoa abrir o app */ }
+}
+
+// --- quem recebe ---
+
+let convitesDe = null;        // a identidade cujos convites este aparelho ouve
+let pararConvites = null;
+let convitesFalharamEm = 0;   // regras antigas (sem convites): tenta de novo mais tarde
+let convitesRecebidos = {};
+let conviteNaTela = false;
+const CHAVE_CONVITES_VISTOS = "yam-convites-vistos"; // { "<código>:<em>": quando respondeu }
+
+function escutarConvites() {
+  const u = lerUsuario();
+  const id = u && u.id ? u.id : null;
+  if (id === convitesDe || !auth.currentUser) return;
+  if (Date.now() - convitesFalharamEm < 5 * 60 * 1000) return;
+  if (pararConvites) pararConvites();
+  pararConvites = null;
+  convitesDe = id;
+  convitesRecebidos = {};
+  if (!id) return;
+  pararConvites = onValue(ref(db, `convites/${id}`), snap => {
+    convitesRecebidos = snap.val() || {};
+    mostrarConvite();
+  }, () => {
+    convitesDe = null;
+    pararConvites = null;
+    convitesFalharamEm = Date.now();
+  });
+}
+
+function convitesVistos() {
+  try { return JSON.parse(localStorage.getItem(CHAVE_CONVITES_VISTOS)) || {}; } catch { return {}; }
+}
+
+function marcarConviteVisto(codigo, c) {
+  const vistos = convitesVistos();
+  vistos[`${codigo}:${c.em}`] = Date.now();
+  for (const [k, quando] of Object.entries(vistos)) if (!(Date.now() - quando < 2 * DIA)) delete vistos[k];
+  try { localStorage.setItem(CHAVE_CONVITES_VISTOS, JSON.stringify(vistos)); } catch {}
+}
+
+function esquecerConvite(codigo, c) {
+  marcarConviteVisto(codigo, c);
+  if (convitesDe) remove(ref(db, `convites/${convitesDe}/${codigo}`)).catch(() => {});
+}
+
+// Os convites que valem: recentes, ainda não respondidos e de outra sala (o mais novo primeiro).
+function convitesParaMostrar(agora = Date.now()) {
+  const vistos = convitesVistos();
+  return Object.entries(convitesRecebidos || {})
+    .filter(([codigo, c]) => /^\d{5}$/.test(codigo) && c && typeof c.de === "string" && typeof c.em === "number" &&
+      agora - c.em < VALIDADE_DO_CONVITE && !vistos[`${codigo}:${c.em}`] && !(sessao && sessao.codigo === codigo))
+    .sort(([, a], [, b]) => b.em - a.em);
+}
+
+function mostrarConviteDepois(ms) {
+  const t = setTimeout(mostrarConvite, ms);
+  if (t && t.unref) t.unref();
+}
+
+async function mostrarConvite() {
+  if (conviteNaTela) return;
+  const candidatos = convitesParaMostrar();
+  if (!candidatos.length) return;
+  // outra janela aberta (uma pergunta, criar sala, boas-vindas…): mostra depois
+  if (document.querySelector(".janela:not([hidden]), .boas-vindas:not([hidden])")) { mostrarConviteDepois(4000); return; }
+  const [codigo, c] = candidatos[0];
+  conviteNaTela = true;
+  let deNovo = true;
+  try {
+    const sala = (await comLimite(lerDoBanco(`partidas/${codigo}`))).val();
+    const u = lerUsuario();
+    const dispensados = dispensadosDe(sala);
+    const naSala = sala ? jogadoresDe(sala).filter(j => !dispensados[j.uid]) : [];
+    const jaEstou = naSala.some(j => u && j.chave === u.chave && j.fora !== true);
+    if (!sala || !sala.criador || sala.revelada || sala.encerrada || jaEstou) {
+      esquecerConvite(codigo, c); // a sala acabou (ou já estou nela por outro aparelho)
+      return;
+    }
+    const comoJoga = modoDaSala(sala) === "vez" ? "cada um na sua vez" : "todos ao mesmo tempo";
+    const resposta = await perguntar({
+      titulo: `${c.de} está te convidando para jogar!`,
+      texto: `Sala ${codigo} · ${comoJoga} · ${sala.iniciada === false ? "esperando começar" : "a partida já começou"}.` +
+        (naSala.length ? `\nNa sala: ${juntarNomes(naSala.map(j => j.nome))}.` : ""),
+      sim: "Entrar na partida", nao: "Agora não"
+    });
+    // a pergunta foi trocada por outra (não foi a pessoa que respondeu): pergunta de novo depois
+    if (resposta === false && !$("janela-pergunta").hidden) {
+      deNovo = false;
+      mostrarConviteDepois(4000);
+      return;
+    }
+    esquecerConvite(codigo, c);
+    if (resposta === true) await entrarPeloConvite(codigo);
+  } catch {
+    deNovo = false; // sem conexão: aparece na próxima mudança dos convites
+  } finally {
+    conviteNaTela = false;
+    if (deNovo && convitesParaMostrar().length) mostrarConviteDepois(600);
+  }
+}
+
+// Entrar pelo convite: como "Entrar em sala", com o código já preenchido.
+async function entrarPeloConvite(codigo) {
+  if (sessao) {
+    if (sessao.codigo === codigo) return;
+    if (!await sairPerguntando({ paraOutra: true })) return;
+  }
+  abrir("entrar");
+  $("familia-codigo").value = codigo;
+  await acaoJanela("entrar");
+}
+
+// avisos/<identidade>/<aparelho> = a inscrição de push deste aparelho, para o
+// convite chegar com o app fechado. Só grava quem é o dono do nome agora (as
+// regras conferem); renova uma vez por semana. Avisos desligados: apaga.
+const CHAVE_AVISOS_CONVITE = "yam-avisos-convite"; // { marca: "<identidade>|<endpoint>", em }
+async function publicarAvisosDoConvite() {
+  const u = lerUsuario();
+  if (!u || !u.id || !auth.currentUser) return;
+  let guardado = null;
+  try { guardado = JSON.parse(localStorage.getItem(CHAVE_AVISOS_CONVITE)); } catch {}
+  try {
+    if (!avisosLigados()) {
+      if (guardado && guardado.marca) {
+        await comLimite(remove(ref(db, `avisos/${guardado.marca.split("|")[0]}/${minhaUid()}`)));
+        localStorage.removeItem(CHAVE_AVISOS_CONVITE);
+      }
+      return;
+    }
+    const inscricao = await inscricaoPush();
+    const marca = `${u.id}|${inscricao.endpoint}`;
+    if (guardado && guardado.marca === marca && Date.now() - (Number(guardado.em) || 0) < 7 * DIA) return;
+    await comLimite(set(ref(db, `avisos/${u.id}/${minhaUid()}`), { ...inscricao, em: serverTimestamp() }));
+    localStorage.setItem(CHAVE_AVISOS_CONVITE, JSON.stringify({ marca, em: Date.now() }));
+  } catch { /* não é o dono do nome agora, ou sem conexão: tenta na próxima */ }
+}
+
 async function sairPerguntando({ paraOutra = false } = {}) {
   const emAndamento = partida && !antesDeComecar() && !partida.revelada && !partida.encerrada;
   const eu = partida && partida.jogadores && partida.jogadores[minhaUid()];
@@ -1248,6 +1510,7 @@ async function acaoJanela(tipo = modoJanela) {
     fecharJanela();
     mostrarTela("tela-jogo"); // podia estar na tela inicial
     atualizarBarra();
+    publicarAvisosDoConvite(); // agora este aparelho é o dono do nome
     if (registrouAgora) {
       avisar(`"${nome}" agora é o seu nome de usuário: ninguém mais pode usar. ` +
         `Se trocar de aparelho, recupere com o código ${lerUsuario().codigo}. ` +
@@ -1687,6 +1950,7 @@ async function avisarProximo(texto) {
 
 // Grava (ou apaga) na sala a inscrição de push deste celular.
 async function avisosMudaram() {
+  publicarAvisosDoConvite();
   if (!sessao || !partida || !comVez()) return;
   const caminho = `partidas/${sessao.codigo}/jogadores/${minhaUid()}`;
   if (!avisosLigados()) {
@@ -2394,7 +2658,7 @@ window.familia = {
   escolherModo, podeJogar, porQueNaoPode, podeDesfazer, mesaMudou, recuperar, trocarNome, avisosMudaram,
   historicoMudou, sincronizarHistorico, registrarNomeSePrecisar, alternarReacoes, reagir, lerRanking,
   abrirChat, fecharChat, enviarMensagem, comecarPartida, voltarParaSala, continuarSemQuemFalta,
-  rodadasQueFaltam,
+  rodadasQueFaltam, abrirConvites, fecharConvites, filtrarConvites,
   jogadoresNaSala: () => (partida ? jogadoresDe(partida).filter(j => !dispensadosDe(partida)[j.uid]).length : 0),
   soDadosDoApp: () => !!(sessao && partida && !partida.revelada && !partida.encerrada && soDadosDaSala()),
   ativa: () => !!sessao,
@@ -2411,4 +2675,5 @@ setTimeout(() => {
 }, 2500);
 if (sessao) usuario().then(escutar).catch(e => atualizarBarra(mensagemDeErro(e)));
 usuario().then(escutarFotos).catch(() => {});
+usuario().then(() => { escutarConvites(); publicarAvisosDoConvite(); }).catch(() => {});
 { const t = setTimeout(() => { limparSalasAoAbrir(); porSalasAntigasNaLista(); }, 8000); if (t && t.unref) t.unref(); } // depois de abrir, sem atrasar nada

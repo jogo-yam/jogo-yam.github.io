@@ -168,3 +168,43 @@ test("regras: sem login, nada", { skip: pular }, async () => {
   const r = await fetch(`http://${HOST}/abertas.json?ns=${NS}`);
   assert.equal(r.ok, false);
 });
+
+test("regras: convite só de quem está na sala, com o próprio nome; quem foi convidado lê e apaga", { skip: pular }, async () => {
+  const codigo = await salaDaAna();
+  await gravar("admin", "identidades/jcaio", { nome: "Caio", chave: "caio" });
+  await gravar("admin", "usuarios/caio", { dono: "uidCaio", segredo: "c".repeat(64), nome: "Caio" });
+  const convite = (de, uid, extra = {}) => ({ de, deUid: uid, em: { ".sv": "timestamp" }, ...extra });
+  const caminho = `convites/jcaio/${codigo}`;
+  assert.equal(await gravar("uidX", caminho, convite("Xis", "uidX")), "negado", "quem não está na sala não convida");
+  assert.equal(await gravar("uidBia", caminho, convite("Ana", "uidBia")), "negado", "com o nome de outra pessoa, não");
+  assert.equal(await gravar("uidBia", caminho, convite("Bia", "uidAna")), "negado", "deUid tem de ser quem grava");
+  assert.equal(await gravar("uidBia", caminho, { ...convite("Bia", "uidBia"), em: 5 }), "negado", "a hora é a do servidor");
+  assert.equal(await gravar("uidBia", caminho, convite("Bia", "uidBia", { lixo: 1 })), "negado", "só os campos do convite");
+  assert.equal(await gravar("uidBia", `convites/jninguem/${codigo}`, convite("Bia", "uidBia")), "negado", "só para quem tem nome no app");
+  assert.equal(await gravar("uidBia", caminho, convite("Bia", "uidBia", { deId: "jbia" })), "ok");
+  assert.equal((await ler("uidQualquer", caminho)).de, "Bia", "com login, lê");
+  assert.equal(await apagar("uidX", caminho), "negado", "outra pessoa não apaga um convite novo");
+  assert.equal(await apagar("uidCaio", caminho), "ok", "quem foi convidado (dono do nome) apaga");
+  assert.equal(await gravar("uidBia", caminho, convite("Bia", "uidBia")), "ok");
+  assert.equal(await apagar("uidBia", caminho), "ok", "quem convidou desfaz");
+  // sala que já acabou: não convida
+  const acabou = await salaDaAna({ revelada: true });
+  assert.equal(await gravar("uidBia", `convites/jcaio/${acabou}`, convite("Bia", "uidBia")), "negado");
+  // convite velho (mais de 6 h): qualquer um tira (o servidor limpa todo dia)
+  await gravar("admin", caminho, { de: "Bia", deUid: "uidBia", em: Date.now() - 7 * 60 * 60 * 1000 });
+  assert.equal(await apagar("uidX", caminho), "ok");
+});
+
+test("regras: avisos do convite só no próprio aparelho, de quem é dono do nome", { skip: pular }, async () => {
+  await gravar("admin", "identidades/jdani", { nome: "Dani", chave: "dani" });
+  await gravar("admin", "usuarios/dani", { dono: "uidDani", segredo: "d".repeat(64), nome: "Dani" });
+  const inscricao = { endpoint: "https://fcm.googleapis.com/wp/x", p256dh: "BAbc", auth: "xyz", em: { ".sv": "timestamp" } };
+  assert.equal(await gravar("uidDani", "avisos/jdani/uidDani", inscricao), "ok");
+  assert.equal(await gravar("uidX", "avisos/jdani/uidX", inscricao), "negado", "quem não é dono do nome");
+  assert.equal(await gravar("uidX", "avisos/jdani/uidDani", inscricao), "negado", "no aparelho dos outros");
+  assert.equal(await gravar("uidDani", "avisos/jdani/uidDani", { ...inscricao, endpoint: "http://x" }), "negado", "só https");
+  assert.equal(await gravar("uidDani", "avisos/jdani/uidDani", { ...inscricao, lixo: 1 }), "negado");
+  assert.equal((await ler("uidQualquer", "avisos/jdani")).uidDani.endpoint, inscricao.endpoint, "com login, lê (o servidor de avisos)");
+  await gravar("admin", "usuarios/dani/dono", "uidDaniTablet"); // o nome foi para o tablet
+  assert.equal(await apagar("uidDani", "avisos/jdani/uidDani"), "ok", "o próprio aparelho sempre pode apagar");
+});

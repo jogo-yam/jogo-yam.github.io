@@ -9,7 +9,8 @@
 //
 // Todo dia, sozinho, avisa quem pausou no último dia da sala e apaga as salas
 // vencidas (tarefaDiaria, mais abaixo). A cada 5 minutos, avisa quem criou a
-// sala quando a vez está parada (vigiarVezes).
+// sala quando a vez está parada (vigiarVezes). Quem convida alguém para a sala
+// chama POST /convite, e a pessoa recebe a notificação do convite.
 //
 // Segredos (guardados na Cloudflare): VAPID_PRIVADA (chave privada, JWK) e
 // FIREBASE_RENOVAR (login do visitante anônimo do servidor; opcional).
@@ -236,6 +237,56 @@ export async function tratarPausa(pedido, env, agora = Date.now(), buscar = fetc
   return { status: enviados ? 200 : 502, motivo: `avisados ${enviados} de ${alvos.length}` };
 }
 
+// ---------- o pedido "convidei alguém" ----------
+// POST /convite { codigo, token, para }: quem está na sala acabou de gravar
+// convites/<para>/<codigo> (para = a identidade de quem foi convidado). O
+// servidor confere no banco que o convite é de quem chamou, é de agora e a sala
+// está de pé, e manda a notificação para os aparelhos da pessoa que ligaram os
+// avisos (avisos/<para>/<aparelho>). O nome de quem convida vem da sala.
+
+const CONVITE_NOVO = 2 * 60 * 1000;
+const convitesAvisados = new Map(); // "<para>:<codigo>:<em>" -> quando (não repete o mesmo convite)
+
+export async function tratarConvite(pedido, env, agora = Date.now(), buscar = fetch) {
+  const { codigo, token, para } = pedido || {};
+  if (!/^\d{5}$/.test(String(codigo)) || typeof token !== "string" || !/^[A-Za-z0-9_-]{1,40}$/.test(String(para))) {
+    return { status: 400, motivo: "pedido inválido" };
+  }
+  const quemChamou = uidDoToken(token);
+  const com = caminho => `${env.FIREBASE_DB}/${caminho}.json?auth=${encodeURIComponent(token)}`;
+  const r = await buscar(com(`convites/${para}/${codigo}`));
+  if (!r.ok) return { status: 403, motivo: "sem acesso ao convite" };
+  const convite = await r.json();
+  if (!convite || convite.deUid !== quemChamou) return { status: 403, motivo: "convite não é de quem chamou" };
+  if (typeof convite.em !== "number" || Math.abs(agora - convite.em) > CONVITE_NOVO) return { status: 204, motivo: "convite antigo" };
+  const marca = `${para}:${codigo}:${convite.em}`;
+  for (const [k, quando] of convitesAvisados) if (agora - quando > CONVITE_NOVO * 2) convitesAvisados.delete(k);
+  if (convitesAvisados.has(marca)) return { status: 204, motivo: "já avisado" };
+
+  const s = await buscar(com(`partidas/${codigo}`));
+  if (!s.ok) return { status: 403, motivo: "sem acesso à sala" };
+  const sala = await s.json();
+  const eu = sala && sala.jogadores && sala.jogadores[quemChamou];
+  if (!temNome(eu)) return { status: 403, motivo: "não está na sala" };
+  if (sala.revelada || sala.encerrada) return { status: 204, motivo: "a partida acabou" };
+
+  const a = await buscar(com(`avisos/${para}`));
+  const aparelhos = a.ok ? Object.values((await a.json()) || {}).filter(i => i && typeof i.endpoint === "string" && i.p256dh && i.auth) : [];
+  if (!aparelhos.length) return { status: 204, motivo: "não pediu avisos" };
+  convitesAvisados.set(marca, agora);
+  const dados = {
+    tipo: "convite",
+    titulo: "Convite para jogar YAM",
+    texto: `${eu.nome} está te convidando para jogar! Toque para entrar na sala ${codigo}.`,
+    codigo: String(codigo)
+  };
+  let enviados = 0;
+  for (const i of aparelhos) {
+    try { if ((await enviarPush(i, dados, env, buscar)).ok) enviados++; } catch { /* segue para o próximo */ }
+  }
+  return { status: enviados ? 200 : 502, motivo: `avisados ${enviados} de ${aparelhos.length}` };
+}
+
 // ---------- todo dia: o prazo de quem pausou e a limpeza ----------
 // O app põe cada sala nova em abertas/<código>. Uma vez por dia (cron, no fim da
 // tarde no Brasil) o servidor entra no Firebase como visitante anônimo e, para
@@ -362,6 +413,18 @@ export async function tarefaDiaria(env, agora = Date.now(), buscar = fetch) {
       feito.avisados += await avisarPrazo(codigo, sala, env, agora, buscar);
     } catch { /* segue para a próxima sala */ }
   }
+  // convites de mais de 1 dia (quem foi convidado não abriu o app): saem do banco
+  feito.convites = 0;
+  try {
+    const r = await buscar(com("convites"));
+    const todos = r.ok ? (await r.json()) || {} : {};
+    for (const [para, salas] of Object.entries(todos)) {
+      for (const [codigo, c] of Object.entries(salas || {})) {
+        if (c && typeof c.em === "number" && c.em > agora - UM_DIA) continue;
+        if ((await buscar(com(`convites/${para}/${codigo}`), { method: "DELETE" })).ok) feito.convites++;
+      }
+    }
+  } catch { /* fica para amanhã */ }
   return { status: 200, motivo: JSON.stringify(feito), feito };
 }
 
@@ -382,7 +445,7 @@ export default {
     const cors = cabecalhosCors(request.headers.get("Origin") || "", env);
     if (request.method === "OPTIONS") return new Response(null, { status: 204, headers: cors });
     const url = new URL(request.url);
-    const tratar = { "/vez": tratarVez, "/pausa": tratarPausa }[url.pathname];
+    const tratar = { "/vez": tratarVez, "/pausa": tratarPausa, "/convite": tratarConvite }[url.pathname];
     if (request.method !== "POST" || !tratar) {
       return new Response("YAM avisos", { status: url.pathname === "/" ? 200 : 404, headers: cors });
     }

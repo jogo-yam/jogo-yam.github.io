@@ -4078,3 +4078,41 @@ tbody td.riscando::after {
 }
 :root[data-letra="grande"] #total-geral-final[data-rodadas]::before { font-size: 12px; }
 :root[data-letra="grande"] #total-geral-final[data-rodadas]::after { font-size: 15px; }
+
+/* ---------- convidar para a sala (quem já tem o app) ---------- */
+.caixa-convidar { max-width: 380px; }
+.caixa-convidar .dica { margin: 0 0 12px; }
+.caixa-convidar input[type="search"] { margin: 0 0 10px; height: 42px; font-size: 16px; }
+.convidar-lista {
+  max-height: 46vh;
+  overflow-y: auto;
+  margin: 0 0 12px;
+  padding: 0;
+  list-style: none;
+  text-align: left;
+  border: 1px solid var(--borda);
+  border-radius: 10px;
+}
+.convidar-lista li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 10px 8px 12px;
+  font-weight: 600;
+}
+.convidar-lista li + li { border-top: 1px solid var(--borda); }
+.convidar-lista button {
+  flex: none;
+  min-height: 36px;
+  padding: 6px 14px;
+  font-size: 14px;
+}
+.convidar-lista button.convidado {
+  background: transparent;
+  box-shadow: none;
+  color: var(--texto-suave);
+  border-color: transparent;
+}
+.convidar-vazio { margin: 4px 0 14px; }
+#convidar-codigo { font-variant-numeric: tabular-nums; letter-spacing: 0.04em; }

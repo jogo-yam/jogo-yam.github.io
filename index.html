@@ -20,14 +20,14 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="theme-color" content="#f4ecd8" media="(prefers-color-scheme: light)">
   <meta name="theme-color" content="#121413" media="(prefers-color-scheme: dark)">
-  <link rel="manifest" href="manifest.json?v=140">
+  <link rel="manifest" href="manifest.json?v=141">
   <link rel="icon" type="image/png" sizes="32x32" href="icone-mesa-32.png">
   <link rel="apple-touch-icon" href="icone-mesa-apple-180.png">
 
   <link rel="preload" href="fontes/nunito.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="preload" href="fontes/fredoka.woff2" as="font" type="font/woff2" crossorigin>
   <!-- ?v= é a versão do app (igual ao VERSAO do app.js; um teste confere): versão nova, endereço novo -->
-  <link rel="stylesheet" href="style.css?v=140">
+  <link rel="stylesheet" href="style.css?v=141">
 
   <!-- Aplica o tema escolhido antes de desenhar a página, para não piscar. -->
   <meta name="apple-mobile-web-app-capable" content="yes">
@@ -616,7 +616,7 @@
     <button id="sala-espera-comecar" class="principal largo" onclick="familia.comecarPartida()"><svg class="icone" aria-hidden="true"><use href="#i-dado"/></svg>Começar partida</button>
     <button id="sala-espera-sem-eles" class="largo" onclick="familia.continuarSemQuemFalta()" hidden>Seguir sem quem falta</button>
     <div class="fim-acoes">
-      <button onclick="familia.compartilharCodigo()"><svg class="icone" aria-hidden="true"><use href="#i-enviar"/></svg>Convidar</button>
+      <button onclick="familia.abrirConvites()"><svg class="icone" aria-hidden="true"><use href="#i-enviar"/></svg>Convidar</button>
       <button class="botao-conversa" onclick="familia.abrirChat()"><svg class="icone" aria-hidden="true"><use href="#i-chat"/></svg>Conversa<span id="sala-espera-novas" class="chat-contador"></span></button>
     </div>
     <button class="link" onclick="familia.confirmarSair()">Sair da sala</button>
@@ -714,6 +714,19 @@
     <button class="largo escolha-sala" onclick="escolherSala('entrar')"><svg class="icone" aria-hidden="true"><use href="#i-entrar"/></svg>Entrar em sala
       <small>Alguém já criou e te passou o código</small></button>
     <button class="link" onclick="fecharEscolhaSala()">Cancelar</button>
+  </div>
+</div>
+
+<!-- Convidar para a sala quem já tem o app: o convite aparece no app da pessoa -->
+<div id="janela-convidar" class="janela" hidden onclick="if (event.target === this) familia.fecharConvites()">
+  <div class="janela-caixa caixa-convidar" role="dialog" aria-modal="true" aria-labelledby="convidar-titulo">
+    <h2 id="convidar-titulo">Convidar para a sala</h2>
+    <p class="dica">Quem tem o app recebe o convite na hora, com um botão para entrar. Sem digitar código.</p>
+    <input id="convidar-busca" type="search" placeholder="Procurar pelo nome" autocomplete="off" aria-label="Procurar pelo nome" oninput="familia.filtrarConvites()" hidden>
+    <ul id="convidar-lista" class="convidar-lista"></ul>
+    <p id="convidar-vazio" class="dica convidar-vazio" role="status" hidden></p>
+    <button class="largo" onclick="familia.compartilharCodigo()"><svg class="icone" aria-hidden="true"><use href="#i-compartilhar"/></svg>Mandar o código <span id="convidar-codigo"></span></button>
+    <button class="link" onclick="familia.fecharConvites()">Fechar</button>
   </div>
 </div>
 
@@ -831,7 +844,7 @@
   </div>
 </div>
 
-<script src="app.js?v=140"></script>
+<script src="app.js?v=141"></script>
 <script>
   // Rede de segurança: se o app.js não carregou (ex.: troca de versão no meio
   // do caminho), recarrega sozinho uma vez, em vez de ficar com a tabela vazia.
@@ -845,7 +858,7 @@
     setTimeout(function () { location.replace(location.pathname + "?atualizado=" + Date.now()); }, 1500);
   })();
 </script>
-<script type="module" src="familia.js?v=140"></script>
+<script type="module" src="familia.js?v=141"></script>
 
 <!-- Service Worker -->
 <script>
