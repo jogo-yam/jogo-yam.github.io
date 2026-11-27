@@ -8,7 +8,7 @@ const rows = [
 const COLUNAS = 4;
 
 // Versão do app: igual ao número do CACHE_NAME do service-worker.js (um teste confere).
-const VERSAO = 139;
+const VERSAO = 140;
 
 // Avisos da vez com o app fechado: servidor na Cloudflare (worker/avisos.mjs).
 // Sem o endereço, a opção "Avisar a minha vez" não aparece.
@@ -723,6 +723,37 @@ function calcular() {
   atualizarTotais(body, totalGeral, state);
   marcarProximas();
   atualizarBotaoNovoJogo();
+  mostrarRodadas();
+}
+
+// ---------- quantas rodadas faltam ----------
+
+// Cada rodada é uma casa marcada (ou riscada). Sozinho: as casas vazias da
+// tabela. Em sala: quem está mais atrasado é quem diz quando o jogo acaba
+// (familia.rodadasQueFaltam), contando quem entrou no meio ou foi pulado.
+function rodadasQueFaltam() {
+  const minhas = LINHAS_JOGO.reduce((n, l) => n + [0, 1, 2, 3].filter(c => !preenchida(l, c)).length, 0);
+  const naSala = window.familia && window.familia.rodadasQueFaltam ? window.familia.rodadasQueFaltam() : null;
+  return typeof naSala === "number" ? Math.max(minhas, naSala) : minhas;
+}
+
+// [linha de cima, pequena; linha de baixo, maior] ou null (acabou)
+const textoDasRodadas = n =>
+  n <= 0 ? null : n === 1 ? ["falta só", "1 rodada"] : ["faltam", `${n} rodadas`];
+
+// Aparece no canto da linha do TOTAL GERAL (data-rodadas-*, desenhado pelo CSS).
+function mostrarRodadas() {
+  if (!totalGeral) return;
+  const texto = textoDasRodadas(rodadasQueFaltam());
+  if (texto) {
+    totalGeral.dataset.rodadasCima = texto[0];
+    totalGeral.dataset.rodadas = texto[1];
+  } else {
+    delete totalGeral.dataset.rodadasCima;
+    delete totalGeral.dataset.rodadas;
+  }
+  totalGeral.setAttribute("aria-label",
+    `Total geral: ${totalGeral.textContent}${texto ? `, ${texto.join(" ")}` : ""}`);
 }
 
 // Toda a tabela tem só valores possíveis? (usado antes de avisar a sala)

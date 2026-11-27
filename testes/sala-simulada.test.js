@@ -382,3 +382,28 @@ test("sala simulada: quem só entrou (não criou) também apaga a sala vencida a
   assert.equal(banco.ler(`abertas/${codigo}`), null, "e saiu da lista de salas abertas");
   assert.ok(banco.ler(`partidas/${outra}`), "a sala nova continua");
 });
+
+test("sala simulada: quantas rodadas faltam conta quem está mais atrasado", async () => {
+  const banco = new Banco();
+  const sozinho = celular(banco, "uidSo", "Sol");
+  assert.equal(sozinho.rodar("rodadasQueFaltam()"), 52, "tabela vazia: 52 rodadas");
+  sozinho.rodar('state["0-0"] = "3"; state["15-2"] = "0"');
+  assert.equal(sozinho.rodar("rodadasQueFaltam()"), 50, "sozinho: as casas vazias (riscada conta como jogada)");
+  assert.deepEqual([...sozinho.rodar("textoDasRodadas(1)")], ["falta só", "1 rodada"]);
+  assert.equal(sozinho.rodar("textoDasRodadas(0)"), null, "acabou: some");
+
+  const { ana, bia, caio } = await salaComTres(banco);
+  assert.equal(ana.rodar("rodadasQueFaltam()"), 52);
+  ana.marcar("0-0", 3);
+  await assentar();
+  assert.equal(ana.rodar("rodadasQueFaltam()"), 52, "Bia e Caio ainda não jogaram: a partida acaba quando eles acabarem");
+  bia.marcar("0-0", 2);
+  await assentar();
+  caio.marcar("0-0", 1);
+  await assentar();
+  for (const c of [ana, bia, caio]) assert.equal(c.rodar("rodadasQueFaltam()"), 51, `rodada 2 para ${c.nome}`);
+  ana.marcar("1-0", 4);
+  await assentar();
+  assert.equal(caio.rodar("rodadasQueFaltam()"), 51, "Ana adiantou, mas Caio ainda tem 51");
+  assert.equal(ana.rodar("rodadasQueFaltam()"), 51, "para Ana também (ela espera os outros)");
+});

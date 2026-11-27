@@ -891,6 +891,7 @@ function atualizarBolinhaDoIcone() {
 
 function atualizarBarra(erro) {
   try { atualizarBolinhaDoIcone(); } catch {}
+  try { mostrarRodadas(); } catch {}
   const barra = $("familia-barra");
   if (!barra) return;
   barra.innerHTML = "";
@@ -1812,6 +1813,20 @@ function noFinal(p = partida) {
   for (const j of ativos) if ((pulos[j.uid] || 0) > menor) saida[j.uid] = (pulos[j.uid] || 0) - menor;
   return saida;
 }
+// Rodadas que faltam para a partida da sala acabar: as casas vazias de quem
+// está mais atrasado (quem já terminou ou foi dispensado não conta; para mim,
+// a minha tabela de agora). Fora de sala ou com a partida revelada: null.
+function rodadasQueFaltam(p = partida) {
+  if (!sessao || !p || p.revelada || p.encerrada) return null;
+  const total = LINHAS_JOGO.length * 4;
+  const eu = minhaUid();
+  const dispensados = dispensadosDe(p);
+  const faltas = jogadoresDe(p).filter(j => !j.terminou && !dispensados[j.uid]).map(j => {
+    const casas = j.uid === eu ? casasMarcadas() : (typeof j.casas === "number" && Number.isFinite(j.casas) ? j.casas : 0);
+    return Math.max(0, total - casas);
+  });
+  return faltas.length ? Math.max(...faltas) : null;
+}
 const textoNoFinal = n => `+${n} no final`;
 
 // Quantas casas a sala toda já marcou (mudou: alguém jogou).
@@ -2379,6 +2394,7 @@ window.familia = {
   escolherModo, podeJogar, porQueNaoPode, podeDesfazer, mesaMudou, recuperar, trocarNome, avisosMudaram,
   historicoMudou, sincronizarHistorico, registrarNomeSePrecisar, alternarReacoes, reagir, lerRanking,
   abrirChat, fecharChat, enviarMensagem, comecarPartida, voltarParaSala, continuarSemQuemFalta,
+  rodadasQueFaltam,
   jogadoresNaSala: () => (partida ? jogadoresDe(partida).filter(j => !dispensadosDe(partida)[j.uid]).length : 0),
   soDadosDoApp: () => !!(sessao && partida && !partida.revelada && !partida.encerrada && soDadosDaSala()),
   ativa: () => !!sessao,
