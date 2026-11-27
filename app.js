@@ -8,7 +8,7 @@ const rows = [
 const COLUNAS = 4;
 
 // Versão do app: igual ao número do CACHE_NAME do service-worker.js (um teste confere).
-const VERSAO = 142;
+const VERSAO = 143;
 
 // Avisos da vez com o app fechado: servidor na Cloudflare (worker/avisos.mjs).
 // Sem o endereço, a opção "Avisar a minha vez" não aparece.
@@ -4485,31 +4485,57 @@ function contextoDeAudio() {
   } catch { return null; }
 }
 
-// Ao voltar para o app (e no primeiro toque depois disso, que o iPhone exige
-// para liberar o som), retoma o áudio. Se ele não voltar, troca por um novo:
-// o próximo som já sai pelo áudio novo (os sons gravados servem nos dois).
-function reavivarAudio() {
-  if (!audio || !somLigado || audio.state === "running") return;
+// Ao minimizar e voltar, o iPhone às vezes devolve o áudio dizendo que está
+// tocando ("running"), mas mudo para sempre (só fechando o app ele voltava), e
+// às vezes o resume() nem termina. Então, no primeiro toque depois de voltar, o
+// app não confia no áudio antigo: cria um novo dentro do toque (o iPhone só
+// libera som novo num toque) e fecha o antigo logo depois. Os sons gravados
+// servem nos dois.
+let renovarAudio = false;
+let conferindoAudio = null;
+
+function trocarAudio() {
   const velho = audio;
-  try { semErro(velho.resume()); } catch {}
-  setTimeout(() => {
-    if (audio !== velho || velho.state === "running" || document.visibilityState !== "visible") return;
-    audio = null;
-    try { semErro(velho.close()); } catch {}
-  }, 500);
+  audio = null;
+  // fecha depois: um som que já começou no antigo termina de tocar
+  if (velho) setTimeout(() => { try { semErro(velho.close()); } catch {} }, 1500);
+  const novo = contextoDeAudio();
+  if (!novo) return;
+  try { // um instante de silêncio: a saída de som já começa a andar neste toque
+    const fonte = novo.createBufferSource();
+    fonte.buffer = novo.createBuffer(1, 1, novo.sampleRate);
+    fonte.connect(novo.destination);
+    fonte.start();
+  } catch {}
+  conferirAudio(novo);
 }
-let audioPausadoAoSair = false;
+
+// Pouco depois do toque, o áudio tem que estar andando (o relógio dele avança).
+// Se não estiver, o próximo toque troca por um novo de novo.
+function conferirAudio(ctx) {
+  clearTimeout(conferindoAudio);
+  const relogio = ctx.currentTime;
+  conferindoAudio = setTimeout(() => {
+    if (audio !== ctx || document.visibilityState !== "visible") return;
+    if (ctx.state !== "running" || ctx.currentTime <= relogio) renovarAudio = true;
+  }, 600);
+}
+
 document.addEventListener("visibilitychange", () => {
-  if (document.visibilityState === "hidden") { audioPausadoAoSair = true; return; }
-  reavivarAudio();
+  if (document.visibilityState === "hidden") { if (audio) renovarAudio = true; return; }
+  // antes do primeiro toque (o som da jogada de alguém na sala), tenta o antigo
+  if (audio && audio.state !== "running") { try { semErro(audio.resume()); } catch {} }
 });
-window.addEventListener("pageshow", reavivarAudio);
-// o primeiro toque depois de voltar: retoma (ou cria um áudio novo dentro do toque)
-["pointerdown", "touchend", "keydown"].forEach(tipo => document.addEventListener(tipo, () => {
-  if (!audioPausadoAoSair && (!audio || audio.state === "running")) return;
-  audioPausadoAoSair = false;
-  if (audio && audio.state !== "running") reavivarAudio();
-  else if (!audio && somLigado) contextoDeAudio();
+window.addEventListener("pagehide", () => { if (audio) renovarAudio = true; });
+// Os toques que o iPhone aceita para liberar som (o pointerdown do dedo não
+// conta). Vêm antes do clique que toca o som, então o som já sai no áudio novo.
+["touchend", "click", "keydown"].forEach(tipo => document.addEventListener(tipo, () => {
+  if (!somLigado) return;
+  if (renovarAudio) { renovarAudio = false; trocarAudio(); }
+  else if (audio && audio.state !== "running") {
+    try { semErro(audio.resume()); } catch {}
+    conferirAudio(audio);
+  }
 }, { capture: true, passive: true }));
 
 function nota(ctx, freq, inicio, duracao, { tipo = "triangle", volume = 0.16 } = {}) {
@@ -4760,6 +4786,12 @@ function atualizarBotaoSom() {
 function alternarSom() {
   somLigado = !somLigado;
   try { localStorage.setItem(CHAVE_SOM, somLigado ? "1" : "0"); } catch {}
+  if (!somLigado && audio) { // ao ligar de novo, vem um áudio novo (dentro deste toque)
+    const velho = audio;
+    audio = null;
+    renovarAudio = false;
+    try { semErro(velho.close()); } catch {}
+  }
   atualizarBotaoSom();
   tocar("marcar"); // amostra ao ligar
 }
