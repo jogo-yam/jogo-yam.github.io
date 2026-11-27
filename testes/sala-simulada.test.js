@@ -76,6 +76,8 @@ test("sala simulada: pausar pelo botão de baixo, voltar e chamar quem ainda est
   assert.equal(banco.ler(`partidas/${codigo}/jogadores/uidBia/fora`), true, "continua na sala, como fora");
   const pausada = bia.rodar(`historico.find(p => p.codigoSala === "${codigo}")`);
   assert.ok(pausada, "a tabela dela ficou em pausa no histórico, com a sala");
+  assert.deepEqual([...pausada.jogadoresSala], ["Ana", "Caio"], "e com quem era a partida (menos ela)");
+  assert.equal(bia.rodar(`textoComQuem(historico.find(p => p.codigoSala === "${codigo}"))`), "com Ana e Caio");
   assert.equal(bia.rodar("casasMarcadas()"), 0, "e a tabela zerou para outra partida");
   assert.equal(ana.familia("pausada()"), true, "para os outros, a partida está pausada");
 
@@ -450,4 +452,27 @@ test("sala simulada: convidar quem já tem o app (a pessoa toca em Entrar e cai 
   assert.equal(eva.perguntas.length, 1);
   assert.equal(eva.familia("sessao"), null, "Eva não entrou");
   assert.equal(eva.familia("convitesParaMostrar().length"), 0, "não pergunta de novo");
+});
+
+test("sala simulada: o resumo da barra e o aviso da vez saindo junto com a jogada", async () => {
+  const banco = new Banco();
+  const { codigo, ana, bia } = await salaComTres(banco);
+  assert.equal(ana.familia("textoDoStatus()"), "3 jogadores · um de cada vez", "sem \"0 terminaram\"");
+  ana.marcar("0-0", 3);
+  await assentar();
+  const pedido = ana.enviados.find(e => e.url.endsWith("/vez"));
+  assert.ok(pedido, "pediu o aviso do próximo");
+  assert.equal(pedido.corpo.casas, 1, "com as casas de agora (o servidor não precisa esperar a gravação)");
+  assert.equal(pedido.corpo.codigo, codigo);
+  assert.equal(vezEm(bia), "uidBia");
+});
+
+test("sala simulada: partida em pausa de antes (sem os nomes) busca com quem era na sala", async () => {
+  const banco = new Banco();
+  const { codigo, bia } = await salaComTres(banco);
+  assert.deepEqual([...await bia.familia(`lerNomesDaSala("${codigo}")`)], ["Ana", "Caio"]);
+  assert.deepEqual([...await bia.familia('lerNomesDaSala("99999")')], [], "sala que não existe mais");
+  assert.equal(bia.rodar('textoComQuem({ codigoSala: "12345" })'), "Sala 12345", "sem os nomes: o código da sala");
+  assert.equal(bia.rodar('textoComQuem({ jogadoresSala: ["Ana", "Bia", "Caio", "Dani", "Eva"] })'), "com Ana, Bia, Caio e mais 2");
+  assert.equal(bia.rodar('textoComQuem({ jogadoresSala: ["Ana", "Bia", "Caio", "Dani"] })'), "com Ana, Bia, Caio e Dani");
 });

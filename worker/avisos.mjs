@@ -134,7 +134,7 @@ export async function enviarPush(inscricao, dados, env, buscar = fetch) {
 
 // ---------- o pedido "passei a vez" ----------
 
-const ABERTO_HA_POUCO = 2 * 60 * 1000; // app aberto na tela há menos de 2 min: não manda push
+const ABERTO_HA_POUCO = 75 * 1000; // app na tela há menos de 75 s: não manda push (o app marca de 30 em 30 s)
 
 function uidDoToken(token) {
   try {
@@ -171,6 +171,11 @@ export async function tratarVez(pedido, env, agora = Date.now(), buscar = fetch,
     sala = await resposta.json();
     if (!sala || !sala.jogadores || !sala.jogadores[quemChamou]) return { status: 403, motivo: "não está na sala" };
     if (sala.revelada || sala.encerrada || modoDaSala(sala) !== "vez") return { status: 204, motivo: "sala sem vez" };
+    // o app pede o aviso junto com a gravação da jogada (sem esperar o banco
+    // confirmar): conta as casas novas de quem chamou, se vieram e são mais
+    const meu = sala.jogadores[quemChamou];
+    const novas = pedido.casas;
+    if (Number.isInteger(novas) && novas <= 52 && novas > (Number(meu.casas) || 0)) meu.casas = novas;
     vez = vezDaSala(sala);
     if (vez !== quemChamou || !pedido.esperar || tentativa === 3) break;
     await esperar(1500);

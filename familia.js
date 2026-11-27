@@ -909,18 +909,12 @@ function atualizarBarra(erro) {
   info.className = "familia-info";
   const titulo = document.createElement("strong");
   titulo.textContent = `Sala ${sessao.codigo}`;
+  // o resumo vai numa linha só dele, embaixo dos botões (no celular não cabia
+  // ao lado deles e ficava cortado com "…")
   const status = document.createElement("small");
-  if (erro) {
-    status.textContent = erro;
-  } else if (partida) {
-    const jogadores = jogadoresDe(partida);
-    const terminaram = jogadores.filter(j => j.terminou).length;
-    status.textContent = `${jogadores.length} jogador${jogadores.length === 1 ? "" : "es"} · ${terminaram} ${terminaram === 1 ? "terminou" : "terminaram"}` +
-      (modoDaSala() === "vez" ? " · um de cada vez" : "") + (soDadosDaSala() ? " · só dados do app" : "");
-  } else {
-    status.textContent = "Conectando…";
-  }
-  info.append(titulo, status);
+  status.className = "familia-status";
+  status.textContent = erro || textoDoStatus();
+  info.append(titulo);
   barra.appendChild(info);
 
   const chat = document.createElement("button");
@@ -950,6 +944,22 @@ function atualizarBarra(erro) {
   botaoSair.textContent = "Sair";
   botaoSair.onclick = confirmarSair;
   barra.appendChild(botaoSair);
+  barra.appendChild(status);
+}
+
+// "3 jogadores · 1 terminou · um de cada vez · só dados do app" (quem foi
+// dispensado não conta; "0 terminaram" não aparece)
+function textoDoStatus() {
+  if (!partida) return "Conectando…";
+  const dispensados = dispensadosDe(partida);
+  const jogadores = jogadoresDe(partida).filter(j => !dispensados[j.uid]);
+  const terminaram = jogadores.filter(j => j.terminou).length;
+  return [
+    `${jogadores.length} jogador${jogadores.length === 1 ? "" : "es"}`,
+    terminaram ? `${terminaram} ${terminaram === 1 ? "terminou" : "terminaram"}` : null,
+    modoDaSala() === "vez" ? "um de cada vez" : null,
+    soDadosDaSala() ? "só dados do app" : null
+  ].filter(Boolean).join(" · ");
 }
 
 // ---------- sala de espera ----------
@@ -1861,13 +1871,13 @@ function passarVez(semAviso = false) {
   const anterior = casasPublicadas;
   casasPublicadas = agora;
   const ultima = ultimaJogadaFeita();
+  // o aviso do próximo sai junto com a gravação, sem esperar o banco confirmar:
+  // vai junto quantas casas eu tenho agora, e o servidor já conta com elas
+  if (!semAviso) avisarProximo(ultima ? textoDaJogada(nomeJogador, ultima.key, ultima.valor) : `${nomeJogador} jogou.`, agora);
   update(ref(db, `partidas/${sessao.codigo}/jogadores/${minhaUid()}`), {
     casas: agora, mesa: null,
     ultima: ultima ? { ...ultima, n: agora, em: serverTimestamp() } : null
-  }).then(() => {
-    if (!semAviso) avisarProximo(ultima ? textoDaJogada(nomeJogador, ultima.key, ultima.valor) : `${nomeJogador} jogou.`);
-  })
-    .catch(() => { casasPublicadas = anterior; acompanharVez(); }); // sem conexão: tenta de novo
+  }).catch(() => { casasPublicadas = anterior; acompanharVez(); }); // sem conexão: tenta de novo
   atualizarBarraVez();
 }
 
@@ -1934,15 +1944,18 @@ async function chamarQuemPausou(motivo) {
 // (Partida pausada no último dia da sala: o servidor de avisos chama quem está
 // fora, uma vez por dia; ver avisarPrazos, no worker.)
 
-// Pede ao servidor de avisos que avise quem está na vez agora (ele confere tudo no banco).
-async function avisarProximo(texto) {
+// Pede ao servidor de avisos que avise quem está na vez agora (ele confere tudo no
+// banco). casas: quantas casas eu tenho com a jogada que acabei de fazer (a
+// gravação dela pode chegar ao banco depois deste pedido).
+async function avisarProximo(texto, casas) {
   if (!AVISOS_URL || !auth.currentUser || !sessao) return;
+  const codigo = sessao.codigo;
   try {
-    const token = await auth.currentUser.getIdToken();
+    const token = await auth.currentUser.getIdToken(); // (vem da memória; só vai à rede perto de vencer)
     await fetch(`${AVISOS_URL}/vez`, {
       method: "POST",
       headers: { "Content-Type": "text/plain" },
-      body: JSON.stringify({ codigo: sessao.codigo, token, texto }),
+      body: JSON.stringify({ codigo, token, texto, ...(Number.isInteger(casas) ? { casas } : {}) }),
       keepalive: true
     });
   } catch { /* sem aviso desta vez; o jogo segue */ }
@@ -1969,8 +1982,9 @@ async function avisosMudaram() {
       await update(ref(db, caminho), { push: inscricao });
     }
   } catch { avisosPublicados = null; }
+  guardarToken();
   marcarVisto();
-  if (!timerVisto) timerVisto = setInterval(marcarVisto, 60 * 1000);
+  if (!timerVisto) timerVisto = setInterval(marcarVisto, 30 * 1000);
 }
 
 // ---------- quem está com o app aberto (pontinho verde na bolinha) ----------
@@ -2012,11 +2026,25 @@ document.addEventListener("visibilitychange", () => marcarAberto());
 window.addEventListener("pageshow", () => marcarAberto());
 
 // "Estou com o app aberto": o servidor não manda notificação para quem está olhando.
+// (De 30 em 30 s enquanto o app está na tela; o servidor só confia por 75 s.)
 function marcarVisto() {
   if (!sessao || !auth.currentUser || !avisosLigados() || !comVez()) return;
-  update(ref(db, `partidas/${sessao.codigo}/jogadores/${minhaUid()}`), {
-    visivel: document.visibilityState === "visible", vistoEm: serverTimestamp()
-  }).catch(() => {});
+  const visivel = document.visibilityState === "visible";
+  const caminho = `partidas/${sessao.codigo}/jogadores/${minhaUid()}`;
+  update(ref(db, caminho), { visivel, vistoEm: serverTimestamp() }).catch(() => {});
+  // Saindo do app, o celular congela a página logo: a gravação acima pode não
+  // sair, e o servidor acharia que você ainda está olhando (e não avisaria a
+  // sua vez). Esta vai mesmo com a página congelada (keepalive). É um POST
+  // simples, que o navegador não precisa perguntar antes (o PATCH vai no endereço).
+  if (!visivel && tokenGuardado) {
+    try {
+      fetch(`${firebaseConfig.databaseURL}/${caminho}.json?auth=${encodeURIComponent(tokenGuardado)}&x-http-method-override=PATCH`, {
+        method: "POST",
+        body: JSON.stringify({ visivel: false, vistoEm: { ".sv": "timestamp" } }),
+        keepalive: true
+      }).catch(() => {});
+    } catch { /* sem isso, vale a gravação normal */ }
+  }
 }
 
 document.addEventListener("visibilitychange", marcarVisto);
@@ -2652,13 +2680,36 @@ function corDaMesaMudou() {
   update(ref(db, `partidas/${sessao.codigo}/jogadores/${uid}`), { corMesa: mesaAtual(), corDados: dadosAtuais() }).catch(() => {});
 }
 
+// Com quem é a partida desta sala (menos eu), na ordem em que entraram: vai junto
+// da tabela para o histórico quando ela fica em pausa.
+function nomesDaSala(codigo) {
+  if (!sessao || sessao.codigo !== codigo || !partida) return null;
+  return nomesSemMim(jogadoresDe(partida));
+}
+
+const nomesSemMim = jogadores => {
+  const eu = minhaUid();
+  const minhaChave = nomeJogador ? chaveDoNome(nomeJogador) : null;
+  return jogadores.filter(j => j.uid !== eu && !(minhaChave && j.chave === minhaChave))
+    .sort((a, b) => (a.entrouEm || 0) - (b.entrouEm || 0)).map(j => j.nome);
+};
+
+// O mesmo, lendo a sala no banco (para as partidas em pausa de antes de o app
+// anotar os nomes). Sala que já fechou: lista vazia.
+async function lerNomesDaSala(codigo) {
+  if (!/^\d{5}$/.test(String(codigo))) return [];
+  await usuario();
+  const snap = await comLimite(lerDoBanco(`partidas/${codigo}/jogadores`));
+  return nomesSemMim(jogadoresDe({ jogadores: snap.val() || {} }));
+}
+
 window.familia = {
   abrir, corDaMesaMudou, fotoMudou, fecharJanela, acaoJanela, sair, confirmarSair, sairPerguntando, compartilharCodigo,
   aoTerminar, fecharEspera, fecharPodio, jogarDeNovo, limparSalasAntigas, sincronizar, registrarResultado,
   escolherModo, podeJogar, porQueNaoPode, podeDesfazer, mesaMudou, recuperar, trocarNome, avisosMudaram,
   historicoMudou, sincronizarHistorico, registrarNomeSePrecisar, alternarReacoes, reagir, lerRanking,
   abrirChat, fecharChat, enviarMensagem, comecarPartida, voltarParaSala, continuarSemQuemFalta,
-  rodadasQueFaltam, abrirConvites, fecharConvites, filtrarConvites,
+  rodadasQueFaltam, abrirConvites, fecharConvites, filtrarConvites, nomesDaSala, lerNomesDaSala,
   jogadoresNaSala: () => (partida ? jogadoresDe(partida).filter(j => !dispensadosDe(partida)[j.uid]).length : 0),
   soDadosDoApp: () => !!(sessao && partida && !partida.revelada && !partida.encerrada && soDadosDaSala()),
   ativa: () => !!sessao,

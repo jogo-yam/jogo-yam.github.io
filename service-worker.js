@@ -1,5 +1,5 @@
 // Ao publicar mudanças, aumente a versão para limpar o cache antigo.
-const CACHE_NAME = "yam-cache-v141";
+const CACHE_NAME = "yam-cache-v142";
 const FILES_TO_CACHE = [
   "./",
   "./index.html",

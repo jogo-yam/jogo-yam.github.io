@@ -81,7 +81,7 @@ function salaCom(extra = {}) {
   };
 }
 
-async function pedir(sala, uid, buscarFirebaseOk = true) {
+async function pedir(sala, uid, buscarFirebaseOk = true, extra = {}) {
   const { tratarVez } = await carregar();
   const { jwk, publica } = chavesVapid();
   const enviados = [];
@@ -93,7 +93,7 @@ async function pedir(sala, uid, buscarFirebaseOk = true) {
     return { ok: true, status: 201 };
   };
   const env = { FIREBASE_DB: "https://teste.firebaseio.com", VAPID_PUBLICA: publica, VAPID_PRIVADA: JSON.stringify(jwk) };
-  const r = await tratarVez({ codigo: "12345", token: tokenDe(uid), texto: "Davi marcou 1 no 1" }, env, 1000000, buscar);
+  const r = await tratarVez({ codigo: "12345", token: tokenDe(uid), texto: "Davi marcou 1 no 1", ...extra }, env, 1000000, buscar);
   return { r, enviados };
 }
 
@@ -118,6 +118,8 @@ test("não avisa: sem pedir avisos, app aberto, fora da sala ou token recusado",
   assert.equal((await pedir(salaCom({ push, visivel: true, vistoEm: 1000000 - 30000 }), "davi")).enviados.length, 0, "app aberto");
   assert.equal((await pedir(salaCom({ push, visivel: true, vistoEm: 1000000 - 10 * 60000 }), "davi")).enviados.length, 1,
     "aberto há muito tempo (o celular pode ter fechado sem avisar): avisa");
+  assert.equal((await pedir(salaCom({ push, visivel: true, vistoEm: 1000000 - 90000 }), "davi")).enviados.length, 1,
+    "o app marca de 30 em 30 s: visto há 90 s já não vale como aberto");
   assert.equal((await pedir(salaCom({ push }), "joao")).r.status, 403, "quem chamou não está na sala");
   assert.equal((await pedir(salaCom({ push }), "davi", false)).r.status, 403, "Firebase recusou o token");
   const daVezDeDavi = salaCom({ push, casas: 1 });
@@ -374,4 +376,19 @@ test("convite: avisa os aparelhos de quem foi convidado, com o nome que está na
   assert.equal((await pedido("12345", "davi", "../x")).status, 400);
   assert.equal((await pedido("99999")).status, 403, "convite que não existe");
   assert.equal(enviados.length, 0);
+});
+
+test("vez: o aviso pode chegar antes da gravação da jogada (vêm as casas novas de quem chamou)", async () => {
+  const cel = celular();
+  const push = { endpoint: "https://fcm.googleapis.com/wp/abc", p256dh: cel.p256dh, auth: cel.auth };
+  // no banco, Davi ainda não gravou a jogada: a vez continua dele
+  const antes = () => { const s = salaCom({ push }); s.jogadores.davi.casas = 0; return s; };
+  assert.equal((await pedir(antes(), "davi")).enviados.length, 0, "sem as casas: a vez ainda é de quem chamou");
+  const { r, enviados } = await pedir(antes(), "davi", true, { casas: 1 });
+  assert.equal(r.status, 200, r.motivo);
+  assert.equal(enviados.length, 1, "com a jogada nova, a vez é de Maria: avisa na hora");
+  assert.equal((await pedir(antes(), "davi", true, { casas: 99 })).enviados.length, 0, "casas que não existem: não conta");
+  assert.equal((await pedir(antes(), "davi", true, { casas: "1" })).enviados.length, 0, "só número inteiro");
+  // a gravação chegou primeiro (banco já com 1): as casas do pedido não mudam nada
+  assert.equal((await pedir(salaCom({ push }), "davi", true, { casas: 1 })).enviados.length, 1);
 });

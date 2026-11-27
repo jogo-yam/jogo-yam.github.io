@@ -739,7 +739,8 @@ body {
 :root[data-letra="grande"] .destaques small,
 :root[data-letra="grande"] .lista-confrontos li.confronto .confronto-info { font-size: 15px; }
 :root[data-letra="grande"] .familia-info strong { font-size: 16px; }
-:root[data-letra="grande"] .familia-info small { font-size: 13.5px; }
+:root[data-letra="grande"] .familia-info small,
+:root[data-letra="grande"] .familia-status { font-size: 13.5px; }
 :root[data-letra="grande"] .privacidade { font-size: 16px; }
 :root[data-letra="grande"] .regras .nota { font-size: 16px; }
 :root[data-letra="grande"] .bv-slide p { font-size: 19px; }
@@ -1151,6 +1152,14 @@ button:disabled:active { box-shadow: none; transform: none; }
   color: var(--texto);
   font-weight: 600;
 }
+
+/* partida em pausa de uma sala: "com Gi Custodio, Isabela e Nathan" (pode quebrar) */
+.sala-info.sala-com {
+  white-space: normal;
+  color: var(--texto);
+  line-height: 1.35;
+}
+.sala-info.sala-com .icone { color: var(--texto-suave); }
 
 .sala-partida {
   flex-basis: 100%;
@@ -2047,11 +2056,21 @@ button.bolinha-mesa:active { transform: scale(0.92); box-shadow: none; }
 
 .familia-barra {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: center;
-  gap: 6px;
+  gap: 4px 6px;
   max-width: 700px;
   margin: 0 auto 8px;
+}
+
+/* "3 jogadores · um de cada vez · só dados do app": linha inteira, embaixo, sem cortar */
+.familia-status {
+  flex: 1 0 100%;
+  font-size: 12px;
+  line-height: 1.3;
+  color: var(--texto-suave);
+  text-align: left;
 }
 
 .familia-barra button {
@@ -3461,6 +3480,11 @@ td.mudou { animation: mudou 0.7s ease-out; }
 .item-historico .item-info > span { grid-area: data; }
 .item-historico .item-info > .sala-info { grid-area: sala; }
 .item-historico .item-comparar { margin-top: 3px; }
+/* em pausa: a etiqueta logo embaixo da data; depois com quem era e as casas */
+.item-historico.em-pausa {
+  grid-template-areas: "ficha data total" "ficha etiqueta etiqueta" "ficha sala sala" "ficha comparar comparar";
+}
+.item-historico .pela-metade { grid-area: etiqueta; }
 .item-historico .item-total { grid-area: total; white-space: nowrap; }
 .item-comparar {
   grid-area: comparar;

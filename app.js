@@ -8,7 +8,7 @@ const rows = [
 const COLUNAS = 4;
 
 // Versão do app: igual ao número do CACHE_NAME do service-worker.js (um teste confere).
-const VERSAO = 141;
+const VERSAO = 142;
 
 // Avisos da vez com o app fechado: servidor na Cloudflare (worker/avisos.mjs).
 // Sem o endereço, a opção "Avisar a minha vez" não aparece.
@@ -856,16 +856,19 @@ function salvarPartidaAtual() {
   const total = calcularTotais(state).geral;
   const existente = entradaDaPartidaAtual();
   // pela metade e de uma sala: guarda o código (para voltar e terminar depois)
+  // e com quem era (para achar a partida no histórico sem abrir uma por uma)
   const sala = !partidaCompleta() && salaDaTabela();
+  const comQuem = sala && window.familia && familia.nomesDaSala ? familia.nomesDaSala(sala.codigo) : null;
+  const comOsNomes = comQuem && comQuem.length ? { jogadoresSala: comQuem } : {};
   if (existente) {
     existente.total = total;
     existente.valores = { ...state };
-    if (sala) { existente.codigoSala = sala.codigo; if (sala.jeito) existente.jeitoSala = sala.jeito; }
-    else if (partidaCompleta()) { delete existente.codigoSala; delete existente.jeitoSala; }
+    if (sala) { existente.codigoSala = sala.codigo; if (sala.jeito) existente.jeitoSala = sala.jeito; Object.assign(existente, comOsNomes); }
+    else if (partidaCompleta()) { delete existente.codigoSala; delete existente.jeitoSala; delete existente.jogadoresSala; }
   } else {
     const id = Date.now();
     historico.unshift({ id, data: new Date().toISOString(), total, valores: { ...state }, nome: nomeJogador || undefined,
-      ...(sala ? { codigoSala: sala.codigo, ...(sala.jeito ? { jeitoSala: sala.jeito } : {}) } : {}) });
+      ...(sala ? { codigoSala: sala.codigo, ...(sala.jeito ? { jeitoSala: sala.jeito } : {}), ...comOsNomes } : {}) });
     guardarPartidaSalvaId(id);
   }
   salvarHistorico();
@@ -2111,8 +2114,9 @@ function atualizarInicio() {
     const prazo = pendente.codigoSala && textoDoPrazo(pendente.jeitoSala && pendente.jeitoSala.prazo);
     document.getElementById("inicio-terminar-titulo").textContent = prazo
       ? `Terminar a partida da sala ${pendente.codigoSala}` : `Continuar a partida de ${formatarDataCurta(pendente.data)}`;
+    const comQuem = pendente.jogadoresSala ? `${textoComQuem(pendente)} · ` : "";
     document.getElementById("inicio-terminar-sub").textContent =
-      `${casasMarcadas(pendente.valores)} de ${LINHAS_JOGO.length * 4} casas · ${prazo || `parou em ${formatarData(pendente.data)}`}`;
+      `${comQuem}${casasMarcadas(pendente.valores)} de ${LINHAS_JOGO.length * 4} casas · ${prazo || `parou em ${formatarData(pendente.data)}`}`;
   }
 
   // resumo das partidas terminadas
@@ -2300,6 +2304,7 @@ function abrirHistorico() {
       const comparar = elemento("span", "item-comparar");
       // pela metade: no lugar da média e do recorde, quantas casas já foram
       const terminada = partidaTerminada(partida);
+      if (!terminada) botao.classList.add("em-pausa");
       const prazo = !terminada && partida.codigoSala && textoDoPrazo(partida.jeitoSala && partida.jeitoSala.prazo);
       if (terminada) comparar.append(barra, doRecorde);
       else comparar.append(elemento("span", "casas-feitas",
@@ -2318,6 +2323,11 @@ function abrirHistorico() {
         const infoSala = elemento("small", partida.sala.posicao === 1 ? "sala-info venceu" : "sala-info");
         mostrarTextoDaSala(infoSala, partida.sala);
         esquerda.appendChild(infoSala);
+      } else if (!terminada && (partida.jogadoresSala || partida.codigoSala)) {
+        // em pausa, de uma sala: com quem era (ou, sem os nomes, o código da sala)
+        const comQuem = elemento("small", "sala-info sala-com", textoComQuem(partida));
+        comQuem.insertAdjacentHTML("afterbegin", icone("sala"));
+        esquerda.appendChild(comQuem);
       }
       total.className = "item-total";
       botao.append(ficha, esquerda, total, comparar);
@@ -2328,6 +2338,42 @@ function abrirHistorico() {
   }
 
   mostrarTela("tela-historico");
+  completarNomesDasPausadas();
+}
+
+// "com Gi Custodio, Isabela e Nathan" (de 4 em diante: "com Ana, Bia, Caio e mais 2");
+// sem os nomes (partida pausada antes desta versão), "Sala 12345".
+function textoComQuem(p) {
+  const nomes = Array.isArray(p.jogadoresSala) ? p.jogadoresSala.filter(n => typeof n === "string" && n) : [];
+  if (!nomes.length) return p.codigoSala ? `Sala ${p.codigoSala}` : "";
+  const lista = nomes.length > 4 ? [...nomes.slice(0, 3), `mais ${nomes.length - 3}`] : nomes;
+  return `com ${lista.length === 1 ? lista[0] : `${lista.slice(0, -1).join(", ")} e ${lista[lista.length - 1]}`}`;
+}
+
+// Partidas em pausa guardadas antes de o app anotar com quem eram: busca os
+// nomes na sala (se ela ainda existe), uma vez por sala, e mostra.
+const salasJaProcuradas = new Set();
+function completarNomesDasPausadas() {
+  if (!window.familia || !familia.lerNomesDaSala) return;
+  const faltam = historico.filter(p => !partidaTerminada(p) && p.codigoSala && !p.jogadoresSala && !salasJaProcuradas.has(p.codigoSala));
+  if (!faltam.length) return;
+  const codigos = [...new Set(faltam.map(p => p.codigoSala))];
+  codigos.forEach(c => salasJaProcuradas.add(c));
+  Promise.all(codigos.map(c => familia.lerNomesDaSala(c).then(nomes => [c, nomes]).catch(() => [c, null]))).then(achados => {
+    let mudou = false;
+    for (const [codigo, nomes] of achados) {
+      if (!nomes || !nomes.length) continue;
+      for (const p of historico) {
+        if (p.codigoSala === codigo && !partidaTerminada(p) && !p.jogadoresSala) { p.jogadoresSala = nomes; mudou = true; }
+      }
+    }
+    if (!mudou) return;
+    salvarHistorico();
+    try {
+      if (!document.getElementById("tela-historico").hidden) abrirHistorico();
+      atualizarInicio();
+    } catch {}
+  });
 }
 
 // A tela da partida mostra uma partida do histórico ou, no pódio, a tabela
